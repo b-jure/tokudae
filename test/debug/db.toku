@@ -1,0 +1,784 @@
+local debug = import("debug");
+
+local fn dostring(s) { return assert(load(s))(); }
+
+print("testing debug library and debug information\n");
+
+{ local a=1; }
+
+assert(!debug.gethook());
+
+local testline = 12;        /// line where 'test' is defined
+local fn test(s, l, p) {    /// this must be line 14
+    gc();  /// avoid gc during trace
+    local fn f(event, line) {
+        assert(event == "line");
+        local l = list.remove(l, 0);
+        if (p) print(l, line);
+        assert(l == line, "wrong trace!!");
+    }
+    debug.sethook(f,"l"); load(s)(); debug.sethook();
+    assert(l.len == 0);
+}
+
+local Cprint = (__c and __c.print) or print;
+
+{ /// test basic cases for 'getinfo'
+    assert(!pcall(debug.getinfo, Cprint, "X"));  /// invalid option
+    assert(!pcall(debug.getinfo, 0, ">"));  /// invalid option
+    assert(!debug.getinfo(1000));  /// out of range level
+    assert(!debug.getinfo(-1));    /// out of range level
+    local a = debug.getinfo(Cprint);
+    print(a.what, a.shortsrc);
+    assert(a.what == "C" and a.shortsrc == "[C]");
+    a = debug.getinfo(Cprint, "L");
+    assert(a.activelines == nil);
+    local b = debug.getinfo(test, "sfL");
+    assert(b.name == nil and b.what == "Tokudae" and
+           b.defline == testline and
+           b.lastdefline == b.defline + 10 and
+           b.func == test and !reg.find(b.shortsrc, "%["));
+    assert(b.activelines[b.defline + 1] and
+           b.activelines[b.lastdefline]);
+    assert(!b.activelines[b.defline] and
+           !b.activelines[b.lastdefline + 1]);
+    print("+");
+}
+
+
+
+{ /// test file and string names truncation
+    local a = "fn f() {}";
+    local fn dostring(s, x) { return load(s, x)(); }
+    dostring(a);
+    print("----");
+    assert(debug.getinfo(f).shortsrc == string.fmt("[string \"%s\"]", a));
+    dostring(a..string.fmt("; %s\n=1;", string.repeat("p", 400)));
+    assert(reg.find(debug.getinfo(f).shortsrc, "^%[string [^\n]*%.%.%.\"%]$"));
+    dostring(a..string.fmt("; %s=1;", string.repeat("p", 400)));
+    assert(reg.find(debug.getinfo(f).shortsrc, "^%[string [^\n]*%.%.%.\"%]$"));
+    dostring("\n"..a);
+    assert(debug.getinfo(f).shortsrc == "[string \"...\"]");
+    dostring(a, "");
+    assert(debug.getinfo(f).shortsrc == "[string \"\"]");
+    dostring(a, "@xuxu");
+    assert(debug.getinfo(f).shortsrc == "xuxu");
+    dostring(a, "@"..string.repeat("p", 1000).."t");
+    assert(reg.find(debug.getinfo(f).shortsrc, "^%.%.%.p*t$"));
+    dostring(a, "=xuxu");
+    assert(debug.getinfo(f).shortsrc == "xuxu");
+    dostring(a, string.fmt("=%s", string.repeat("x", 500)));
+    assert(reg.find(debug.getinfo(f).shortsrc, "^x*$"));
+    dostring(a, "=");
+    assert(debug.getinfo(f).shortsrc == "");
+    __G.a = nil; __G.f = nil;
+    __G[string.repeat("p", 400)] = nil;
+    print("+");
+}
+
+
+loop {
+    local g = {x = fn() {
+        local a = debug.getinfo(2);
+        assert(a.name == "f" and a.namewhat == "local");
+        a = debug.getinfo(1);
+        assert(a.name == "x" and a.namewhat == "field");
+        return "xixi";
+    }};
+    local f = fn() { return 1+1 and (!1 or g.x()); };
+    assert(f() == "xixi");
+    g = debug.getinfo(f);
+    assert(g.what == "Tokudae" and g.func == f and g.namewhat == "" and !g.name);
+
+    fn f(x, name) {   /// local!
+        name = name or "f";
+        local a = debug.getinfo(1);
+        assert(a.name == name and a.namewhat == "local");
+        return x;
+    }
+
+    /// breaks in different conditions
+    if (3>4) break; f();
+    if (3<4) a=1; else break; f();
+    while (1) { local x=10; break; } f();
+    local b = 1;
+    if (3>4) return math.sin(1); f();
+    local a = 3<4; f();
+    a = 3<4 or 1; f();
+    loop { local x=20; if (4>3) f(); else break; f(); break; }
+    g = {};
+    f(g).x = f(2) and f(10)+f(9);
+    assert(g.x == f(19));
+    fn g(x) { if (!x) return 3; return (x("a", "x")); }
+    assert(g(f) == "a");
+
+    /// continue in different conditions
+    loop {
+        if (3>4) continue; f();
+        if (3<4) a=1; else continue; f();
+        local b = 1;
+        a = 3<4; f();
+        a = 3<4 or 1; f();
+        loop { local x=20; if (4>3) f(); else continue; f(); break; }
+        break;
+    }
+    break;
+}
+
+
+test([=[if
+(math.sin(1))
+  a=1;
+else
+  a=2;
+]=], [2,3,5]);
+
+
+test([=[
+local fn foo() {
+}
+foo();
+A = 1;
+A = 2;
+A = 3;
+]=], [1, 3, 2, 4, 5, 6]);
+__G.A = nil;
+
+
+/// optimized 'if'
+test([=[
+if (nil)
+  a=1;
+else
+  a=2;
+]=], [4]);
+
+test([=[a=1;
+loop {
+  a=a+1;
+  if (a==3) break;
+}
+]=], [1,3,4,3,4,5]);
+
+test([=[ {
+  return;
+}
+]=], [2]);
+
+test([=[local a;
+a=1;
+while (a<=3)
+  a=a+1;
+]=], [1,2,3,4,3,4,3,4,3,4]);
+
+test([=[while (math.sin(1))
+  if (math.sin(1))
+    break;
+a=1;]=], [1,2,3,4]);
+
+test([=[foreach i in range(0,3)
+  a=i;
+]=], [1,2,1,2,1,2,1,2]);
+
+test([=[foreach i,v in indices(["a","b"])
+  a=tostr(i) .. v;
+]=], [1,2,1,2,1,2]);
+
+test([=[for (local i=0;
+            i<3;
+            i=i+1)
+        a=1;
+]=], [1,2,4,3,2,4,3,2,4,3,2,4]);
+
+/// code jumps back
+test([=[for (local i=0; i<3; i=i+1) a=1;]=], [1,1,1,1,1,1,1]);
+
+__G.a = nil;
+
+
+{ /// testing line info/trace with large gaps in source
+
+    local a = [1, 2, 3, 10, 124, 125, 126, 127, 128, 129, 130,
+               255, 256, 257, 500, 1000];
+    local s = [=[
+        local b = [10];
+        a = b[0] X + Y b[0];
+        b = 4;
+    ]=];
+    foreach _, i in indices(a) {
+        local subs = {X = string.repeat("\n", i)};
+        foreach _, j in indices(a) {
+            subs.Y = string.repeat("\n", j);
+            local s = reg.gsub(s, "[XY]", subs);
+            test(s, [1, 2, 2 + i, 2 + i + j, 2 + i, 2 + i + j, 3 + i + j]);
+        }
+    }
+}
+__G.a = nil;
+
+
+{ /// testing active lines
+    local fn checkactivelines(f, lines) {
+        local t = debug.getinfo(f, "sL");
+        foreach _, l in indices(lines) {
+            l = l + t.defline;
+            assert(t.activelines[l]);
+            t.activelines[l] = undef;
+        }
+        assert(nextfield(t.activelines) == nil);  /// no extra lines
+    }
+
+    checkactivelines(fn(...) { /// vararg function
+        /// 1st line is empty
+        /// 2nd line is empty
+        /// 3th line is empty
+        local a = 20;
+        /// 5th line is empty
+        local b = 30;
+        /// 7th line is empty
+    }, [4, 6, 8]);
+
+    checkactivelines(fn(a) {
+        /// 1st line is empty
+        /// 2nd line is empty
+        a = 20;
+        local b = 30;
+        /// 5th line is empty
+    }, [3, 4, 6]);
+
+    checkactivelines(fn(a, b, ...) {}, [0]);
+
+    checkactivelines(fn(a, b) {
+    }, [1]);
+
+    foreach _, n in indices([0, 1, 2, 10, 50, 100, 1000, 10000])
+        checkactivelines(
+            load(string.fmt("%s return 1;", string.repeat("\n", n))),
+            [n + 1]);
+}
+
+print("+");
+
+/// invalid levels in [gs]etlocal
+assert(!pcall(debug.getlocal, 20, 1));
+assert(!pcall(debug.setlocal, -1, 1, 10));
+
+
+/// parameter names
+local fn foo(a,b,...) { local d, e; }
+
+assert(debug.getlocal(foo, 1) == "a");
+assert(debug.getlocal(foo, 2) == "b");
+assert(!debug.getlocal(foo, 3));
+
+assert(!debug.getlocal(Cprint, 1));
+
+
+fn foo() { return (debug.getlocal(1, -1)); }
+assert(!foo(10));
+
+
+/// varargs
+fn foo(a, ...) {
+    local l = [...];
+    foreach i in range(0, l.len) {
+        local n, v = debug.getlocal(1, -i - 1);;
+        assert(n == "(vararg)" and v == l[i]);
+    }
+    assert(!debug.getlocal(1, -(l.len + 1)));
+    assert(!debug.setlocal(1, -(l.len + 1), 30));
+    if (l.len > 0) {
+        (fn(x) {
+            assert(debug.setlocal(2, -1, x) == "(vararg)");
+            assert(debug.setlocal(2, -l.len, x) == "(vararg)");
+         })(420);
+        assert(... == 420);
+    }
+}
+
+foo();
+foo(Cprint);
+foo(200, 3, 4);
+local a = [];
+foreach i in range(0, 1000) a[i] = i;
+foo(list.flatten(a));
+
+
+
+{ /// test hook presence in debug info
+    assert(!debug.gethook());
+    local count = 0;
+    local fn f() {
+        assert(debug.getinfo(1).namewhat == "hook");
+        local sndline = reg.match(debug.traceback(), "\n(.-)\n");
+        assert(string.find(sndline, "hook"));
+        count = count + 1;
+    }
+    debug.sethook(f, "l");
+    local a = 0;
+    __ENV.a = a;
+    a = 1;
+    debug.sethook();
+    assert(count == 4);
+}
+__ENV.a = nil;
+
+
+a = {}; local L = nil;
+local glob = 1;
+local oldglob = glob;
+debug.sethook(fn(e,l) {
+    gc(); /// force GC during a hook
+    local f, m, c = debug.gethook();
+    assert(m == "crl" and c == 0);
+    if (e == "line") {
+        if (glob != oldglob) {
+            L = l-1; /// get the first line where "glob" has changed
+            oldglob = glob;
+        }
+    } else if (e == "call") {
+        local f = debug.getinfo(2, "f").func;
+        a[f] = 1;
+    } else assert(e == "return");
+}, "crl");
+
+
+fn f(a,b) {
+    gc();
+    local _, x = debug.getlocal(1, 1);
+    local _, y = debug.getlocal(1, 2);
+    assert(x == a and y == b);
+    assert(debug.setlocal(2, 3, "pera") == "AA".."AA");
+    assert(debug.setlocal(2, 4, "manga") == "B");
+    x = debug.getinfo(2);
+    assert(x.func == g and x.what == "Tokudae" and
+           x.name == "g" and x.nupvals == 2 and
+           reg.find(x.source, "^@.*db%.toku$"));
+    glob = glob+1;
+    assert(debug.getinfo(1, "l").currline == L+1);
+    assert(debug.getinfo(1, "l").currline == L+2);
+}
+
+fn foo() {
+    glob = glob+1;
+    assert(debug.getinfo(1, "l").currline == L+1);
+}; foo();  /// set L
+/// check line counting inside strings and empty lines
+
+local _ = "alo\
+alo" .. [=[
+
+]=];
+/*
+*/
+assert(debug.getinfo(1, "l").currline == L+11);  /// check count of lines
+
+
+fn g(...) {
+    local arg = [...];
+    { local a,b,c; a=math.sin(40); }
+    local feijao;
+    local AAAA,B = "xuxu", "abacate";
+    f(AAAA,B);
+    assert(AAAA == "pera" and B == "manga");
+    {
+        local B = 13;
+        local x,y = debug.getlocal(1,5);
+        assert(x == "B" and y == 13);
+    }
+}
+
+g();
+
+
+assert(a[f] and a[g] and a[assert] and a[debug.getlocal] and !a[Cprint]);
+
+
+/// tests for manipulating non-registered locals (C and Tokudae temporaries)
+
+local n, v = debug.getlocal(0, 1);
+assert(v == 0 and n == "(C temporary)");
+n, v = debug.getlocal(0, 2);
+assert(v == 2 and n == "(C temporary)");
+assert(!debug.getlocal(0, 3));
+assert(!debug.getlocal(0, 0));
+
+fn f() {
+    assert(getargs(1, debug.getlocal(2,3)) == 1);
+    assert(!debug.getlocal(2,4));
+    debug.setlocal(2, 3, 10);
+    return 20;
+}
+
+fn g(a,b) { return (a+1) + f(); }
+
+assert(g(0,0) == 30);
+ 
+__G.f, __G.g = nil;
+
+debug.sethook(nil);
+assert(!debug.gethook());
+
+
+/// minimal tests for setuservalue/getuservalue
+{
+    assert(!debug.setuservalue(io.stdin, 10));
+    local a, b = debug.getuservalue(io.stdin, 10);
+    assert(a == nil and !b);
+}
+
+/// testing interaction between multiple values x hooks
+{
+    local fn f(...) { return 3, ...; }
+    local count = 0;
+    local a = [];
+    foreach i in range(0, 100) a[i] = i;
+    debug.sethook(|| { count++; }, "", 1);
+    local l = [list.flatten(a)];
+    assert(l.len == 100);
+    l = [list.flatten(a, 0, 2)];
+    assert(l.len == 3);
+    l = [f(list.flatten(a, 0, 29))];
+    assert(l.len == 31);
+}
+
+
+/// testing access to function arguments
+
+local fn collectlocals(level) {
+    local tab = {};
+    foreach i in range(1, math.maxint) {
+        local n, v = debug.getlocal(level + 1, i);
+        if (!(n and reg.find(n, "^[a-zA-Z0-9_]+$")))
+            break; /// consider only real variables
+        tab[n] = v;
+    }
+    return tab;
+}
+
+
+local X = nil;
+a = {};
+class a.f {
+    fn f(a,b,...) {
+        local arg = [...];
+        local c = 13;
+    }
+}
+a.f = a.f();
+debug.sethook(fn(e) {
+    assert(e == "call");
+    dostring("XX = 12;"); /// test dostring inside hooks
+    /// testing errors inside hooks
+    assert(!pcall(load("a=\"joao\"+1;")));
+    debug.sethook(fn(e, l) {
+        assert(debug.getinfo(2, "l").currline == l);
+        local f,m,c = debug.gethook();
+        assert(e == "line");
+        assert(m == "l" and c == 0);
+        debug.sethook(nil);  /// hook is called only once
+        assert(!X);     /// check that
+        X = collectlocals(2);
+    }, "l");
+}, "c");
+
+a.f.f(1,2,3,4,5);
+assert(X.self == a.f and X.a == 1 and X.b == 2 and X.c == nil);
+assert(XX == 12);
+assert(!debug.gethook());
+__G.XX = nil;
+
+
+/// testing access to local variables in return hook (bug in 5.2)
+{
+    local X = false;
+
+    local fn foo(a, b, ...) {
+        { local x,y,z; }
+        local c, d = 10, 20;
+        return;
+    }
+
+    local fn aux() {
+        if (debug.getinfo(2).name == "foo") {
+            X = true; /// to signal that it found 'foo'
+            local tab = {a = 100, b = 200, c = 10, d = 20};
+            foreach n, v in fields(collectlocals(2)) {
+                assert(tab[n] == v);
+                tab[n] = undef;
+            }
+            assert(nextfield(tab) == nil); /// 'tab' must be empty
+        }
+    }
+
+    debug.sethook(aux, "r"); foo(100, 200); debug.sethook();
+    assert(X);
+
+}
+
+
+local fn eqseq(l1, l2) {
+    assert(l1.len == l2.len);
+    local e = l2.len;
+    for (local i = 0; i < e; i=i+1)
+        assert(l1[i] == l2[i]);
+}
+
+
+{  print("testing inspection of parameters/returned values");
+    local on = false;
+    local inp, out;
+
+    local fn hook(event) {
+        if (!on) return;
+        local ar = debug.getinfo(2, "sur");
+        local l = [];
+        foreach i in range(ar.ftransfer, ar.ftransfer + ar.ntransfer) {
+            local _, v = debug.getlocal(2, i+1);
+            l[l.len] = v;
+        }
+        if (event == "return")
+            out = l;
+        else
+            inp = l;
+    }
+
+    debug.sethook(hook, "cr");
+
+    on = true; math.sin(3); on = false;
+    eqseq(inp, [3]); eqseq(out, [math.sin(3)]);
+
+    on = true; getargs(1, 10, 20, 30, 40); on = false;
+    eqseq(inp, [1, 10, 20, 30, 40]); eqseq(out, [20, 30, 40]);
+
+    local fn foo(a, ...) { return ...; }
+    local fn foo1() { on = !on; return foo(20, 10, 0); }
+    foo1(); on = false;
+    eqseq(inp, [20]); eqseq(out, [10, 0]);
+
+    debug.sethook();
+}
+
+
+
+{ /// testing upvalue access
+    local fn getupvalues(f) {
+        local t = {};
+        local i = 0;
+        while (true) {
+            local name, value = debug.getupvalue(f, i);
+            if (!name) break;
+            assert(!t[name]);
+            t[name] = value;
+            i = i + 1;
+        }
+        return t;
+    }
+
+    local a,b,c = 1,2,3;
+    local fn foo1(a) { b = a; return c; }
+    local fn foo2(x) { a = x; return c+b; }
+    assert(!debug.getupvalue(foo1, 2));
+    assert(!debug.getupvalue(foo1, -1));
+    assert(!debug.setupvalue(foo1, 2, "xuxu"));
+    local t = getupvalues(foo1);
+    assert(t.a == nil and t.b == 2 and t.c == 3);
+    t = getupvalues(foo2);
+    assert(t.a == 1 and t.b == 2 and t.c == 3);
+    assert(debug.setupvalue(foo1, 0, "xuxu") == "b");
+    assert(([debug.getupvalue(foo2, 2)])[1] == "xuxu");
+    /// upvalues of C functions are allways "called" "" (the empty string)
+    assert(debug.getupvalue(reg.gmatch("x", "x"), 0) == "");
+}
+
+
+{ /// testing count hooks
+    local a=0;
+    debug.sethook(fn(e) { a=a+1; }, "", 1);
+    a=0; foreach i in range(0, 1000); assert(2000 < a and a < 2016);
+    debug.sethook(fn(e) { a=a+1; }, "", 4);
+    a=0; foreach i in range(0,1000); assert(500 < a and a < 505);
+    local f,m,c = debug.gethook();
+    assert(m == "" and c == 4);
+    debug.sethook(fn(e) { a=a+1; }, "", 4000);
+    a=0; foreach i in range(0, 1000); assert(a == 0);
+
+    {
+        debug.sethook(Cprint, "", 2**24 - 1); /// count upperbound
+        local f,m,c = debug.gethook();
+        assert(([debug.gethook()])[2] == 2**24 - 1);
+    }
+
+    debug.sethook();
+}
+
+/// testing local function information
+{
+    co = load([=[
+        local x = 2;
+        local A = 5
+                  +
+                  x;
+        return;
+    ]=]);
+    local a = 0;
+    /// 'A' should be visible to debugger only after its complete definition
+    debug.sethook(fn(e, l) {
+        if (l == 3) { /// after addition with '5', local A is active
+            a = a + 1;
+            assert(debug.getlocal(2, 2) == "A");
+        } else if (l == 4) { /// operands are swapped (commutative op)
+            a = a + 1;
+            assert(debug.getlocal(2, 2) == "(temporary)");
+        }
+    }, "l");
+    co(); /// run local function definition
+    debug.sethook(); /// turn off hook
+    assert(a == 2); /// ensure all two lines where hooked
+}
+
+
+{ /// testing traceback
+    assert(debug.traceback(Cprint) == Cprint);
+    assert(debug.traceback(Cprint, 4) == Cprint);
+    assert(reg.find(debug.traceback("hi", 4), "^hi\n"));
+    assert(reg.find(debug.traceback("hi"), "^hi\n"));
+    assert(!reg.find(debug.traceback("hi"), "'debug.traceback'"));
+    assert(reg.find(debug.traceback("hi", 0), "'traceback'"));
+    assert(reg.find(debug.traceback(), "^stack traceback:\n"));
+
+    { /// C-function names in traceback
+        local st, msg = (fn() { return pcall; })()(debug.traceback);
+        assert(st == true and string.find(msg, "pcall"));
+    }
+
+
+    /// testing nparams, nupvals and isvararg
+    local t = debug.getinfo(Cprint, "u");
+    assert(t.isvararg == true and t.nparams == 0 and t.nupvals == 0);
+
+    t = debug.getinfo(fn(a,b,c) {}, "u");
+    assert(t.isvararg == false and t.nparams == 3 and t.nupvals == 0);
+
+    t = debug.getinfo(fn(a,b,...) { return t[a]; }, "u");
+    assert(t.isvararg == true and t.nparams == 2 and t.nupvals == 1);
+
+    t = debug.getinfo(1);   /// main
+    assert(t.isvararg == true and t.nparams == 0 and t.nupvals == 1 and
+            debug.getupvalue(t.func, 0) == "__ENV");
+
+    t = debug.getinfo(math.sin);  /// C function
+    assert(t.isvararg == true and t.nparams == 0 and t.nupvals == 0);
+
+    t = debug.getinfo(reg.gmatch("abc", "a"));   /// C closure
+    assert(t.isvararg == true and t.nparams == 0 and t.nupvals > 0);
+}
+
+
+
+assert(typeof(debug.getctable()) == "table");
+assert(typeof(debug.getclist()) == "list");
+
+
+{ /// test tagmethod information
+    local a = (class {})();
+    local fn f(self) {
+        local info = debug.getinfo(1);
+        assert(info.namewhat == "metamethod");
+        rawset(self, "op", info.name);
+        return info.name;
+    }
+    setmetatable(getclass(a), {
+        __getidx = f, __setidx = f, __gc = f, __close = f, __call = f,
+        __init = nil, __concat = f, __add = f, __sub = f, __mul = f,
+        __div = f, __idiv = f, __mod = f, __pow = f, __shl = f, __shr = f,
+        __band = f, __bor = f, __bxor = f, __unm = f, __bnot = f, __eq = f,
+        __lt = f, __le = f
+    });
+
+    local b = getclass(a)();
+
+    assert(a[3] == "getidx" and a**b == "pow" and a..a == "concat");
+    assert(a/a == "div" and a//b == "idiv" and a%a == "mod");
+    assert(a+a == "add" and a-a == "sub" and a*a == "mul" and
+           -a == "unm" and (a&a) == "band");
+    assert((a|a) == "bor" and (a^a) == "bxor" and a<<b == "shl" and b>>a == "shr");
+    assert(a==b and rawget(a, "op") == "eq");
+    assert(b>=a and rawget(a, "op") == "le");
+    assert(a>=b and rawget(b, "op") == "le");
+    assert(a>b and rawget(b, "op") == "lt");
+    assert(b>a and rawget(a, "op") == "lt");
+    assert(~a == "bnot");
+
+    /// test __init
+    assert(getmetatable(a)).__init = |self| {
+        local info = debug.getinfo(1);
+        assert(info.namewhat == "" and !info.name);
+        return self;
+    };
+    assert(typeof(getclass(a)()) == "instance");
+
+    /// test __metatable
+    assert(getmetatable(a)).__metatable = |_| { return nil; };
+    assert(typeof(getmetatable(a)) == "function");
+    local st,err = pcall(setmetatable, getclass(a), nil);
+    assert(!st and string.find(err, "protected metatable"));
+}
+
+{ /// testing for-iterator name
+    local fn f() { assert(debug.getinfo(1).name == "for iterator"); }
+    foreach i in f;
+}
+
+
+if !__TESTS.gc and !__TESTS.memory { /* compiled without gc and memory tests? */
+    /// testing debug info for finalizers
+    local name = nil;
+    /// create a piece of garbage with a finalizer
+    local mt = {}; mt.__gc = || {
+        local t = debug.getinfo(1);  /// get function information
+        assert(t.namewhat == "metamethod");
+        name = t.name;
+    };
+    setmetatable(class{}, mt)(); mt = nil;
+    /// repeat until previous finalizer runs (setting 'name')
+    loop { local a = {}; if (name) break; }
+    assert(name == "__gc");
+}
+
+
+/* run only if not running via 'test.toku' or if running in isolation */
+if !__opts or (__opts and __opts.run_isolated) {
+    print("testing traceback sizes");
+
+    local fn countlines(s) {
+        return getargs(1, reg.gsub(s, "\n", ""));
+    }
+
+    local fn deep(lvl, n) {
+        if (lvl == 0)
+            return (debug.traceback("message", n));
+        else
+            return (deep(lvl-1, n));
+    }
+
+    local fn checkdeep(total, start) {
+        local s = deep(total, start);
+        local rest = reg.match(s, "^message\nstack traceback:\n(.*)$");
+        local cl = countlines(rest);
+        /// at most 10 lines in first part, 10 in second, plus '...'
+        assert(cl <= 10 + 10 + 1);
+        local brk = reg.find(rest, "%.%.%.\t%(skip");
+        if (brk) { /// does message have '...'?
+            local rest1 = string.substr(rest, 0, brk-1);
+            local rest2 = string.substr(rest, brk);
+            assert(countlines(rest1) == 10 and countlines(rest2) == 10);
+        } else
+            assert(cl == total - start + 4);
+    }
+
+    foreach d in range(0, 51, 10)
+        foreach l in range(d+1)
+            checkdeep(d, l);
+} else
+    (Message or print)("skipped traceback size tests");

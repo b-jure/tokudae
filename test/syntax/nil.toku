@@ -1,0 +1,4 @@
+assert(!nil);
+assert(nil == nil);
+assert(nil != true);
+assert(nil != false);

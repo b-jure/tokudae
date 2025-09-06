@@ -1,0 +1,18 @@
+local class X {}
+local x = X();
+assert(getclass(x) == X);
+assert(getclass(X) == X);
+
+X = class {
+    fn test1() {}
+    fn test2() {}
+};
+
+x = X();
+local res = getclass(x, "test1");
+assert(typeof(res) == "bound method");
+local self, method = unwrapmethod(res);
+assert(self == x and method == getclass(X, "test1"));
+_, method = unwrapmethod(getclass(x, "test2"));
+assert(method == getclass(X, "test2"));
+assert(!getclass(x, "test3") and !getclass(X, "test3"));

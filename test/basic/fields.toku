@@ -1,0 +1,62 @@
+local x = "Water";
+local t = {
+    a = "69",
+    b = "420",
+    c = "1337",
+    ["x"] = 69,
+    ["y"] = 420,
+    ["z"] = 1337,
+    [x] = true
+};
+assert(x and t);
+assert(typeof(t) == "table");
+
+local i = 0;
+foreach k, v in fields(t) {
+    assert(k and v);
+    i++;
+}
+assert(i == 7);
+
+local class X {
+    __init = fn(x, y, z) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+        return self;
+    };
+};
+local ins = X(69, 420, 1337);
+assert(typeof(ins) == "instance");
+assert(ins.x == 69 and ins.y == 420 and ins.z == 1337);
+
+foreach k, v in fields(ins) {
+    assert(k and v);
+    i++;
+}
+assert(i == 10);
+
+
+local class MyTable {
+    __init = || {
+        self.table = { a = 1, b = 2, c = 3, d = 4 };
+        return self;
+    };
+    __fields = || {
+        local fn iter(self, k) {
+            if (typeof(self) != "instance" or getclass(self) != MyTable)
+                error("iterator expects instance of MyTable");
+            return nextfield(self.table, k);
+        }
+        return iter, self, nil;
+    };
+}
+ins = MyTable();
+foreach k, v in fields(ins) i++;
+assert(i == 14);
+
+local iter, state, index = fields(ins);
+local st, err = pcall(iter, {}, index);
+assert(!st and string.find(err, "instance of MyTable"));
+st, err = pcall(iter, (class{})(), index);
+assert(!st and string.find(err, "instance of MyTable"));

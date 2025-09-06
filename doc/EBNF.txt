@@ -1,0 +1,145 @@
+# Below is complete EBNF syntax of Tokudae.
+# To make this compatible with manual html tags use this
+# search and replace (n)vim regex on the EBNF:
+#
+# s/'\([^']*\)'/\&lsquo;<b>\1<\/b>\&rsquo;/g
+#
+# Additionally the keywords need to not have &lsquo; and &rsquo;,
+# the following search and replace (n)vim regex ensures this:
+#
+# s/&lsquo;\(<b>[a-zA-Z]\+<\/b>\)&rsquo;/\1/g
+
+chunk ::= block
+
+assignop ::= '=' | '+=' | '-='
+           | '*=' | '/=' | '//='
+           | '**=' | '%=' | '&='
+           | '|=' | '^=' | '>>='
+           | '<<=' | '..='
+
+expstm ::= varlist assignop explist | var '++' | var '--'
+
+varlist ::= var {',' var}
+
+var ::= Name | prefixexp '[' exp ']' | prefiexp '.' Name
+
+breakstm ::= 'break' ';'
+
+continuestm ::= 'continue' ';'
+
+fnstm ::= 'fn' dottedname parenparams funcbody
+
+classstm ::= 'class' dottedname [inherit] [classbodystm]
+
+dottedname ::= Name {'.' Name}
+
+loopstm ::= 'loop' stm
+
+whilestm ::= 'while' exp stm
+
+dowhilestm ::= 'do' stm 'while' exp ';'
+
+forinit ::= localstm | expstm
+
+forinfix ::= [forinit] ';' [exp] ';' [expstm]
+
+forclauses ::= '(' forinfix ')' | forinfix ';'
+
+forstm ::= 'for' forclauses stm
+
+forexplist ::= exp [',' exp]
+             | exp ',' exp [',' exp]
+             | exp ',' exp ',' exp [',' exp]
+
+foreachstm ::= 'foreach' namelist 'in' forexplist stm
+
+ifstm ::= 'if' exp stm ['else' stm]
+
+switchbody ::= '{' {'case' exp ':' {stm}} ['default' ':' {stm}] '}'
+
+switchstm ::= 'switch' exp switchbody
+
+switchblock ::= {decl} [breakstm] | block
+
+loopblock ::= {decl} [continuestm] | switchblock
+
+blockstm ::= '{' loopblock '}'
+
+returnstm ::= 'return' [explist] [';']
+
+functiondef ::= 'fn' parenparams funcbody | pipeparams funcbody
+
+sep ::= ',' | ';'
+
+elementlist ::= exp {sep exp} [sep]
+
+listdef ::= '[' [elementlist] ']'
+
+field ::= '[' exp ']' '=' exp | Name '=' exp
+
+fieldlist ::= field {sep field} [sep]
+
+tabledef ::= '{' [fieldlist] '}'
+
+pipeparams ::= '|' [parameters] '|'
+
+classbody ::= '{' {classvalue} '}'
+
+method ::= 'fn' Name parenparams funcbody
+
+localfn ::= 'local' 'fn' Name parenparams funcbody
+
+parenparams ::= '(' [parameters] ')'
+
+parameters ::= namelist [',' '...'] | '...'
+
+namelist ::= Name {',' Name}
+
+funcbody ::= ['::'] funcblock
+
+funcblock ::= '{' block '}' | stm
+
+block ::= {decl} [returnstm]
+
+decl ::= localstm ';' | localfn | localclass | stm
+
+localstm ::= 'local' attnamelist ['=' explist]
+
+attnamelist ::= Name attrib {',' Name attrib}
+
+attrib ::= ['<' Name '>']
+
+localclass ::= 'local' 'class' Name [inherit] [classbodystm]
+
+stm ::= ';' | expstm ';' | call ';' | breakstm | continuestm | fnstm
+      | classstm | loopstm | whilestm | dowhilestm | forstm | foreachstm
+      | ifstm | switchstm | blockstm | returnstm
+
+classdef ::= 'class' [inherit] [classbodystm]
+
+inherit ::= 'inherits' exp
+
+classbodystm ::= '{' {classvaluestm} '}'
+
+classvaluestm ::= classvalue | localstm ';'
+
+classvalue ::= method | metafield
+
+metafield ::= Name '=' exp ';'
+
+prefixexp ::= var | call ['?'] | '(' exp ')' | 'super'
+
+call ::= prefixexp '(' [explist] ')'
+
+explist ::= exp {',' exp}
+
+binop ::= '+' | '-' | '*' | '/' | '//' | '**' | '%'
+        | '&' | '~' | '|' | '^' | '>>' | '<<' | '..'
+        | '<' | '<=' | '>' | '>=' | '=='| '!='
+        | and | or
+
+unop ::= '-' | '!' | '~'
+
+exp ::= 'true' | 'false' | 'nil' | '...' | Numeral | LiteralString
+      | listdef | tabledef | functiondef | classdef | prefixexp
+      | exp binop exp | unop exp

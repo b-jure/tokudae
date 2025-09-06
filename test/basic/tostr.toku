@@ -1,0 +1,25 @@
+assert(tostr("already a string") == "already a string");
+assert(tostr(nil) == "nil");
+assert(tostr(true) == "true");
+assert(tostr(false) == "false");
+assert(tostr(52) == "52");
+assert(tostr(52.25) == "52.25");
+assert(tostr(52.69e2) == "5269.0");
+assert(tostr(0000) == "0");
+assert(string.find(tostr([]), "list"));
+assert(string.find(tostr({}), "table"));
+assert(string.find(tostr(fn (x){ return x; }), "function"));
+local class X {}
+assert(string.find(tostr(X), "class"));
+assert(string.find(tostr(X()), "instance"));
+
+X = class {
+    __init = |name| { self.name = name; return self; };
+    __tostring = || { return self.name .. " Banana"; };
+};
+local x = X("Green");
+assert(tostr(x) == "Green Banana");
+
+X = class { __name = "Mango"; };
+x = X();
+assert(string.find(tostr(x), "Mango"));

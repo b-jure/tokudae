@@ -1,0 +1,319 @@
+if __TESTS.gc or __TESTS.memory { /* compiled with GC or memory tests? */
+    (Message or print)("skipped incremental garbage collection tests");
+    return;
+}
+
+print("testing incremental garbage collection");
+
+assert(gc("isrunning"));
+
+gc();
+
+
+local fn nop() {}
+
+local fn gcinfo() {
+    return gc("count") * 1024;
+}
+
+
+{ /// test weird parameters to 'gc'
+  /// save original parameters
+    local a = gc("param", "pause", 200);
+    local b = gc("param", "stepmul", 200);
+    local l = [0, 2, 10, 90, 500, 5000, 30000, 0x7ffffffe];
+    foreach i in range(0, len(l)) {
+        local p = l[i];
+        foreach j in range(0, len(l)) {
+            local m = l[j];
+            gc("param", "pause", p);
+            gc("param", "stepmul", m);
+            gc("step", 0);
+            gc("step", 10000);
+        }
+    }
+    /// restore original parameters
+    gc("param", "pause", a);
+    gc("param", "stepmul", b);
+    gc();
+}
+
+
+{ /// test the "size" of basic GC steps (whatever they mean...)
+    print("steps");
+    local fn dosteps(siz) {
+        gc();
+        local a = [];
+        for (local i = 0; i < 100; i=i+1) {
+            a[i] = [[]];
+            local b = [];
+        }
+        local x = gcinfo();
+        local i = 0;
+        loop { /// do steps until it completes a collection cycle
+            i = i+1;
+            if (gc("step", siz)) break;
+        }
+        assert(gcinfo() < x);
+        return i; /// number of steps
+    }
+
+    if (__POSIX or __WINDOWS) {
+        gc("stop");
+        assert(dosteps(100) < dosteps(20));
+        gc("restart");
+    }
+}
+
+
+__G["while"] = 234;
+
+
+///
+/// tests for GC activation when creating different kinds of objects
+///
+local fn GC1() {
+    local u;
+    local b;  /// (it is above 'u' in the stack)
+    local finish = false;
+    local mt = [];
+    mt = { __gc = || { finish = true; } };
+    u = setmetatable(class {}, mt);
+    b = [34];
+    loop {
+        u = [];
+        if (finish) break;
+    }
+    assert(b[0] == 34); /// 'u' was collected, but 'b' was not
+
+    finish = false; local i = 0;
+    u = setmetatable(class {}, mt);
+    loop {
+        i = i + 1;
+        u = tostr(i) .. tostr(i);
+        if (finish) break;
+    }
+    assert(b[0] == 34); /// 'u' was collected, but 'b' was not
+
+    finish = false;
+    u = setmetatable(class {}, mt);
+    loop {
+        local i;
+        u = fn () { return i; };
+        if (finish) break;
+    }
+    assert(b[0] == 34); /// 'u' was collected, but 'b' was not
+}
+
+local fn GC2() {
+    local u;
+    local finish = false;
+    local mt = { __gc = || { finish = true; } };
+    u = [setmetatable(class {}, mt)];
+    local b = [34];
+    loop {
+        u = [[]];
+        if (finish) break;
+    }
+    assert(b[0] == 34); /// 'u' was collected, but 'b' was not
+
+    finish = false; local i = 0;
+    u = [setmetatable(class {}, mt)];
+    loop {
+        i = i + 1;
+        u = [tostr(i) .. tostr(i)];
+        if (finish) break;
+    }
+    assert(b[0] == 34); /// 'u' was collected, but 'b' was not
+
+    finish = false;
+    u = [setmetatable(class {}, mt)];
+    loop {
+        local i;
+        u = [fn () { return i; }];
+        if (finish) break;
+    }
+    assert(b[0] == 34); /// 'u' was collected, but 'b' was not
+}
+
+local fn GC() { GC1(); GC2(); }
+
+
+{
+    print("creating many objects");
+
+    local limit = 5000;
+
+    for (local i = 0; i < limit; i = i + 1) {
+        local a = {};
+        a = nil;
+    }
+
+    local a = "a";
+
+    for (local i = 0; i < limit; i = i + 1) {
+        a = tostr(i) .. "b";
+        a = reg.gsub(a, "(%d%d*)", "%1 %1");
+        a = "a";
+    }
+
+    a = {};
+
+    fn a.test(self) {
+        for (local i = 1; i <= limit; i=i+1) {
+            load(string.fmt("fn temp(a) { return \"a%d\"; }", i), "")();
+            assert(temp() == string.fmt("a%d", i));
+        }
+    }
+
+    a.test(a);
+    __G.temp = nil;
+}
+
+
+{ /// collection of functions without locals, globals, etc.
+    local f = fn() {};
+}
+
+
+print("functions with errors");
+local prog = [=[
+{
+  a = 10;;
+  fn foo(x,y) {
+    a = sin(a+0.456-0.23e-12);
+    return fn (z) { return sin(%x+z); };
+  }
+  local x = fn (w) { a=a+w; };
+}
+]=];
+{
+    local step = 1;
+    for (local i=0; i < len(prog); i=i+1) {
+        for (local j=i; j < len(prog); j=j+1)
+            pcall(load(string.substr(prog, i, j), ""));
+    }
+}
+__G.a = nil;
+__G.x = nil;
+
+{
+    foo = nil;
+    print("long strings");
+    local x = "01234567890123456789012345678901234567890123456789012345678901234567890123456789";
+    assert(len(x)==80);
+    local s = "";
+    local k = math.min(300, (math.maxint // 80) // 2);
+    for (local n = 1; n <= k; n=n+1) {
+        s = s..x;
+        local j = tostr(n);
+    }
+    assert(len(s) == k*80);
+    s = string.substr(s, 0, 9999);
+    local i;
+    s, i = reg.gsub(s, "(%d%d%d%d)", "");
+    assert(i==10000 // 4);
+
+    assert(__G["while"] == 234);
+    __G["while"] = nil;
+}
+
+
+if !__port {
+    /// test the pace of the collector
+    gc(); gc();
+    local x = gcinfo();
+    gc("stop");
+    loop {
+        local a = {};
+        if (gcinfo() > 3*x) break;
+    }
+    gc("restart");
+    assert(gc("isrunning"));
+    loop {
+        local a = {};
+        if (gcinfo() <= x*2) break;
+    }
+} else
+    (Message or print)("skipped testing the pace of the collector");
+
+
+{
+    local lim = 15;
+    local a = {};
+    /// fill a with `collectable' indices
+    for (local i=0; i < lim; i=i+1) a[{}] = i;
+    local b = {};
+    foreach k,v in fields(a) b[k]=v;
+    /// remove all indices and collect them
+    foreach n in fields(b) {
+        a[n] = undef;
+        assert(typeof(n) == "table" and nextfield(n) == nil);
+        gc();
+    }
+    b = nil;
+    gc();
+    foreach n in fields(a) error("cannot be here");
+    for (local i=0; i < lim; i=i+1) a[i] = i;
+    for (local i=0; i < lim; i=i+1) assert(a[i] == i);
+}
+
+
+if !__port {
+    local a = {};
+    foreach i in range(0,200000)
+        a = {nextfield = a};
+    a = nil;
+    gc();
+} else
+    (Message or print)("skipped testing long tables");
+
+
+{
+    gc();
+    gc("stop");
+    gc("step"); /// steps should not unblock the collector
+    local x = gcinfo();
+    loop {
+        foreach i in range(0, 1000)
+            __ENV.a = {}; /// no collection during the loop
+        if (gcinfo() > 2*x) break;
+    }
+    gc("restart");
+    __ENV.a = nil;
+}
+
+
+
+{ /// create an object to be collected when state is closed
+    local setmetatable,assert,typeof,print,getmetatable =
+          setmetatable,assert,typeof,print,getmetatable;
+    local mt = {};
+    mt.__gc = |o| {
+        assert(getmetatable(o) == mt);
+        /// create new objects during GC
+        local a = "xuxu"..tostr(10+3).."test", {};
+        ___Glob = o; /// ressurrect object
+        setmetatable(class {}, mt)(); /// new one with the same metatable
+        print(">>> closing state " .. "<<<\n");
+    };
+    local u = setmetatable(class {}, mt);
+    u();
+    ___Glob = [u]; /// avoid object being collected before program end
+}
+
+assert(gc("isrunning"));
+
+{ /// check that the collector is not reentrant
+    local res = true;
+    setmetatable(class {}, {
+        __gc = |o| {
+            print("Collecting object", o);
+            res = gc();
+        }
+    })();
+    gc();
+    assert(!res);
+}
+
+__G.a = nil;

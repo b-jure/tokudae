@@ -1,0 +1,21 @@
+# number of bits in the mantissa of a floating-point number
+local floatbits = 24;
+{
+    local p = 2.0**floatbits;
+    while (p < p + 1.0) {
+        p = p * 2.0;
+        floatbits = floatbits + 1;
+    }
+}
+
+# float equality
+local fn eq(a,b,limit) {
+    if (!limit ) {
+        if (floatbits >= 50) limit = 1E-11;
+        else limit = 1E-5;
+    }
+    # a == b needed for +inf/-inf
+    return (a == b or math.abs(a-b) <= limit);
+}
+
+assert(eq(math.deg(math.pi/2), 90) and eq(math.rad(90), math.pi/2));

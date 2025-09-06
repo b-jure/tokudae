@@ -1,0 +1,112 @@
+local class Empty {}
+assert(typeof(Empty) == "class");
+assert(typeof(Empty()) == "instance");
+local PI <final> = 3.141592654;
+local class Circle {
+    __init = fn() {
+        self.radius = 4;
+        return self;
+    };
+    fn area() {
+        rsq = self.radius ** 2;
+        return rsq * PI;
+    }
+    fn circumference() {
+        local d = self.radius * 2;
+        return d * PI;
+    }
+}
+local circ = Circle();
+assert(typeof(circ) == "instance");
+assert(circ.radius == 4);
+assert(circ.area() == 4**2*PI);
+assert(circ.circumference() == 4*2*PI);
+local ent;
+assert(ent == nil);
+local class Entity {
+    fn type() {
+        return "Entity";
+    }
+}
+assert(typeof(Entity) == "class");
+ent = Entity();
+assert(typeof(ent) == "instance");
+assert(ent.type() == "Entity");
+local class Human inherits Entity {
+    __init = fn(fname, lname) {
+        self.fname = fname or "?";
+        self.lname = lname or "?";
+        return self;
+    };
+    __name = "HumanInstance";
+    fn type() {
+        return "Human " .. super.type();
+    }
+}
+ent = Human("John", "Cena");
+assert(typeof(ent) == "instance");
+assert(ent.fname == "John" and ent.lname == "Cena");
+assert(ent.type() == "Human Entity");
+assert(string.find(tostr(ent), "HumanInstance"));
+ent = Human();
+assert(ent.fname == "?" and ent.lname == "?");
+
+local class Counter {
+    local empty1 <close> = nil;
+    local empty2 <close> = false;
+    local empty3 <close>;
+    local count = 0;
+    fn tick() {
+        local oldcount = count;
+        count++;
+        return oldcount;
+    }
+    local padding1 = fn() {};
+    local padding2 = 5;
+    local padding3 = fn() {};
+    local padding4 = "garbage";
+    fn reset() {
+        count = 0;
+    }
+    fn donothing() {
+        return "nothing";
+    }
+}
+
+local c = Counter();
+assert(c.tick() == 0);
+assert(c.tick() == 1);
+assert(c.tick() == 2);
+assert(c.tick() == 3);
+assert(c.tick() == 4);
+assert(c.tick() == 5);
+assert(c.tick() == 6);
+assert(c.tick() == 7);
+assert(c.tick() == 8);
+c.reset();
+assert(c.tick() == 0);
+assert(c.tick() == 1);
+assert(c.tick() == 2);
+assert(c.tick() == 3);
+assert(c.tick() == 4);
+assert(c.tick() == 5);
+assert(c.tick() == 6);
+assert(c.tick() == 7);
+assert(c.tick() == 8);
+assert(c.donothing() == "nothing");
+
+
+local class Ref {
+    local nref = 0;
+
+    __init = || { nref++; return self; };
+    __gc = || { nref--; };
+
+    fn refcount() return nref;
+}
+local class Object inherits Ref {}
+
+foreach i in range(15)
+    Object();
+gc();
+assert(Object().refcount() == 1);

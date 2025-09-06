@@ -1,0 +1,53 @@
+/*
+** @ID: test/syntax5.toku
+** See Copyright Notice in file tokudae.h
+*/
+
+/* test locals and errors inside of class definition */
+
+local chunk = [=[
+    local class Y {
+        local y = 69;
+        fn test() { return y; }
+        __init = || { self.y = 0; return self; };
+    }
+
+    local t = {};
+    class t.z inherits Y {
+        local x <close> = 420;
+        __init = || {
+            getmetatable(super).__init(self);
+            self.x = 0;
+            return self;
+        };
+        fn test1() { return x; }
+    };
+
+    local a = t.z();
+    assert(a.y == 0 and a.x == 0);
+    assert(a.test() == 69 and a.test1() == 420);
+]=];
+
+local f = assert(load(chunk));
+local st, res = pcall(f);
+assert(!st and string.find(res, "local variable x"));
+
+chunk = string.replace(chunk, "<close> ", ""); /* remove close attribute */
+assert(load(chunk))(); /* all ok */
+
+chunk = [=[
+    local x = class {
+        fn x() { return "x"; }
+        local a = "this is not allowed";
+        __name = "anonymous";
+    };
+    assert(string.find(tostr(x()), "anonymous:"));
+    assert(x().x() == "x");
+]=];
+st, res = load(chunk);
+assert(!st and string.find(res, "can't have locals"));
+
+local n;
+chunk, n = reg.gsub(chunk, "%s*local a[^\n]*\n", "");
+assert(n == 1); /* exactly one match was substituted/replaced */
+assert(load(chunk))(); /* all ok */

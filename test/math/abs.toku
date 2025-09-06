@@ -1,0 +1,24 @@
+local fn checkerr(msg, f, ...) {
+    local st, err = pcall(f, ...);
+    assert(!st and string.find(err, msg));
+}
+
+local fn eqt(x,y) {
+    return a == b and math.type(a) == math.type(b);
+}
+
+local x = -5;
+assert(math.abs(x) == 5);
+assert(math.abs(-x) == 5);
+assert(math.abs(-5) == 5);
+assert(math.abs(--5) == 5);
+x = -6.420e-2;
+assert(math.abs(x) == -x);
+assert(math.abs(x) == 6.420e-2);
+checkerr("number expected", math.abs, "str");
+
+local minint = math.minint;
+local maxint = math.maxint;
+assert(eqt(math.abs(minint), minint));
+assert(eqt(math.abs(maxint), maxint));
+assert(eqt(math.abs(-maxint), maxint));

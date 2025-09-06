@@ -1,0 +1,18 @@
+local a = !true;                  # (folded)
+assert(a == false);
+a = !!true;                 # (folded)
+assert(a == true);
+a = !!!true;                # (folded)
+assert(a == false);
+a = !false;                 # (folded)
+assert(a == true);
+a = !!false;                # (folded)
+assert(a == false);
+a = !!!false;               # (folded)
+assert(a == true);
+a = !a;                     # (not folded)
+assert(a == false);
+a = !!a;                    # (not folded)
+assert(a == false);
+a = !!!a;                   # (not folded)
+assert(a == true);

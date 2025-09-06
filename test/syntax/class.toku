@@ -1,0 +1,44 @@
+local a = {};
+assert(typeof(a) == "table");
+a.b = class {
+    fn name() {
+        return "Class";
+    }
+};
+assert(typeof(a.b) == "class");
+local t = getmethods(a.b);
+foreach k,v in fields(t)
+    assert(k and v);
+a = class inherits a.b {
+    fn myname() {
+        return "Sub" .. super.name();
+    }
+};
+assert(typeof(a) == "class");
+a = a();
+t = getmethods(getclass(a));
+assert(typeof(t) == "table");
+foreach k,v,g in fields(t)
+    assert(k and v);
+assert(typeof(a) == "instance");
+assert(a.name() == "Class");
+assert(a.myname() == "SubClass");
+
+/* class without inherit and body */
+assert(typeof(class) == "class");
+assert(typeof((class)()) == "instance");
+
+/* class with inherit but no body */
+assert(typeof(class inherits getclass(a)) == "class");
+assert(typeof((class inherits getclass(a))()) == "instance");
+
+prog = [=[
+local a = class { fn x() :: return 1; };
+local b = class { fn wrong() { self = 5; return super.x(); } };
+b().wrong(); /// errors here
+]=];
+
+res, err = pcall(assert(load(prog)));
+assert(!res and string.find(err, "'self' is not an instance"));
+
+prog, res, err = nil;

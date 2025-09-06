@@ -1,0 +1,15 @@
+local s = "What is your favorite animal?";
+assert(string.cspan(s, "siroy") == 5);
+assert(string.cspan(s, "sroy") == 6);
+assert(string.cspan(s, "roy") == 8);
+assert(string.cspan(s, "ro") == 9);
+assert(string.cspan(s, "r") == 11);
+
+assert(string.cspan(s, "") == len(s));
+assert(string.cspan(s, "x") == len(s));
+
+assert(string.cspan(s, "a", 3) == 11);
+assert(string.cspan(s, "a", 2, 3) == 0);
+assert(string.cspan(s, "a", 1, 2) == 1);
+assert(string.cspan(s, "a", 2, 1) == nil);
+assert(string.cspan(s, "a", nil, -(len(s)) - 1) == nil);

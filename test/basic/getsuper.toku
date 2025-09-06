@@ -1,0 +1,26 @@
+class X {
+    fn name() return "X";
+}
+local x = X();
+assert(x.name() == "X");
+
+class Y inherits X {
+    fn name() {
+        assert(super.name() == "X");
+        assert(getsuper(super) == nil);
+        assert(super == X);
+        assert(super.name == super.name);
+        assert(super.name == getsuper(self, "name"));
+        return "Y" .. super.name();
+    }
+}
+local y = Y();
+assert(y.name() == "YX");
+assert(getsuper(x) == nil);
+assert(!getsuper(x, "name"));
+assert(getsuper(y) == X);
+assert(getsuper(y, "name"));
+assert(!getsuper(y, "bla"));
+assert(getsuper(y) == getclass(x));
+
+assert(getsuper(Y, "name")() == "X");

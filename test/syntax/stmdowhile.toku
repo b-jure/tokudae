@@ -1,0 +1,30 @@
+local x = 0;
+do {
+    x = 1;
+} while false;
+assert(x == 1);
+
+do x++; while (x < 5);
+assert(x == 5);
+
+do {
+    loop break;
+    x += 2;
+    if x == 13 break;
+    else assert(x < 14);
+} while true;
+
+assert(x == 13);
+
+x = 0;
+
+do {
+    do {
+        x++;
+        if (x == 90) break;
+    } while (x < 100);
+    if (x == 499) break;
+    continue;
+} while false;
+
+assert(x == 499);

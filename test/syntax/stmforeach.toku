@@ -1,0 +1,66 @@
+local transactions = {
+    Luigi = 69,
+    Marco = 420,
+    Fabio = 1337,
+};
+assert(typeof(transactions) == "table");
+assert(transactions.Luigi == 69);
+assert(transactions.Marco == 420);
+assert(transactions.Fabio == 1337);
+foreach k, v in fields(transactions) {
+    assert(k == "Luigi" or k == "Marco" or k == "Fabio");
+    assert(v == 69 or v == 420 or v == 1337);
+}
+local points = [69, 420, 1337];
+assert(typeof(points) == "list");
+assert(points[0] == 69);
+assert(points[1] == 420);
+assert(points[2] == 1337);
+local array_iter = fn(arr) {
+    local i = 0;
+    local n = len(arr);
+    return fn () {
+        if (i < n) {
+            i = i + 1;
+            return i - 1, arr[i - 1];
+        } else
+            return nil;
+    };
+};
+foreach i, point in array_iter(points) {
+    if (i == 0) {
+        assert(point == 69);
+        continue;
+    }
+    assert(i == 1 or i == 2);
+    assert(point == 420 or point == 1337);
+}
+local X = class {
+    __close = fn() {
+        assert(Y == 69);
+        print("Closing " .. tostr(self));
+    };
+    __gc = fn() {
+        Y = nil;
+        print("Collecting " .. tostr(self));
+    };
+};
+X = X();
+Y = 69;
+foreach i, point in array_iter(points), nil, nil, X {
+    switch (i) {
+        case 0: assert(point == 69); break;
+        case 1: assert(point == 420); break;
+        case 2: assert(point == 1337); break;
+        default: {
+            print("unreachable");
+            assert(nil);
+        }
+    }
+    if (i == 2) break;
+}
+gc();
+
+X = nil;
+gc(); /// collect instance
+assert(Y == nil);

@@ -1,0 +1,519 @@
+/// most (all?) tests here assume a reasonable "Unix-like" shell
+if __port or (cliargs or __cliargs)[0] != "../tokudae" {
+    (Message or print)("skipped interpreter test");
+    return;
+}
+
+/// use only "double quotes" inside shell scripts (better change to
+/// run on Windows)
+
+assert(os.execute()); /// machine has a system command
+
+local cliargs = cliargs or __G.__cliargs;
+local args = args or __G.__args;
+
+local prog = os.tmpname();
+local otherprog = os.tmpname();
+local out = os.tmpname();
+
+local progname = cliargs[0] or __G.__prog;
+print("progname: "..progname);
+
+local prepfile = fn(s, mod, p) {
+    mod = mod and "wb" or "w";  /// mod true means binary files
+    p = p or prog;              /// file to write the program
+    local f = io.open(p, mod);
+    f.write(s);
+    assert(f.close());
+};
+
+local fn getoutput() {
+    local f = io.open(out);
+    local t = f.read("a");
+    f.close();
+    assert(os.remove(out));
+    return t;
+}
+
+local fn checkprogout(s) {
+    /// expected result must end with new line
+    assert(string.substr(s, -1) == "\n");
+    local t = getoutput();
+    foreach line in reg.gmatch(s, ".-\n")
+        assert(reg.find(t, line, 0, true));
+}
+
+local fn checkout(s) {
+    local t = getoutput();
+    if s != t printf("'%' - '%'\n", s, t);
+    assert(s == t);
+    return t;
+}
+
+
+local fn RUN(p, ...) {
+    p = reg.gsub(p, "tokudae", "\""..progname.."\"", 1);
+    local s = string.fmt(p, ...);
+    assert(os.execute(s));
+}
+
+
+local fn NoRun(msg, p, ...) {
+    p = reg.gsub(p, "tokudae", "\""..progname.."\"", 1);
+    local s = string.fmt(p, ...);
+    s = string.fmt("%s >%s 2>&1", s, out);  /// send output and error to 'out'
+    assert(!os.execute(s));
+    assert(reg.find(getoutput(), msg, 0, true));  /// check error message
+}
+
+RUN("tokudae -v > /dev/null 2>&1");
+
+printf("(temporary program file used in these tests: %)", prog);
+
+/// running stdin as a file
+prepfile("");
+RUN("tokudae - < %s > %s", prog, out);
+checkout("");
+
+prepfile([=[
+  print(
+1, a
+);
+]=]);
+RUN("tokudae - < %s > %s", prog, out);
+checkout("1\tnil\n");
+
+RUN("echo \"print(10);\nprint(2);\n\" | tokudae > %s", out);
+checkout("10\n2\n");
+
+
+/// test option '-'
+RUN("echo \"print(args[1]);\" | tokudae - -x > %s", out);
+checkout("-x\n");
+
+/// test environment variables used by tokudae
+
+prepfile("print(package.path);");
+
+/// test TOKU_PATH
+RUN("env TOKU_INIT= TOKU_PATH=x tokudae %s > %s", prog, out);
+checkout("x\n");
+
+/// test TOKU_PATH_version
+RUN("env TOKU_INIT= TOKU_PATH_1_0=y TOKU_PATH=x tokudae %s > %s", prog, out);
+checkout("y\n");
+
+/// test TOKU_CPATH
+prepfile("print(package.cpath);");
+RUN("env TOKU_INIT= TOKU_CPATH=xuxu tokudae %s > %s", prog, out);
+checkout("xuxu\n");
+
+/// test TOKU_CPATH_version
+RUN("env TOKU_INIT= TOKU_CPATH_1_0=yacc TOKU_CPATH=x tokudae %s > %s", prog, out);
+checkout("yacc\n");
+
+/// test TOKU_INIT (and its access to 'args' list)
+prepfile("print(X);");
+RUN("env TOKU_INIT=\"X=tonum(args[1]);\" tokudae %s 3.2 > %s", prog, out);
+checkout("3.2\n");
+
+/// test TOKU_INIT_version
+prepfile("print(X);");
+RUN("env TOKU_INIT_1_0=\"X=10;\" TOKU_INIT=\"X=3;\" tokudae %s > %s", prog, out);
+checkout("10\n");
+
+/// test TOKU_INIT for files
+prepfile("x = x or 10; print(x); x = x + 1;");
+RUN("env TOKU_INIT=\"@%s\" tokudae %s > %s", prog, prog, out);
+checkout("10\n11\n");
+
+/// test errors in TOKU_INIT
+NoRun("TOKU_INIT:1: msg", "env TOKU_INIT='error(\"msg\");' tokudae");
+
+/// test option '-E'
+local defaultpath, defaultCpath;
+
+{
+    prepfile("print(package.path, package.cpath);");
+    RUN("env TOKU_INIT=\"error(10);\" TOKU_PATH=xxx TOKU_CPATH=xxx tokudae -E %s > %s",
+         prog, out);
+    local output = getoutput();
+    defaultpath = reg.match(output, "^(.-)\t");
+    defaultCpath = reg.match(output, "\t(.-)$");
+
+    /// running with an empty environment
+    RUN("env -i tokudae %s > %s", prog, out);
+    output = getoutput();
+    assert(defaultpath == reg.match(output, "^(.-)\t"));
+    assert(defaultCpath == reg.match(output, "\t(.-)$"));
+}
+
+/// paths did not change
+assert(!reg.find(defaultpath, "xxx") and
+       reg.find(defaultpath, "tokudae") and
+       !reg.find(defaultCpath, "xxx") and
+       reg.find(defaultCpath, "tokudae"));
+
+
+/// test replacement of ';;' to default path
+local fn convert(p) {
+    prepfile("print(package.path);");
+    RUN("env TOKU_PATH=\"%s\" tokudae %s > %s", p, prog, out);
+    local expected = getoutput();
+    expected = string.substr(expected, 0, -2); /// cut final end of line
+    if reg.find(p, ";;") {
+        p = reg.gsub(p, ";;", ";"..defaultpath..";");
+        p = reg.gsub(p, "^;", "");  /// remove ';' at the beginning
+        p = reg.gsub(p, ";$", "");  /// remove ';' at the end
+    }
+    assert(p == expected);
+}
+
+convert(";");
+convert(";;");
+convert("a;;b");
+convert(";;b");
+convert("a;;");
+convert("a;b;;c");
+
+
+/// test -l over multiple libraries
+prepfile("print(1); a=2; return {x=15};");
+prepfile(string.fmt("print(a); print(__G[\"%s\"].x);", prog), false, otherprog);
+RUN("env TOKU_PATH=\"?;;\" tokudae -l %s -l%s -lstring -l io %s > %s", prog, otherprog, otherprog, out);
+checkout("1\n2\n15\n2\n15\n");
+
+/// test explicit global names in -l
+prepfile("print(str.toupper(\"alo alo\"), m.max(10, 20));");
+RUN("tokudae -l 'str=string' '-lm=math' -e 'print(m.sin(0));' %s > %s", prog, out);
+checkout("0.0\nALO ALO\t20\n");
+
+
+/// test module names with version suffix ("_libs/lib2-v2")
+RUN("env TOKU_CPATH='./_libs/?.so' tokudae -l lib2-v2 -e 'print(lib2.id());' > %s", out);
+checkout("true\n");
+
+
+/// test 'cliargs and 'args' lists
+local a = [=[
+    assert(args.len == 4 and args[1] == "a" and
+           args[2] == "b" and args[3] == "c");
+    assert(cliargs.len == 3 and cliargs[0] == "%s" and
+           cliargs[1] == "-e "and cliargs[2] == "--");
+    assert(args[4] == undef and cliargs[3] == undef);
+    local _, a, b, c = ...;
+    assert(... != "a" and a == "a" and b == "b" and c == "c");
+]=];
+a = string.fmt(a, progname);
+prepfile(a);
+RUN("tokudae \"-e \" -- %s a b c", prog); /// "-e " runs an empty command
+
+/// test 'args' availability in libraries
+prepfile("assert(args);");
+prepfile("assert(args);", false, otherprog);
+RUN("env TOKU_PATH=\"?;;\" tokudae -l%s - < %s", prog, otherprog);
+
+/// test messing up the 'args' and 'cliargs' lists
+RUN("echo \"print(...);\" | tokudae -e \"args[0] = 100;\" - > %s", out);
+checkout("100\n");
+NoRun("'args' is not a list", "echo \"\" | tokudae -e \"args = 1;\" -");
+RUN("echo \"print(...);\" | tokudae -e \"args[0] = 100;\" - > %s", out);
+checkout("100\n");
+NoRun("'cliargs' is not a list", "echo \"\" | tokudae -e \"cliargs = 1;\" -");
+
+/// test error in 'print'
+RUN("echo 10 | tokudae -e \"print=nil;\" -i > /dev/null 2> %s", out);
+assert(reg.find(getoutput(), "error calling 'print'"));
+
+/// test 'debug.debug'
+RUN("echo \"io.stderr.write(1000);\ncont\" | tokudae -e \"import(\\\"debug\\\").debug();\" 2> %s", out);
+checkout("tokudae_debug> 1000tokudae_debug> ");
+
+{ /// test warning for locals
+    RUN("echo \"  		local x;\" | tokudae -i > %s 2>&1", out);
+    assert(string.find(getoutput(), "warning: "));
+
+    RUN("echo \"local1 = 10;\nlocal1 + 3\" | tokudae -i > %s 2>&1", out);
+    local t = getoutput();
+    assert(!string.find(t, "warning"));
+    assert(string.find(t, "13"));
+}
+
+print("testing warnings");
+
+/// no warnings by default
+RUN("echo \"io.stderr.write(1); warn([=[XXX]=]);\" | tokudae 2> %s", out);
+checkout("1");
+
+prepfile([=[
+warn("@allow");               /// unknown control, ignored
+warn("@off", "XXX", "@off");  /// these are not control messages
+warn("@off");                 /// this one is
+warn("@on", "YYY", "@on");    /// not control, but warn is off
+warn("@off");                 /// keep it off
+warn("@on");                  /// restart warnings
+warn("", "@on");              /// again, no control, real warning
+warn("@on");                  /// keep it "started"
+warn("Z", "Z", "Z");          /// common warning
+]=]);
+RUN("tokudae -W %s 2> %s", prog, out);
+checkout([=[
+Tokudae warning: @offXXX@off
+Tokudae warning: @on
+Tokudae warning: ZZZ
+]=]);
+
+if !__TESTS.gc and !__TESTS.memory { /* not running GC and memory tests? */
+    prepfile([=[
+        warn("@allow");
+        /// create two objects to be finalized when closing state
+        /// the errors in the finalizers must generate warnings
+        u1 = setmetatable(class{}, {__gc = ||{ error("XYZ"); }})();
+        u2 = setmetatable(class{}, {__gc = ||{ error("ZYX"); }})();
+    ]=]);
+    RUN("tokudae -W %s 2> %s", prog, out);
+    checkprogout("ZYX)\nXYZ)\n");
+
+    /// finalizer called when closing a state could
+    /// subvert finalization order
+    prepfile([=[
+        /// ensure instances will be collected only at the end of the program
+        gc("stop");
+
+        print("creating 1");
+        /// this finalizer should be called last
+        setmetatable(class{}, { __gc = || { print(1); } })();
+        print("creating 2");
+        setmetatable(class{}, { __gc = || {
+            print("2");
+            print("creating 3");
+            /// this finalizer should not be called, as object will be
+            /// created after 'toku_close' has been called
+            setmetatable(class{}, { __gc = || { print(3); } })();
+            print(gc() or false); /// cannot call collector here
+            os.exit(0, true);
+        }})();
+    ]=]);
+    RUN("tokudae -W %s > %s", prog, out);
+    checkout("creating 1\ncreating 2\n2\ncreating 3\nfalse\n1\n");
+}
+
+
+/// test many arguments
+prepfile([=[print(([...])[29]);]=]);
+RUN("tokudae %s %s > %s", prog, string.repeat(" a", 30), out);
+checkout("a\n");
+
+RUN([=[tokudae "-eprint(1);" "-ea=3;" -e "print(a);" > %s]=], out);
+checkout("1\n3\n");
+
+/// test interactive mode
+prepfile([=[
+(6*2-6); /// ===
+a =
+10;
+print(a);
+a]=]);
+RUN([=[tokudae -e"__PROMPT=\"\"; __PROMPT2=\"\";" -i < %s > %s]=], prog, out);
+checkprogout("6\n10\n10\n\n");
+
+prepfile("a = [=[b\nc\nd\ne]=];\na");
+RUN([=[tokudae -e"__PROMPT=\"\"; __PROMPT2=\"\";" -i < %s > %s]=], prog, out);
+checkprogout("b\nc\nd\ne\n\n");
+
+/// input interrupted in continuation line
+prepfile("a.\n");
+RUN([=[tokudae -i < %s > /dev/null 2> %s]=], prog, out);
+checkprogout("near <eof>\n");
+
+local prompt = "alo";
+prepfile([=[ ///
+a = 2;
+]=]);
+RUN([=[tokudae "-e__PROMPT=\"%s\";" -i < %s > %s]=], prompt, prog, out);
+local t = getoutput();
+assert(reg.find(t, prompt .. ".*" .. prompt .. ".*" .. prompt));
+
+/// using the prompt default
+prepfile([=[ ///
+a = 2;
+]=]);
+RUN([=[tokudae -i < %s > %s]=], prog, out);
+t = getoutput();
+prompt = "> "; /// the default
+assert(reg.find(t, prompt .. ".*" .. prompt .. ".*" .. prompt));
+
+
+/// non-string prompt
+prompt = [=[
+    local C = \"X\";
+    __PROMPT=setmetatable(class{}, {
+        __tostring = || {
+            C = C .. \"X\";
+            return C;
+        }
+    })();
+]=];
+prepfile([=[ ///
+a = 2;
+]=]);
+RUN([=[tokudae -e "%s" -i < %s > %s]=], prompt, prog, out);
+t = getoutput();
+/// skip version line and then check the presence of the three prompts
+assert(reg.find(t, "^.-\nXX[^\nX]*\n?XXX[^\nX]*\n?XXXX\n?$"));
+
+
+/// test for error objects
+prepfile([=[
+debug = import("debug");
+m = class {
+    __init = || { self.x = 0; return self; };
+};
+m = m();
+local mt = getmetatable(m);
+mt.__tostring = |x| { return tostr(debug.getinfo(4).currline + x.x); };
+setmetatable(getclass(m), mt);
+error(m);
+]=]);
+NoRun(progname .. ": 9\n", [=[tokudae %s]=], prog);
+
+prepfile("error({});");
+NoRun("error object is a table value", [=[tokudae %s]=], prog);
+
+
+/// chunk broken in many lines
+local s = [=[ ///
+fn f( x ) {
+  local a = [==[
+xuxu
+]==];
+  local b = "\
+xuxu\n";
+  if x == 11 return 1 + 12 , 2 + 20; /* test multiple returns */
+  return x + 1;
+  ///\\
+}
+return( f( 100 ) );
+assert( a == b );
+{ return f( 11 ); }  ]=];
+s = reg.gsub(s, " ", "\n\n"); /// change all spaces for newlines
+prepfile(s);
+RUN([=[tokudae -e"__PROMPT=\"\"; __PROMPT2=\"\";" -i < %s > %s]=], prog, out);
+checkprogout("101\n13\t22\n\n");
+
+prepfile([=[#comment in 1st line without \n at the end]=]);
+RUN("tokudae %s", prog);
+
+/// close tokudae with an open file
+prepfile(string.fmt([=[io.output(%q); io.write("alo");]=], out));
+RUN("tokudae %s", prog);
+checkout("alo");
+
+/// bug in 5.2 beta (extra \0 after version line)
+RUN([=[tokudae -v  -e"print(\"hello\");" > %s]=], out);
+t = getoutput();
+local pat = "PUC%-Rio\n.*Jure Bagi"..utf8.charpattern.."\nhello";
+assert(reg.find(t, pat));
+
+
+/// testing os.exit
+prepfile("os.exit(nil, true);");
+RUN("tokudae %s", prog);
+prepfile("os.exit(0, true);");
+RUN("tokudae %s", prog);
+prepfile("os.exit(true, true);");
+RUN("tokudae %s", prog);
+prepfile("os.exit(1, true);");
+NoRun("", "tokudae %s", prog);  /// no message
+prepfile("os.exit(false, true);");
+NoRun("", "tokudae %s", prog);  /// no message
+
+
+/// to-be-closed variables in main chunk
+prepfile([=[
+    local x <close> = setmetatable(class{}, {
+        __close = |_, err| { assert(err == nil); print("Ok"); }
+    })();
+    
+    local e1 <close> = setmetatable(class{}, {
+        __close = |_, _| { print(120); }
+    })();
+    os.exit(true, true);
+]=]);
+RUN("tokudae %s > %s", prog, out);
+checkprogout("120\nOk\n");
+
+
+/// remove temporary files
+assert(os.remove(prog));
+assert(os.remove(otherprog));
+assert(!os.remove(out));
+
+/// invalid options
+NoRun("unknown option '-g'", "tokudae -g");
+NoRun("unknown option '---'", "tokudae ---");
+NoRun("unknown option '-Ex'", "tokudae -Ex");
+NoRun("unknown option '-vv'", "tokudae -vv");
+NoRun("unknown option '-iv'", "tokudae -iv");
+NoRun("'-e' needs argument", "tokudae -e");
+NoRun("expected '='", "tokudae -e a");
+NoRun("'-l' needs argument", "tokudae -l");
+
+
+{
+    local Cwarn = (__c and __c.warn) or warn;
+    /// 'warn' must get at least one argument
+    local st, msg = pcall(Cwarn);
+    assert(string.find(msg, "string expected"));
+
+    /// 'warn' does not leave unfinished warning in case of errors
+    /// (message would appear in next warning)
+    st, msg = pcall(Cwarn, "SHOULD NOT APPEAR", {});
+    assert(string.find(msg, "string expected"));
+}
+
+{ /// testing Ctrl-C
+    /// interrupt a script
+    local fn kill(pid) {
+        return os.execute(string.fmt("kill -INT %s 2> /dev/null", pid));
+    }
+
+    /// function to run a script in background, returning its output file
+    /// descriptor and its pid
+    local fn runback(tokudaeprog) {
+        /// shell script to run 'tokudaeprog' in background and echo its pid
+        local shellprg = string.fmt("%s -e \"%s\" & echo $!", progname, tokudaeprog);
+        local f = io.popen(shellprg, "r");  /// run shell script
+        local pid = f.read(); /// get pid for Tokudae script
+        print("(if test fails now, it may leave a Tokudae script running in background, pid " .. pid .. ")");
+        return f, pid;
+    }
+
+    /// Tokudae script that runs protected infinite loop and then prints '42'
+    local f, pid = runback([=[
+        pcall(fn() { print(12); while true; }); print(42);]=]);
+    /// wait until script is inside 'pcall'
+    assert(f.read() == "12");
+    kill(pid); /// send INT signal to Tokudae script
+    /// check that 'pcall' captured the exception and script continued running
+    assert(f.read() == "42"); /// expected output
+    assert(f.close());
+
+    /// Tokudae script in a long unbreakable search
+    f, pid = runback([=[
+        print(15); reg.find(string.repeat(\"a\", 100000), \".*b\");]=]);
+    /// wait (so script can reach the loop)
+    assert(f.read() == "15");
+    assert(os.execute("sleep 1"));
+    /// must send at least two INT signals to stop this Tokudae script
+    local n = 100;
+    foreach i in range(100) { /// keep sending signals
+        if !kill(pid) { /// until it fails
+            n = i+1; /// number of non-failed kills
+            break;
+        }
+    }
+    assert(f.close());
+    assert(n >= 2);
+    print(string.fmt("done (with %d kills)", n));
+}

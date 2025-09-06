@@ -1,0 +1,18 @@
+local s = "What is your favorite animal?";
+assert(string.span(s, "tahwW siyorufv") == 20);
+assert(string.span(s, "tahwW syorufv") == 5);
+assert(string.span(s, "animal") == 0);
+
+assert(string.span(s, "") == 0);
+assert(string.span(s, "What isyourfvtenml?") == len(s));
+assert(string.span(s, string.ascii_lowercase) == 0);
+assert(string.span(s, string.ascii_uppercase) == 1);
+assert(string.span(s, string.ascii_letters) == 4);
+assert(string.span(s, string.ascii_letters .. " ") == len(s) - 1);
+assert(string.span(s, string.ascii_letters .. " ?") == len(s));
+
+assert(string.span(s, "What ", 3) == 2);
+assert(string.span(s, "What ", 2, 3) == 2);
+assert(string.span(s, "What ", 2, 2) == 1);
+assert(string.span(s, "What ", 2, 1) == nil);
+assert(string.span(s, "What ", nil, -(len(s)) - 1) == nil);

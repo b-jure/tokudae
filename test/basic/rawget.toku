@@ -1,0 +1,32 @@
+local a = class {
+    __getidx = fn(k) {
+        assert(k);
+        return nil;
+    };
+};
+local x = a();
+x.ok = 69;
+assert(x["ok"] == nil);
+assert(rawget(x, "ok") == 69);
+x = {ok = 69};
+assert(x["ok"] == 69);
+assert(rawget(x, "ok") == 69);
+assert(rawget(x, "notok") == undef);
+
+/// rawget only fields
+local class X {
+    fn a() {}
+    fn b() {}
+}
+x = X();
+x.c = 5;
+assert(x.c == 5 and rawget(x, "c") == 5);
+assert(rawget(x, "a") == nil);
+assert(typeof(x.a) == "bound method");
+assert(rawget(x, "b") == nil);
+assert(typeof(x.b) == "bound method");
+
+/// allow bound methods
+assert(typeof(rawget(x, "a", true)) == "bound method");
+assert(typeof(rawget(x, "b", true)) == "bound method");
+assert(rawget(x, "c", true) == 5);

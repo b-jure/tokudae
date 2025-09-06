@@ -1,0 +1,135 @@
+local t = {};
+assert(typeof(t) == "table");
+class t.line {
+    __init = fn(x, y) {
+        self.x = x;
+        self.y = y;
+        return self;
+    };
+    fn cords() {
+        return self.x, self.y;
+    }
+}
+assert(typeof(t.line) == "class");
+t.myline = t.line(15, 12);
+assert(typeof(t.myline) == "instance");
+assert(t.myline.x == 15);
+assert(t.myline.y == 12);
+local x, y = t.myline.cords();
+assert(x == 15);
+assert(y == 12);
+t.config = {};
+assert(typeof(t.config) == "table");
+class t.config.point {
+    __init = fn(x, y) {
+        self.x = x;
+        self.y = y;
+        return self;
+    };
+    fn cords() {
+        return self.x, self.y;
+    }
+}
+assert(typeof(t.config.point) == "class");
+t.config.myconfig = t.config.point(69, 420);
+assert(typeof(t.config.myconfig) == "instance");
+x, y = t.config.myconfig.cords();
+assert(x == 69);
+assert(y == 420);
+
+{
+    class Vec2 {
+        __init = |x, y| {
+            self.x = (x or 0);
+            self.y = (y or 0);
+            return self;
+        };
+        __add = |rhs| {
+            return getclass(self)(self.x + rhs.x, self.y + rhs.y);
+        };
+        __name = "Vec2";
+    };
+    local class x inherits Vec2 {} /* inherits all metafields */
+    local vec = x(2, 3) + x(3, 3);
+    assert(vec.x == 5 and vec.y == 6);
+    assert(string.find(tostr(vec), "Vec2"));
+}
+
+
+/* test locals inside class statement */
+
+class t.Counter {
+    local empty1 <close> = nil;
+    local empty2 <close> = false;
+    local empty3 <close>;
+    local count = 0;
+    fn tick() {
+        local oldcount = count;
+        count++;
+        return oldcount;
+    }
+    local padding1 = fn() {};
+    local padding2 = 5;
+    local padding3 = fn() {};
+    local padding4 = "garbage";
+    fn reset() {
+        count = 0;
+    }
+    fn donothing() {
+        return "nothing";
+    }
+}
+
+local oldc = t.Counter();
+assert(oldc.tick() == 0);
+assert(oldc.tick() == 1);
+assert(oldc.tick() == 2);
+assert(oldc.tick() == 3);
+assert(oldc.tick() == 4);
+assert(oldc.tick() == 5);
+assert(oldc.tick() == 6);
+assert(oldc.tick() == 7);
+assert(oldc.tick() == 8);
+oldc.reset();
+assert(oldc.tick() == 0);
+assert(oldc.tick() == 1);
+assert(oldc.tick() == 2);
+assert(oldc.tick() == 3);
+assert(oldc.tick() == 4);
+assert(oldc.tick() == 5);
+assert(oldc.tick() == 6);
+assert(oldc.tick() == 7);
+assert(oldc.tick() == 8);
+assert(oldc.donothing() == "nothing");
+
+class t.MyCounter inherits (class inherits t.Counter {}) {}
+local c = t.MyCounter();
+/* all inherited methods are the same as are their upvalues */
+assert(c.tick() == 9);
+assert(c.tick() == 10);
+assert(c.tick() == 11);
+assert(c.tick() == 12);
+c.reset();
+assert(c.tick() == 0);
+assert(c.tick() == 1);
+assert(c.tick() == 2);
+assert(c.tick() == 3);
+assert(c.donothing() == "nothing");
+
+assert(!getmetatable(t.MyCounter));
+setmetatable(t.MyCounter, {
+    __init = |self| {
+        self.reset();
+        return self;
+    };
+});
+c = t.MyCounter();
+assert(c.tick() == 0);
+assert(c.tick() == 1);
+assert(c.tick() == 2);
+assert(c.tick() == 3);
+c = t.MyCounter();
+assert(c.tick() == 0);
+assert(c.tick() == 1);
+assert(c.tick() == 2);
+assert(c.tick() == 3);
