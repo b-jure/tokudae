@@ -138,7 +138,7 @@
 
 #if defined(TOKU_USE_WINDOWS)       /* { */
 
-#define t_getenv(name)      getenv(name)
+#define t_getenv(T, name)       (UNUSED(T), getenv(name))
 
 static int t_setenv(toku_State *T, const char *name, const char *value) {
     size_t ln = strlen(name); 
@@ -159,7 +159,7 @@ static int t_setenv(toku_State *T, const char *name, const char *value) {
 
 #elif defined(TOKU_USE_POSIX)         /* }{ */
 
-#define t_getenv(name)      getenv(name)
+#define t_getenv(T, name)       (UNUSED(T), getenv(name))
 
 static int t_setenv(toku_State *T, const char *name, const char *value) {
     int res;
@@ -240,7 +240,7 @@ static int os_tmpname(toku_State *T) {
 
 
 static int os_getenv(toku_State *T) {
-    toku_push_string(T, t_getenv(tokuL_check_string(T, 0))); /* if NULL push nil */
+    toku_push_string(T, t_getenv(T, tokuL_check_string(T, 0))); /*NULL==nil*/
     return 1;
 }
 
