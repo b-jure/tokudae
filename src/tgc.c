@@ -833,7 +833,7 @@ static void restartgc(GState *gs) {
 ** call to finalizer.
 */
 static t_mem singlestep(toku_State *T) {
-    t_mem work;
+    t_mem work = 0; /* to prevent warnings */
     GState *gs = G(T);
     gs->gcstopem = 1; /* prevent emergency collections */
     switch (gs->gcstate) {

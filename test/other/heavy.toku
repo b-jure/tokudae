@@ -150,7 +150,7 @@ fn toomanyidx() {
   
 
 
-if __heavy and !__port {
+if !__port and __heavy {
     /// skip them anyway
     (Message or print)("skipped heavy non-portable tests");
     ///teststring();

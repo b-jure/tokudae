@@ -1,4 +1,4 @@
-if __port or !(__POSIX and __WINDOWS) {
+if __port or !(__POSIX or __WINDOWS) {
     (Message or print)("skipped pclose/popen/execute tests");
     return; /* these tests requre either posix or windows environment */
 }

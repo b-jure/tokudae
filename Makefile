@@ -1,8 +1,8 @@
 # Makefile for installing Tokudae
 
 # Use one of these configurations (or add yours)
-#include config_linux.mk
-include config_mingw.mk
+include config_linux.mk
+#include config_mingw.mk
 
 CORE_O = src/tapi.o src/tlist.o src/tcode.o src/tdebug.o src/tfunction.o\
 	 src/tgc.o src/ttable.o src/tlexer.o src/tmem.o src/tmeta.o\

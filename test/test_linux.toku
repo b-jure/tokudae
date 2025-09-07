@@ -537,7 +537,7 @@ local fn run_test(filepath) {
 ** @isend - ?any
 */
 local fn testsuite_headerfmt(tsuite, isend) {
-    local txt, mode, cl = "BEGIN", fn(x) :: return x, MAGENTA;
+    local txt, mode, cl = "BEGIN", fn(x) {return x}, MAGENTA;
     if isend {
         mode = STRIKE;
         cl = CYAN;
@@ -1150,6 +1150,8 @@ local fn set_output_options() {
                 io.write(tostr(arg));
             }
             io.write("\n");
+            output().flush();
+            output().close();
             output(oldout);
         };
 
@@ -1178,6 +1180,8 @@ local fn set_output_options() {
             }
             str = str .. "\n";
             io.write(str);
+            output().flush();
+            output().close();
             output(oldout);
         };
     }
