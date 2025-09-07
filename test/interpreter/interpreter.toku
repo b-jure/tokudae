@@ -1,11 +1,10 @@
 /// most (all?) tests here assume a reasonable "Unix-like" shell
-if __port or (cliargs or __cliargs)[0] != "../tokudae" {
+if __port or !__POSIX or (cliargs or __cliargs)[0] != "../tokudae" {
     (Message or print)("skipped interpreter test");
     return;
 }
 
-/// use only "double quotes" inside shell scripts (better change to
-/// run on Windows)
+/// use only "double quotes" inside shell scripts (better change to run on Windows)
 
 assert(os.execute()); /// machine has a system command
 
@@ -83,7 +82,7 @@ prepfile([=[
 RUN("tokudae - < %s > %s", prog, out);
 checkout("1\tnil\n");
 
-RUN("echo \"print(10);\nprint(2);\n\" | tokudae > %s", out);
+RUN("echo \"print(10);\nprint(2);\n\" | tokudae - > %s", out);
 checkout("10\n2\n");
 
 
@@ -140,7 +139,6 @@ local defaultpath, defaultCpath;
     local output = getoutput();
     defaultpath = reg.match(output, "^(.-)\t");
     defaultCpath = reg.match(output, "\t(.-)$");
-
     /// running with an empty environment
     RUN("env -i tokudae %s > %s", prog, out);
     output = getoutput();

@@ -5,9 +5,7 @@ local fn testerr(msg, f, ...) {
     return (!stat and string.find(err, msg));
 }
 
-local fn checkerr(msg, f, ...) {
-    assert(testerr(msg, f, ...));
-}
+local fn checkerr(msg, f, ...) :: assert(testerr(msg, f, ...));
 
 assert(os.date("") == "");
 assert(os.date("!") == "");
@@ -61,7 +59,7 @@ if (math.maxint > 2**31) # have larger toku_Integer?
 
 
 if !__port {
-    if (__POSIX) { /* test Posix-specific modifiers */
+    if __POSIX { /* test Posix-specific modifiers */
         assert(typeof(os.date("%Ex")) == "string");
         assert(typeof(os.date("%Oy")) == "string");
     }
@@ -88,9 +86,12 @@ if !__port {
             /* this is the maximum year */
             assert(tonum(os.time({year=(1 << 31) + 1899, month=12, day=31,
                                   hour=23, min=59, sec=59})));
-            /* this is too much */
-            checkerr("represented", os.time, {year=(1 << 31) + 1899, month=12,
-                    day=31, hour=23, min=59, sec=60});
+	    if __POSIX or __WINDOWS {
+            	/* this is too much */
+            	checkerr("represented", os.time, {year=(1 << 31) + 1899, month=12,
+                     	 day=31, hour=23, min=59, sec=60});
+	    } else
+		(Message or print)("skipped time limit test");
         }
         /* internal 'int' fields cannot hold these values */
         checkerr("field 'day' is out-of-bound", os.time,

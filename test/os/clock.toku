@@ -1,6 +1,8 @@
+local lim = (__opts and __opts.noprint) and 5000 or 500000;
 local start = os.clock();
 assert(start and typeof(start) == "number");
-for (local i = 0; i < 5000; i = i + 1);
+for (local i = 0; i < lim; i = i + 1) print(i); /* print stuff to make sure it takes long */
 local end = os.clock();
 assert(end and typeof(end) == "number");
+print(end, start);
 assert(end - start > 0);

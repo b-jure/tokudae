@@ -1,6 +1,8 @@
 # custom
 tags
 tokudae
+install
+*.swp
 
 # Object files
 *.o

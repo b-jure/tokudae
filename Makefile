@@ -1,8 +1,9 @@
 # Makefile for installing Tokudae
 
-include config.mk
+# Use one of these configurations (or add yours)
+#include config_linux.mk
+include config_mingw.mk
 
-TOKUDAE_A = libtokudae.a
 CORE_O = src/tapi.o src/tlist.o src/tcode.o src/tdebug.o src/tfunction.o\
 	 src/tgc.o src/ttable.o src/tlexer.o src/tmem.o src/tmeta.o\
 	 src/tobject.o src/tparser.o src/tvm.o src/tprotected.o src/treader.o\
@@ -12,7 +13,6 @@ LIB_O = src/tokudaeaux.o src/tbaselib.o src/tloadlib.o src/tokudaelib.o src/tstr
 	src/tutf8lib.o
 BASE_O = $(CORE_O) $(LIB_O) $(MYOBJS)
 
-TOKUDAE_T = tokudae
 TOKUDAE_O = src/tokudae.o
 
 ALL_O= $(BASE_O) $(TOKUDAE_O)
@@ -20,10 +20,10 @@ ALL_T= $(TOKUDAE_A) $(TOKUDAE_T)
 ALL_A= $(TOKUDAE_A)
 
 # What to install.
-TO_BIN = tokudae
-TO_INC = tokudae.h tokudaeconf.h tokudaelib.h tokudaeaux.h tokudaelimits.h tokudae.hpp
-TO_LIB = libtokudae.a
-TO_MAN = tokudae.1
+TO_BIN = $(TOKUDAE_T)
+TO_INC = src/tokudae.h src/tokudaeconf.h src/tokudaelib.h src/tokudaeaux.h src/tokudaelimits.h src/tokudae.hpp
+TO_LIB = $(TOKUDAE_A)
+TO_MAN = doc/tokudae.1
 
 default: $(PLATFORM)
 
@@ -72,59 +72,35 @@ guess:
 	@echo Guessing `$(UNAME)`
 	@$(MAKE) `$(UNAME)`
 
-AIX aix:
-	$(MAKE) $(ALL) CC="xlc" CFLAGS="-O2 -DTOKU_USE_POSIX -DTOKU_USE_DLOPEN" SYSLIBS="-ldl" SYSLDFLAGS="-brtl -bexpall"
-
-bsd:
-	$(MAKE) $(ALL) SYSCFLAGS="-DTOKU_USE_POSIX -DTOKU_USE_DLOPEN" SYSLIBS="-Wl,-E"
-
-FreeBSD NetBSD OpenBSD freebsd:
-	$(MAKE) $(ALL) SYSCFLAGS="-DTOKU_USE_LINUX -DTOKU_USE_READLINE -I/usr/include/edit" SYSLIBS="-Wl,-E -ledit" CC="cc"
-
 generic: $(ALL)
 
-ios:
-	$(MAKE) $(ALL) SYSCFLAGS="-DTOKU_USE_IOS"
+linux: $(ALL)
 
-Linux linux: linux-noreadline
+linux-noreadline: $(ALL)
 
-linux-noreadline:
-	$(MAKE) $(ALL) SYSLIBS="-Wl,-E"
+linux-readline: $(ALL)
 
-linux-readline: 	clean
-	$(MAKE) $(ALL) SYSCFLAGS="-DTOKU_USE_LINUX -DTOKU_USE_READLINE" SYSLIBS="-Wl,-E -ldl -lreadline"
-
-Darwin macos macosx:
-	$(MAKE) $(ALL) SYSCFLAGS="-DTOKU_USE_MACOSX -DTOKU_USE_READLINE" SYSLIBS="-lreadline"
-
-mingw:
-	$(MAKE) "TOKUDAE_A=tokudae1.dll" "TOKUDAE_T=tokudae.exe" \
-	"AR=$(CC) -shared -o" "RANLIB=strip --strip-unneeded" \
-	"SYSCFLAGS=-DTOKU_BUILD_AS_DLL" "SYSLIBS=" "SYSLDFLAGS=-s" tokudae.exe
+mingw: $(ALL)
 
 posix:
 	$(MAKE) $(ALL) SYSCFLAGS="-DTOKU_USE_POSIX"
 
-SunOS solaris:
-	$(MAKE) $(ALL) SYSCFLAGS="-DTOKU_USE_POSIX -DTOKU_USE_DLOPEN -D_REENTRANT" SYSLIBS="-ldl"
-
-
 install: dummy
-	cd src && $(MKDIR) $(INSTALL_BIN) $(INSTALL_INC) $(INSTALL_LIB) \
-		  $(INSTALL_MAN) $(INSTALL_TMOD) $(INSTALL_CMOD)
-	cd src && $(INSTALL_EXEC) $(TO_BIN) $(INSTALL_BIN)
-	cd src && $(INSTALL_DATA) $(TO_INC) $(INSTALL_INC)
-	cd src && $(INSTALL_DATA) $(TO_LIB) $(INSTALL_LIB)
-	cd doc && $(INSTALL_DATA) $(TO_MAN) $(INSTALL_MAN)
+	$(MKDIR) $(INSTALL_BIN) $(INSTALL_INC) $(INSTALL_LIB) \
+		 $(INSTALL_MAN) $(INSTALL_TMOD) $(INSTALL_CMOD)
+	$(INSTALL_EXEC) $(TO_BIN) $(INSTALL_BIN)
+	$(INSTALL_DATA) $(TO_INC) $(INSTALL_INC)
+	$(INSTALL_DATA) $(TO_LIB) $(INSTALL_LIB)
+	$(INSTALL_DATA) $(TO_MAN) $(INSTALL_MAN)
 
 uninstall:
-	cd src && cd $(INSTALL_BIN) && $(RM) $(TO_BIN)
-	cd src && cd $(INSTALL_INC) && $(RM) $(TO_INC)
-	cd src && cd $(INSTALL_LIB) && $(RM) $(TO_LIB)
-	cd doc && cd $(INSTALL_MAN) && $(RM) $(TO_MAN)
+	cd $(INSTALL_BIN) && $(RM) $(TO_BIN)
+	cd $(INSTALL_INC) && $(RM) $(TO_INC)
+	cd $(INSTALL_LIB) && $(RM) $(TO_LIB)
+	cd $(INSTALL_MAN) && $(RM) $(TO_MAN)
 
 local:
-	$(MAKE) install INSTALL_ROOT=../install
+	$(MAKE) install INSTALL_ROOT=./install
 
 # make may get confused with install/ if it does not support .PHONY.
 dummy:
@@ -160,13 +136,13 @@ pc:
 	echo pc o a depend buildecho
 
 # Compiler modules may use special flags.
-clexer.o:
+tlexer.o:
 	$(CC) $(CFLAGS) $(CMCFLAGS) -c tlexer.c
 
-cparser.o:
+tparser.o:
 	$(CC) $(CFLAGS) $(CMCFLAGS) -c tparser.c
 
-ccode.o:
+tcode.o:
 	$(CC) $(CFLAGS) $(CMCFLAGS) -c tcode.c
 
 # DO NOT DELETE
@@ -235,12 +211,12 @@ tmeta.o: src/tmeta.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
 tobject.o: src/tobject.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
  src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tvm.h \
  src/tstate.h src/tlist.h src/tmeta.h
-tokudaeaux.o: src/tokudaeaux.c src/tokudaeprefix.h src/ttrace.h \
- src/tobject.h src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h \
- src/tokudaeaux.h
 tokudae.o: src/tokudae.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
  src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
  src/tokudaelib.h
+tokudaeaux.o: src/tokudaeaux.c src/tokudaeprefix.h src/ttrace.h \
+ src/tobject.h src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h \
+ src/tokudaeaux.h
 tokudaelib.o: src/tokudaelib.c src/tokudaeprefix.h src/ttrace.h \
  src/tobject.h src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h \
  src/tokudaelib.h src/tokudaeaux.h

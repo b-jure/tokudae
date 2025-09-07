@@ -1,4 +1,4 @@
-# Configuration file for building and installing Tokudae
+# Configuration file for building and installing Tokudae on mingw
 
 
 # {=========================================================================
@@ -13,8 +13,8 @@ R = $(V).0
 # 				Paths & Installing
 # ==========================================================================
 # Your platform (see PLATFORMS for possible values).
-PLATFORM = linux
-PLATFORMS = guess aix bsd freebsd ios macosx posix solaris linux mingw generic 
+PLATFORM = mingw
+PLATFORMS = guess posix linux linux-readline mingw generic 
 
 # Install paths
 INSTALL_ROOT = /usr/local
@@ -40,11 +40,11 @@ INSTALL_DATA = $(INSTALL) -m 0644
 # -DTOKUI_TRACE_EXEC => Traces bytecode execution (including stack state).
 # -DTOKUI_DISASSEMBLE_BYTECODE => Disassembles precompiled chunks.
 # -DTOKUI_EMERGENCYGCTESTS => Forces an emergency collection at every single
-# allocation.
+# 			      allocation.
 # -DTOKUI_HARDMEMTESTS => Forces a full collection at all points where the
-# collector can run.
+# 			  collector can run.
 # -DTOKUI_HARDSTACKTESTS => forces a reallocation of the stack at every point
-# where the stack can be reallocated.
+# 			    where the stack can be reallocated.
 
 CC = gcc
 CFLAGS = -std=c99 -Wfatal-errors -Wall -Wextra -Werror -Wconversion $(SYSCFLAGS) $(MYCFLAGS)
@@ -52,24 +52,24 @@ LDFLAGS = $(SYSLDFLAGS) $(MYLDFLAGS)
 LIBS = -lm $(SYSLIBS) $(MYLIBS)
 
 # system flags
-SYSCFLAGS =
-SYSLDFLAGS =
+SYSCFLAGS = -DTOKU_BUILD_AS_DLL
+SYSLDFLAGS = -s
 SYSLIBS =
 
 # Release flags
-#MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
-#MYLDFLAGS =
-#MYLIBS =
-#MYOBJS =
+MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
+MYLDFLAGS =
+MYLIBS =
+MYOBJS =
 
 # Testing flags
 #ASANFLAGS = -fsanitize=address -fsanitize=undefined \
 # 	    -fsanitize=pointer-subtract -fsanitize=pointer-compare
-MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
-	   #-DTOKUI_DISASSEMBLE_BYTECODE -DTOKUI_TRACE_EXEC
-MYLDFLAGS = $(ASANFLAGS)
-MYLIBS =
-MYOBJS =
+#MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
+#	   #-DTOKUI_DISASSEMBLE_BYTECODE -DTOKUI_TRACE_EXEC
+#MYLDFLAGS = $(ASANFLAGS)
+#MYLIBS =
+#MYOBJS =
 
 # Special flags for compiler modules; -Os reduces code size.
 CMCFLAGS= 
@@ -79,9 +79,17 @@ CMCFLAGS=
 # {=========================================================================
 # 			Archiver and Other Utilities
 # ==========================================================================
-AR = ar rcu
-RANLIB = ranlib
+AR = gcc -shared -o
+RANLIB = strip --strip-unneeded
 RM = rm -f
 MKDIR = mkdir -p
 UNAME = uname
+# }=========================================================================
+
+
+# {=========================================================================
+# 			       Targets
+# ==========================================================================
+TOKUDAE_T = tokudae.exe
+TOKUDAE_A = tokudae1.dll
 # }=========================================================================

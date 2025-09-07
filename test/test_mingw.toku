@@ -1,4 +1,4 @@
-#!../tokudae
+#!../tokudae.exe
 
 /* Quick version check, keep this first! */
 local version = "Tokudae 1.0";
@@ -40,7 +40,7 @@ __opts = {
 /* false if not running heavy tests */
 __heavy = __G.__heavy or true; /* default is true */
 /* false if runnning non-portable tests or assuming posix/windows environment */
-__port = __G.__port or !(__POSIX or __WINDOWS); /* default is false on windows and posix */
+__port = __G.__port or false;
 /* false if not reporting messages of (parts of) tests not performed */
 __skipmsg = __G.__skipmsg or true; /* default is true */
 
@@ -49,15 +49,17 @@ __skipmsg = __G.__skipmsg or true; /* default is true */
 ** standalone executable or running non-portable options.
 */
 
-local make_target = !__port and "linux-readline" or "guess";
+local script_name = "test_mingw.toku";
+
+local make_target = !__port and "mingw" or "generic";
 local make_threads = !__port and 12 or 1;
 
-local dev_null = __POSIX and "/dev/null" or "nul";
+local dev_null = "/dev/null";
 local dev_null1 = " > " .. dev_null;
 local dev_null2 = " 2> " .. dev_null;
 local dev_null12 = dev_null1 .. " 2>&1";
 
-local cp = __POSIX and "cp" or "copy";
+local cp = "cp";
 
 /* }===================================================================== */
 
@@ -69,7 +71,7 @@ local cp = __POSIX and "cp" or "copy";
 */
 
 /* save program name */
-local prog =  "../tokudae";
+local prog =  "../tokudae.exe";
 local oldprog = prog .. ".old";
 
 
@@ -78,8 +80,8 @@ if (string.startswith(args[0], "./") and !string.startswith(script, "./"))
     script = "./" .. script;
 
 
-if script != "./test.toku" {
-    io.stderr.write("Test script must be run as a command.\nExiting...");
+if script != "./" .. script_name {
+    io.stderr.write(string.fmt("Test script '%s' must be run as a command. ('./%s')\nExiting...", script, script_name));
     return; /* done */
 }
 
@@ -285,26 +287,15 @@ local fn buildcmd(...) {
 */
 local fn lscmd(what, path) {
     local cmd;
-    assert(__POSIX or __WINDOWS);
     if (what == "d") { /* list directories? */
-        if (__POSIX) { /* posix environment? */
-            cmd = "ls -p"; /* use 'ls' */
-            if (path) cmd = buildcmd(cmd, path);
-            cmd = buildcmd(cmd, "| grep /"); /* and 'grep' */
-        } else { /* otherwise windows environment */
-            cmd = "dir /b /a:d"; /* use 'dir' */
-            if (path) cmd = buildcmd(cmd, path);
-        }
+        cmd = "ls -p"; /* use 'ls' */
+        if (path) cmd = buildcmd(cmd, path);
+        cmd = buildcmd(cmd, "| grep /"); /* and 'grep' */
     } else { /* otherwise list non-hidden files */
         assert(what == "f");
-        if (__POSIX) {
-            cmd = "ls -p ";
-            if (path) cmd = buildcmd(cmd, path);
-            cmd = buildcmd(cmd, "| grep -v /"); /* and 'grep' */
-        } else {
-            cmd = "dir /b /a:-d-h ";
-            if (path) cmd = buildcmd(cmd, path);
-        }
+        cmd = "ls -p ";
+        if (path) cmd = buildcmd(cmd, path);
+        cmd = buildcmd(cmd, "| grep -v /"); /* and 'grep' */
     }
     return cmd;
 }
@@ -328,7 +319,7 @@ local fn verify_tests_table(tests) {
 
 
 /* combination of 'error' and 'string.fmt' */
-local fn errorfmt(fmt, ...) error(fmt(fmt, ...));
+local fn errorfmt(fmt, ...) :: error(fmt(fmt, ...));
 
 
 /*
@@ -1175,7 +1166,8 @@ local fn set_output_options() {
                 io.write(tostr(arg));
             }
             io.write("\n");
-            output(oldout);
+	    output().close(); /* close current output file */
+            output(oldout); /* open and restore old output file */
         };
 
         /* replace 'printf' while testing */
@@ -1203,7 +1195,8 @@ local fn set_output_options() {
             }
             str = str .. "\n";
             io.write(str);
-            output(oldout);
+	    output().close(); /* close current output file */
+            output(oldout); /* open and restore old output file */
         };
     }
     if !__opts.warnings { /* no warnings? */
