@@ -27,7 +27,7 @@ TO_MAN = doc/tokudae.1
 
 default: $(PLATFORM)
 
-all: clean $(ALL_T) 
+all: $(ALL_T) 
 
 o: $(ALL_O)
 

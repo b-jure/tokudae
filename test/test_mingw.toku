@@ -1166,8 +1166,8 @@ local fn set_output_options() {
                 io.write(tostr(arg));
             }
             io.write("\n");
-            out.flush();
-            out.close();
+            output().flush();
+            output().close();
             output(oldout); /* open and restore old output file */
         };
 
@@ -1196,8 +1196,8 @@ local fn set_output_options() {
             }
             str = str .. "\n";
             io.write(str);
-            out.flush();
-            out.close();
+            output().flush();
+            output().close();
             output(oldout); /* open and restore old output file */
         };
     }
