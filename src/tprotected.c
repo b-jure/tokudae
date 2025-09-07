@@ -30,52 +30,62 @@
 ** =======================================================
 */
 
+
+/* chain list of long jump buffers */
+typedef struct toku_longjmp {
+    struct toku_longjmp *prev;
+    jmp_buf buf;
+    volatile int status;
+} toku_longjmp;
+
+
 /*
 ** TOKUI_THROW/TOKUI_TRY define how Tokudae does exception handling. By
 ** default, Tokudae handles errors with exceptions when compiling as
-** T++ code, with _longjmp/_setjmp when asked to use them, and with
+** C++ code, with _longjmp/_setjmp when available (POSIX), and with
 ** longjmp/setjmp otherwise.
 */
 #if !defined(TOKUI_THROW)				/* { */
 
 #if defined(__cplusplus) && !defined(TOKU_USE_LONGJMP)	/* { */
 
-/* T++ exceptions */
+/* C++ exceptions */
 #define TOKUI_THROW(T,c)	throw(c)
-#define TOKUI_TRY(T,c,a) \
-	try { a } catch(...) { if ((c)->status == 0) (c)->status = -1; }
-#define t_jmpbuf	        int  /* dummy variable */
+
+static void TOKUI_TRY(toku_State *T, toku_longjmp *c, ProtectedFn *f,
+                                                      void *ud) {
+    try {
+        f(L, ud); /* call function protected */
+    }
+    catch (toku_longjmp *c1) { /* Tokudae error */
+        if (c1 != c) /* not the correct level? */
+            throw; /* rethrow to upper level */
+    }
+    catch (...) { /* non-Tokudae exception */
+        c->status = -1; /* create some error code */
+    }
+}
+
 
 #elif defined(TOKU_USE_POSIX)				/* }{ */
 
 /*
-** In POSIX, try _longjmp/_setjmp
+** In POSIX, use _longjmp/_setjmp
 ** (more efficient, does not manipulate signal mask).
 */
 #define TOKUI_THROW(T,c)	_longjmp((c)->buf, 1)
-#define TOKUI_TRY(T,c,a)	if (_setjmp((c)->buf) == 0) { a }
-#define t_jmpbuf		jmp_buf
+#define TOKUI_TRY(T,c,f,ud)	if (_setjmp((c)->buf) == 0) ((f)(T,ud))
+
 
 #else						        /* }{ */
 
 /* ISO C handling with long jumps */
 #define TOKUI_THROW(T,c)	longjmp((c)->buf, 1)
-#define TOKUI_TRY(T,c,a)	if (setjmp((c)->buf) == 0) { a }
-#define t_jmpbuf		jmp_buf
+#define TOKUI_TRY(T,c,f,ud)	if (setjmp((c)->buf) == 0) ((f)(T,ud))
 
 #endif							/* } */
 
 #endif							/* } */
-
-
-
-/* chain list of long jump buffers */
-typedef struct toku_longjmp {
-    struct toku_longjmp *prev;
-    t_jmpbuf buf;
-    volatile int status;
-} toku_longjmp;
-
 
 
 void tokuPR_seterrorobj(toku_State *T, int errcode, SPtr oldtop) {
@@ -129,15 +139,13 @@ t_noret tokuPR_throw(toku_State *T, int errcode) {
 }
 
 
-int tokuPR_rawcall(toku_State *T, ProtectedFn fn, void *ud) {
+int tokuPR_rawcall(toku_State *T, ProtectedFn f, void *ud) {
     t_uint32 old_nCcalls = T->nCcalls;
     toku_longjmp lj;
     lj.status = TOKU_STATUS_OK;
     lj.prev = T->errjmp;
     T->errjmp = &lj;
-    TOKUI_TRY(T, &lj, 
-        fn(T, ud);
-    );
+    TOKUI_TRY(T, &lj, f, ud); /* call 'f' catching errors */
     T->errjmp = lj.prev;
     T->nCcalls = old_nCcalls;
     return lj.status;
@@ -146,14 +154,14 @@ int tokuPR_rawcall(toku_State *T, ProtectedFn fn, void *ud) {
 /* }====================================================== */
 
 
-int tokuPR_call(toku_State *T, ProtectedFn fn, void *ud,
-              ptrdiff_t old_top, ptrdiff_t ef) {
+int tokuPR_call(toku_State *T, ProtectedFn f, void *ud, ptrdiff_t old_top,
+                                                        ptrdiff_t ef) {
     int status;
     CallFrame *old_cf = T->cf;
     t_ubyte old_allowhook = T->allowhook;
     ptrdiff_t old_errfunc = T->errfunc;
     T->errfunc = ef;
-    status = tokuPR_rawcall(T, fn, ud);
+    status = tokuPR_rawcall(T, f, ud);
     if (t_unlikely(status != TOKU_STATUS_OK)) {
         T->cf = old_cf;
         T->allowhook = old_allowhook;

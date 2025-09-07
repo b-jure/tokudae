@@ -224,7 +224,12 @@
 
 
 #define TOKULIB_API     TOKU_API
+
+#if defined(__cplusplus)
+#define TOKUMOD_API     extern "C"
+#else
 #define TOKUMOD_API     TOKU_API
+#endif
 
 
 /*

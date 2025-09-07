@@ -407,7 +407,7 @@ TOKU_API void *toku_to_userdata(toku_State *T, int index) {
 
 /*
 ** Returns a pointer to the internal representation of an object.
-** Note that ANSI T does not allow the conversion of a pointer to
+** Note that ISO C does not allow the conversion of a pointer to
 ** function to a 'void*', so the conversion here goes through
 ** a 'size_t'. (As the returned pointer is only informative, this
 ** conversion should not be a problem.)

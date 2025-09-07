@@ -115,7 +115,7 @@ static int checkmode(const char *mode) {
 #elif defined(TOKU_USE_WINDOWS) && !defined(_CRTIMP_TYPEINFO) \
    && defined(_MST_VER) && (_MST_VER >= 1400)	/* }{ */
 
-/* Windows (but not DDK) and Visual T++ 2005 or higher */
+/* Windows (but not DDK) and Visual C++ 2005 or higher */
 #define t_fseek(f,o,w)		_fseeki64(f,o,w)
 #define t_ftell(f)		_ftelli64(f)
 #define t_seeknum		__int64
