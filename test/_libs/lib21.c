@@ -1,3 +1,5 @@
+#define TOKU_LIB
+
 #include "tokudae.h"
 
 

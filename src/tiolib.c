@@ -592,7 +592,7 @@ static int aux_read(toku_State *T, FILE *f, int first) {
         success = 1;
         for (n = first; nargs-- && success; n++) {
             if (toku_type(T, n) == TOKU_T_NUMBER) {
-                size_t l = t_castS2U(tokuL_check_integer(T, n));
+                size_t l = cast_sizet(t_castS2U(tokuL_check_integer(T, n)));
                 success = (l == 0) ? test_eof(T, f) : read_chars(T, f, l);
             } else {
                 size_t lp;

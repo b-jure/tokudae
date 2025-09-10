@@ -1,4 +1,5 @@
 local a,b = reg.find("", ""); /// empty patterns are tricky
+print(a,b);
 assert(a == 0 and b == -1);
 a,b = reg.find("alo", "");
 assert(a == 0 and b == -1);

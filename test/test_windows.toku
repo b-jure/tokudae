@@ -1,5 +1,3 @@
-#!../tokudae
-
 /* Quick version check, keep this first! */
 local version = "Tokudae 1.0";
 if __VERSION != version { /* test script and core version mismatch? */
@@ -49,15 +47,16 @@ __skipmsg = __G.__skipmsg or true; /* default is true */
 ** standalone executable or running non-portable options.
 */
 
-local make_target = "linux-readline";
-local make_threads = 6;
+local script_name = "test_windows.toku";
 
-local dev_null = "/dev/null";
+local batfile = ".\\winmake.bat";
+
+local dev_null = "/nul";
 local dev_null1 = " > " .. dev_null;
 local dev_null2 = " 2> " .. dev_null;
 local dev_null12 = dev_null1 .. " 2>&1";
 
-local cp = "cp";
+local cp = "powershell -Command cp";
 
 /* }===================================================================== */
 
@@ -69,17 +68,17 @@ local cp = "cp";
 */
 
 /* save program name */
-local prog =  "../tokudae";
+local prog =  "..\\tokudae.exe";
 local oldprog = prog .. ".old";
 
 
 local script = string.substr(debug.getinfo(1, "s").source, 1); /* skip '@' */
-if (string.startswith(args[0], "./") and !string.startswith(script, "./"))
-    script = "./" .. script;
+if (string.startswith(args[0], ".\\") and !string.startswith(script, ".\\"))
+    script = ".\\" .. script;
 
 
-if script != "./test_linux.toku" {
-    io.stderr.write("Test script must be run as a command.\nExiting...");
+if script != ".\\" .. script_name {
+    io.stderr.write("Test script must be run directly.\nExiting...");
     return; /* done */
 }
 
@@ -201,40 +200,37 @@ debug = nil;
 __c = {};
 
 
-local fn isatty() { return execute("[ -t 1 ]"); }
+local fn isatty() :: return execute("( <CON (echo.)) >nul 2>&1");
 
 
 /*
-** Apply escape code 'c' if 'stdout' is terminal.
-** @s - string
+** Apply escape code 'c' if options are enabled and 'stdout' is terminal.
 ** @c - string
+** @s - ?string
+** @ismode - ?boolean
 */
-local fn termcode(c, s) {
+local fn tcode(c, s, ismode) {
     s = s or "";
     if !__port and __opts.termcodes and isatty()
-        return (c .. s .. "\e[0m") or s;
+        return (c .. s .. (ismode and "\e[0m" or ""));
     return s;
 }
 
-local ESC = fn (seq) { return "\e" .. seq; };
+local fn ESC(seq) :: return "\e" .. seq;
 
 /* colors */
-local fn RED(s) { return termcode(ESC("[31m"), s); }
-local fn GREEN(s) { return termcode(ESC("[32m"), s); }
-local fn YELLOW(s) { return termcode(ESC("[33m"), s); }
-local fn BLUE(s) { return termcode(ESC("[34m"), s); }
-local fn MAGENTA(s) { return termcode(ESC("[35m"), s); }
-local fn CYAN(s) { return termcode(ESC("[36m"), s); }
+local fn RED(s)     :: return tcode(ESC("[31m"), s, true);
+local fn GREEN(s)   :: return tcode(ESC("[32m"), s, true);
+local fn YELLOW(s)  :: return tcode(ESC("[33m"), s, true);
+local fn BLUE(s)    :: return tcode(ESC("[34m"), s, true);
+local fn MAGENTA(s) :: return tcode(ESC("[35m"), s, true);
+local fn CYAN(s)    :: return tcode(ESC("[36m"), s, true);
 
 /* modes */
-local fn STRIKE(s) { return termcode(ESC("[9m"), s); }
+local fn STRIKE(s) :: return tcode(ESC("[9m"), s, true);
 
-/* cursor */
-local fn SAVEPOS() { return termcode(ESC("7")); }
-local fn LOADPOS() { return termcode(ESC("8")); }
-
-/* erase */
-local fn ERASELINE() { return termcode(ESC("[2K")); }
+/* editing */
+local fn ERASELINE() :: return tcode(ESC("[2K"));
 
 
 if __skipmsg { /* store skipped (parts of) tests? */
@@ -283,16 +279,14 @@ local fn buildcmd(...) {
 ** @path - ?string
 */
 local fn lscmd(what, path) {
-    local cmd;
+    local cmd = "dir /b /a:";
     if (what == "d") { /* list directories? */
-	cmd = "ls -p"; /* use 'ls' */
+	cmd ..= "d";
 	if (path) cmd = buildcmd(cmd, path);
-	cmd = buildcmd(cmd, "| grep /"); /* and 'grep' */
     } else { /* otherwise list non-hidden files */
         assert(what == "f");
-        cmd = "ls -p ";
+        cmd ..= "-d-h";
         if (path) cmd = buildcmd(cmd, path);
-        cmd = buildcmd(cmd, "| grep -v /"); /* and 'grep' */
     }
     return cmd;
 }
@@ -456,9 +450,10 @@ local fn showmem() {
 };
 
 
-local fn loginfo(msg) 	:: if !__port and isatty() printf("[%]: %", YELLOW("INFO"), msg);
-local fn loginput(msg) 	:: if !__port and isatty() stdout.write(fmt("[%s]: %s", MAGENTA("INPUT"), msg));
-local fn logcmd(msg) 	:: if !__port and isatty() printf("[%]: %", RED("CMD"), msg);
+/* log functions */
+local fn loginfo(msg)  :: printf("[%]: %", YELLOW("INFO"), msg);
+local fn loginput(msg) :: printf("[%]: %", MAGENTA("INPUT"), msg);
+local fn logcmd(msg)   :: printf("[%]: %", RED("CMD"), msg);
 
 
 /* temporary output file */
@@ -467,6 +462,7 @@ local tempfile = (class {
         assert(typeof(self) == "instance");
         if self.file {
             loginfo(fmt("removing temporary output file '%s'...", self.file));
+	    self.file.close();
             rm(self.file);
         }
     };
@@ -491,23 +487,21 @@ local prompt_run_failed_test;
 */
 local fn run_test(filepath) {
     if (__opts.memory) showmem();
-    local termcodes = __opts.termcodes and execute("[ -t 1 ]");
-    if (termcodes and __opts.noprint and !__opts.warnings) {
-        output(stdout);
-        stdout.write(fmt("%sCurrently running '%s'...", SAVEPOS(), YELLOW(filepath)));
-        flush();
+    local tc = __opts.termcodes;
+    if (tc and isatty() and __opts.noprint and !__opts.warnings) {
+        stdout.write(fmt("Currently running '%s'...", YELLOW(filepath)));
+        stdout.flush();
     }
     local stat, msg, code, c;
     if __opts.run_isolated
-        stat, msg, code = execute(prog .. " " .. filepath .. dev_null12);
+        stat, msg, code = execute(buildcmd(prog, filepath, dev_null12));
     else { /* otherwise run in the same global environment */
         stat, msg = xpcall(runfile, traceback, filepath);
         c = clock();
     }
-    if (termcodes and __opts.noprint and !__opts.warnings) {
-        output(stdout);
-        stdout.write(LOADPOS() .. ERASELINE());
-        flush();
+    if (tc and isatty() and __opts.noprint and !__opts.warnings) {
+        stdout.write("\r" .. ERASELINE());
+        stdout.flush();
     }
     print_test_result(stat, filepath, c);
     if (__opts.enter_debug) {
@@ -658,18 +652,18 @@ local fn run_all_testsuites(tests_script) {
 ** Usage string.
 */
 local usage = [=[
-usage: ./test.toku [-h] [-cCwWoOmMrRzZfFaAiIdDbB[t|e|s arg] ...] [arg_testsuite ...]
-                   [-ttest_file | -t test_file]
-                   [-etestsuite_name | -e testsuite_name]
-                   [-stests_script | -s tests_script]
-                   [--minimal-flags]
-                   [--port-flags]
-                   [--verbose-flags]
-                   [--standard-flags]
-                   [--info]
-                   [--out-tests]
-                   [--gen-dir-tests]
-                   [--gen-script-tests]
+usage: .\test_{platform}.toku [-h] [-cCwWoOmMrRzZfFaAiIdDbB[t|e|s arg] ...] [arg_testsuite ...]
+                   	      [-ttest_file | -t test_file]
+                   	      [-etestsuite_name | -e testsuite_name]
+                   	      [-stests_script | -s tests_script]
+                              [--minimal-flags]
+                              [--port-flags]
+                              [--verbose-flags]
+                              [--standard-flags]
+                              [--info]
+                              [--out-tests]
+                              [--gen-dir-tests]
+                              [--gen-script-tests]
 
 Available options are:
     -h      Show usage (this), this must be the first option and argument.
@@ -773,9 +767,9 @@ Other:
     If that doesn't solve it, then the script '__opts.tests_script' contains
     invalid test filepath. You could always try to re-generate the tests script
     from the current directory with:
-    './test.toku --out-tests --gen-dir-tests > {tests_script}'.
+    '.\test_{platform}.toku --out-tests --gen-dir-tests > {tests_script}'.
 
-    Note: If your system does not have access to 'system', you should use the
+    Note: If your system does not have access to 'os.execute', you should use the
     default testsuites script that comes with the distribution or re-build it
     manually, by writting out the test table structure yourself, or modify the
     test script itself.
@@ -1191,6 +1185,7 @@ local fn set_output_options() {
     }
 }
 
+
 local fn report(fatal, msg, st, what, code) {
     if !st {
         loginfo(fmt("fail, %s (%s -> %d)", msg, what, code));
@@ -1208,9 +1203,7 @@ local fn rmoldprog(restore) {
     if have_oldprog {
         if restore { /* restore before removing? */
             loginfo(fmt("%s backup executable...", GREEN("restoring")));
-            report(true, "can't restore executable",
-                   execute(fmt("%s %s %s", cp, oldprog, prog)));
-
+            report(true, "can't restore executable", execute(buildcmd(cp, oldprog, prog)));
         }
         loginfo(fmt("%s backup executable...", RED("removing")));
         rm(oldprog);
@@ -1225,6 +1218,10 @@ local fn rmoldprog(restore) {
 /* ============ MAIN ============= */
 
 handle_cli_args();
+if __opts.rebuild {
+    loginfo("-[bB] flag is ignnored and is not supported on windows");
+    __opts.rebuild = false; /* do not rebuild on windows */
+}
 
 if showinfo /* only show enabled/disabled options? */
     display_run_information();
@@ -1234,9 +1231,9 @@ else if !out_tests and __opts.rebuild { /* rebuild standalone interpreter? */
            execute(fmt("%s %s %s %s", cp, prog, oldprog, dev_null1)));
     loginfo(fmt("%s backup executable '%s'", GREEN("created"), oldprog));
     have_oldprog = true;
-    local cmd = buildcmd("make -j",  make_threads);
-    local dir = (prog == "./tokudae") and "." or "..";
-    cmd = buildcmd("cd", dir, "&&", cmd, "clean", dev_null1, "&&", cmd, make_target);
+    local cmd = buildcmd(batfile);
+    local dir = (prog == ".\\tokudae.exe") and "." or "..";
+    cmd = buildcmd("cd", dir, "&&", batfile, "clean", dev_null1, "&&", batfile);
     cmd = buildcmd(cmd, dev_null1); /* redirect 'stdout' to null */
     logcmd(cmd);
     if !report(false, msg, execute(cmd)) { /* rebuild failed? */

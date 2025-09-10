@@ -1,8 +1,11 @@
 # custom
 tags
 tokudae
+log.txt
 install
 *.swp
+.vs
+*.old
 
 # Object files
 *.o

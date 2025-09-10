@@ -9,18 +9,17 @@
 
 #include "tokudaeprefix.h"
 
-#include <stdlib.h>
-#include <unistd.h>
 #include <errno.h>
-#include <time.h>
-#include <string.h>
 #include <locale.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #include "tokudae.h"
-#include "tokudaeaux.h"
-#include "tokudaelimits.h"
 
+#include "tokudaeaux.h"
 #include "tokudaelib.h"
+#include "tokudaelimits.h"
 
 
 /*
@@ -73,6 +72,8 @@
 */
 
 #if defined(TOKU_USE_POSIX)	/* { */
+
+#include <unistd.h>
 
 #define t_gmtime(t,r)		gmtime_r(t,r)
 #define t_localtime(t,r)	localtime_r(t,r)
@@ -147,7 +148,7 @@ static int t_setenv(toku_State *T, const char *name, const char *value) {
     char *p;
     if (t_unlikely(lv >= lv + ln + 1))
         tokuL_error(T, "\"{name}={value}\" string for 'setenv' is too large");
-    p = tokuL_buff_initsz(&b, lv+ln+1);
+    p = tokuL_buff_initsz(T, &b, lv+ln+1);
     /* make "name=value" */
     memcpy(p, name, sizeof(char)*ln);
     p[ln] = '=';

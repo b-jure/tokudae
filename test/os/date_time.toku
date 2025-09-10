@@ -65,12 +65,14 @@ if !__port {
     }
 
     /* test large dates (assume at least 4-byte ints and time_t) */
-    local t0 = os.time({year = 1970, month = 1, day = 0});
-    local t1 = os.time({year = 1970, month = 1, day = 0, sec = (1 << 31) - 1});
+    local t0 = os.time({year = 1970, month = 1, day = __WINDOWS and 1 or 0});
+    local t1 = os.time({year = 1970, month = 1, day = __WINDOWS and 1 or 0, sec = (1 << 31) - 1});
     assert(t1 - t0 == (1 << 31) - 1);
-    t0 = os.time({year = 1970, month = 1, day = 1});
-    t1 = os.time({year = 1970, month = 1, day = 1, sec = -(1 << 31)});
-    assert(t1 - t0 == -(1 << 31));
+    if !__WINDOWS { /* windows doesn't handle time before epoch */
+        t0 = os.time({year = 1970, month = 1, day = 1});
+        t1 = os.time({year = 1970, month = 1, day = 1, sec = -(1 << 31)});
+	assert(t1 - t0 == -(1 << 31));
+    }
 
     /* test out-of-range dates (at least for Unix) */
     if (maxint >= 2**62) {
@@ -83,13 +85,20 @@ if !__port {
         } else {
             /* time_t has 8 bytes; an int year cannot represent a huge time */
             checkerr("cannot be represented", os.date, "%Y", 2**60);
-            /* this is the maximum year */
-            assert(tonum(os.time({year=(1 << 31) + 1899, month=12, day=31,
-                                  hour=23, min=59, sec=59})));
-	    if __POSIX or __WINDOWS {
-            	/* this is too much */
+	    if __POSIX {
+		/* this is the maximum year */
+		assert(tonum(os.time({year=(1 << 31) + 1899, month=12, day=31,
+				      hour=23, min=59, sec=59})));
+		/* this is too much */
             	checkerr("represented", os.time, {year=(1 << 31) + 1899, month=12,
-                     	 day=31, hour=23, min=59, sec=60});
+                     	                          day=31, hour=23, min=59, sec=60});
+	    } else if __WINDOWS {
+		/* this is the maximum year (23:59:59 December 31, 3000 UTC) */
+		assert(tonum(os.time({year=3000, month=12, day=31,
+				      hour=23, min=59, sec=59})));
+		/* this is too much (for some reason differs from the official limit?) */
+		/* rounded up to the day and added two days for timezone */
+		checkerr("represented", os.time, {year=3001, month=1, day=20});
 	    } else
 		(Message or print)("skipped time limit test");
         }

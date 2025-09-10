@@ -270,9 +270,9 @@ local fn testfmt(test, stat) {
 local fn buildcmd(...) {
     local cmd = "";
     local args = [...];
-    foreach _,arg in indices(args) {
+    foreach i,arg in indices(args) {
         cmd ..= tostr(arg);
-        if arg != args.last
+        if i != args.len - 1
             cmd ..= " ";
     }
     return cmd;

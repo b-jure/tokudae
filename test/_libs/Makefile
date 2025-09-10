@@ -23,7 +23,7 @@ lib2.so: lib2.c $(TOKU_DIR)/tokudaeconf.h $(TOKU_DIR)/tokudae.h
 lib21.so: lib21.c $(TOKU_DIR)/tokudaeconf.h $(TOKU_DIR)/tokudae.h
 	$(CC) $(CFLAGS) -o lib21.so lib21.c
 
-lib2-v2.so: lib21.c $(TOKU_DIR)/tokudaeconf.h $(TOKU_DIR)/tokudae.h
+lib2-v2.so: lib22.c $(TOKU_DIR)/tokudaeconf.h $(TOKU_DIR)/tokudae.h
 	$(CC) $(CFLAGS) -o lib2-v2.so lib22.c
 
 clean:

@@ -56,7 +56,7 @@ assert(!io.open(fname));
 io.output(fname); /* create new 'fname' file and set it as output */
 assert(io.output() != io.stdout);
 
-{
+if !__WINDOWS { /* terminal input on windows is a regular file */
     local status, msg, code = io.stdin.seek("set", 1000);
     assert(!status and typeof(msg) == "string" and typeof(code) == "number");
 }
@@ -132,6 +132,7 @@ assert(os.remove(fname));
     assert(f2.read("n") == -maxint);
     assert(f2.read("n") == -maxint);
     assert(f2.read("n") == -0xABCp-3);
+    f2.close(); /* on windows we have to close before removing */
     assert(os.remove(fname));
 }
 

@@ -1274,6 +1274,7 @@ TOKU_API int toku_error(toku_State *T) {
         tokuD_errormsg(T);
     /* toku_unlock() is called after control leaves the core */
     toku_assert(0);
+    return 0; /* to prevent warnings */
 }
 
 /* }====================================================================== */
