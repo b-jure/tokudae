@@ -24,6 +24,7 @@ TO_BIN = $(TOKUDAE_T)
 TO_INC = src/tokudae.h src/tokudaeconf.h src/tokudaelib.h src/tokudaeaux.h src/tokudaelimits.h src/tokudae.hpp
 TO_LIB = $(TOKUDAE_A)
 TO_MAN = doc/tokudae.1
+TO_DOC = doc/manual.html doc/manual.css doc/contents.html doc/EBNF.txt
 
 default: $(PLATFORM)
 
@@ -87,17 +88,19 @@ posix:
 
 install: dummy
 	$(MKDIR) $(INSTALL_BIN) $(INSTALL_INC) $(INSTALL_LIB) \
-		 $(INSTALL_MAN) $(INSTALL_TMOD) $(INSTALL_CMOD)
+		 $(INSTALL_MAN) $(INSTALL_TMOD) $(INSTALL_CMOD) $(INSTALL_DOC)
 	$(INSTALL_EXEC) $(TO_BIN) $(INSTALL_BIN)
 	$(INSTALL_DATA) $(TO_INC) $(INSTALL_INC)
 	$(INSTALL_DATA) $(TO_LIB) $(INSTALL_LIB)
 	$(INSTALL_DATA) $(TO_MAN) $(INSTALL_MAN)
+	$(INSTALL_DATA) $(TO_DOC) $(INSTALL_DOC)
 
 uninstall:
 	cd $(INSTALL_BIN) && $(RM) $(TO_BIN)
 	cd $(INSTALL_INC) && $(RM) $(TO_INC)
 	cd $(INSTALL_LIB) && $(RM) $(TO_LIB)
 	cd $(INSTALL_MAN) && $(RM) $(TO_MAN)
+	cd $(INSTALL_DOC) && $(RM) $(TO_DOC)
 
 local:
 	$(MAKE) install INSTALL_ROOT=./install

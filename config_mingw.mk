@@ -45,6 +45,9 @@ INSTALL_DATA = $(INSTALL) -m 0644
 # 			  collector can run.
 # -DTOKUI_HARDSTACKTESTS => forces a reallocation of the stack at every point
 # 			    where the stack can be reallocated.
+#
+# Recommended macro to define for debug builds
+# -TOKU_USE_APICHECK => enables asserts in the API (consistency checks)
 
 CC = gcc
 CFLAGS = -std=c99 -Wfatal-errors -Wall -Wextra -Werror -Wconversion $(SYSCFLAGS) $(MYCFLAGS)
