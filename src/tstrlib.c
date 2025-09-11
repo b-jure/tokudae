@@ -185,7 +185,7 @@ static int s_startswith(toku_State *T) {
     const char *s2 = tokuL_check_lstring(T, 1, &l2);
     toku_Integer i = tokuL_opt_integer(T, 2, 0);
     toku_Integer j = tokuL_opt_integer(T, 3, -1);
-    if (j < -(toku_Integer)l1) /* 'j' would be less than 0? */
+    if (j < -cast_Integer(l1)) /* 'j' would be less than 0? */
         goto l_fail; /* empty interval */
     else { /* convert to positions */
         posi = posrelStart(i, l1);

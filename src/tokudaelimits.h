@@ -224,6 +224,8 @@ typedef t_ubyte Instruction;
 #define cast_ubytep(e)      cast(t_ubyte *,(e))
 #define cast_byte(e)        cast(t_byte,(e))
 #define cast_ushort(e)      cast(t_ushort,(e))
+#define cast_long(e)        cast(long,(e))
+#define cast_ulong(e)       cast(t_ulong,(e))
 #define cast_int(e)         cast(int,(e))
 #define cast_uint(e)        cast(t_uint,(e))
 #define cast_umem(e)        cast(t_umem,(e))

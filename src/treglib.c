@@ -601,7 +601,7 @@ static int reg_gsub(toku_State *T) {
     const char *p = tokuL_check_lstring(T, 1, &lp); /* pattern */
     const char *lastmatch = NULL; /* end of last match */
     int tr = toku_type(T, 2); /* replacement type */
-    toku_Integer max_s = tokuL_opt_integer(T, 3, (toku_Integer)srcl + 1);
+    toku_Integer max_s = tokuL_opt_integer(T, 3, cast_Integer(srcl + 1));
     int anchor = (*p == '^');
     toku_Integer n = 0; /* replacement count */
     int changed = 0; /* change flag */

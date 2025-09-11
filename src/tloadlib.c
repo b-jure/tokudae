@@ -75,9 +75,9 @@ static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym);
 ** (The '__extension__' in gnu compilers is only to avoid warnings.)
 */
 #if defined(__GNUC__)
-#define cast_func(p) (__extension__ (toku_CFunction)(p))
+#define cast_Tfunc(p) (__extension__ (toku_CFunction)(p))
 #else
-#define cast_func(p) ((toku_CFunction)(p))
+#define cast_Tfunc(p) ((toku_CFunction)(p))
 #endif
 
 
@@ -100,8 +100,8 @@ static void *csys_load(toku_State *T, const char *path, int global) {
 static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym) {
     toku_CFunction f;
     const char *msg;
-    (void)dlerror(); /* clear any old error conds. before calling 'dlsym' */
-    f = cast_func(dlsym(lib, sym));
+    UNUSED(dlerror()); /* clear any old error conds. before calling 'dlsym' */
+    f = cast_Tfunc(dlsym(lib, sym));
     if (t_unlikely(f == NULL && (msg = dlerror()) != NULL))
         toku_push_fstring(T, msg);
     return f;
@@ -155,7 +155,7 @@ static void pusherror(toku_State *T) {
 
 
 static int csys_unloadlib(toku_State *T, void *lib) {
-    int res = FreeLibrary((HMODULE)lib);
+    int res = FreeLibrary(cast(HMODULE, lib));
     if (t_unlikely(res == 0)) pusherror(T);
     return res;
 }
@@ -163,14 +163,14 @@ static int csys_unloadlib(toku_State *T, void *lib) {
 
 static void *csys_load(toku_State *T, const char *path, int global) {
     HMODULE lib = LoadLibraryExA(path, NULL, TOKU_LLE_FLAGS);
-    (void)(global); /* not used: symbols are 'global' by default */
+    UNUSED(global); /* not used: symbols are 'global' by default */
     if (lib == NULL) pusherror(T);
     return lib;
 }
 
 
 static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym) {
-    toku_CFunction f = (toku_CFunction)(voidf)GetProcAddress((HMODULE)lib, sym);
+    toku_CFunction f = cast_Tfunc(GetProcAddress(cast(HMODULE, lib), sym));
     if (f == NULL) pusherror(T);
     return f;
 }
@@ -183,21 +183,21 @@ static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym) {
 #define DLMSG "dynamic libraries not enabled; check your Tokudae installation"
 
 static int csys_unloadlib(toku_State *T, void *lib) {
-    (void)(lib); /* unused */
+    UNUSED(lib);
     toku_push_literal(T, DLMSG);
     return 1;
 }
 
 
 static void *csys_load(toku_State *T, const char *path, int global) {
-    (void)(path); (void)(global); /* unused */
+    UNUSED(path); UNUSED(global);
     toku_push_literal(T, DLMSG);
     return NULL;
 }
 
 
 static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym) {
-    (void)(lib); (void)(sym); /* unused */
+    UNUSED(lib); UNUSED(sym);
     toku_push_literal(T, DLMSG);
     return NULL;
 }
@@ -371,9 +371,9 @@ static int pkg_searchpath(toku_State *T) {
                                        tokuL_check_string(T, 1),
                                        tokuL_opt_string(T, 2, "."),
                                        tokuL_opt_string(T, 3, TOKU_DIRSEP));
-    if (fname != NULL) {
+    if (fname != NULL)
         return 1;
-    } else { /* error message is on top of the stack */
+    else { /* error message is on top of the stack */
         tokuL_push_fail(T);
         toku_insert(T, -2);
         return 2; /* return fail + error message */
@@ -566,9 +566,9 @@ static int searcher_C(toku_State *T) {
 
 
 static int searcher_Croot(toku_State *T) {
-    const char *filename;
     const char *name = tokuL_check_string(T, 0);
     const char *p = strchr(name, '.');
+    const char *filename;
     int res;
     if (p == NULL) return 0; /* is root */
     toku_push_lstring(T, name, cast_diff2sz(p - name));

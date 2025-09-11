@@ -51,14 +51,14 @@
 /* type to represent time_t in Tokudae */
 #if !defined(TOKU_NUMTIME)	/* { */
 
-#define t_time			toku_Integer
-#define t_push_time(T,t)	toku_push_integer(T,(toku_Integer)(t))
+#define t_timet			toku_Integer
+#define t_push_time(T,t)	toku_push_integer(T, cast_Integer(t))
 #define t_totime(T,index)       tokuL_check_integer(T, index)
 
 #else				/* }{ */
 
-#define t_time			toku_Number
-#define t_push_time(T,t)	toku_push_number(T,(toku_Number)(t))
+#define t_timet			toku_Number
+#define t_push_time(T,t)	toku_push_number(T, cast_num(t))
 #define t_totime(T,index)	tokuL_check_number(T, index)
 
 #endif				/* } */
@@ -81,8 +81,8 @@
 #else				/* }{ */
 
 /* ISO C definitions */
-#define t_gmtime(t,r)		((void)(r)->tm_sec, gmtime(t))
-#define t_localtime(t,r)	((void)(r)->tm_sec, localtime(t))
+#define t_gmtime(t,r)		(UNUSED((r)->tm_sec), gmtime(t))
+#define t_localtime(t,r)	(UNUSED((r)->tm_sec), localtime(t))
 
 #endif				/* } */
 
@@ -164,7 +164,7 @@ static int t_setenv(toku_State *T, const char *name, const char *value) {
 
 static int t_setenv(toku_State *T, const char *name, const char *value) {
     int res;
-    (void)(T); /* unused */
+    UNUSED(T);
     if (*value == '\0' && strlen(value) == 0)
         res = unsetenv(name);
     else
@@ -258,7 +258,7 @@ static int os_setenv(toku_State *T) {
 
 
 static int os_clock(toku_State *T) {
-    toku_push_number(T, ((toku_Number)clock()/(toku_Number)CLOCKS_PER_SEC));
+    toku_push_number(T, (cast_num(clock()) / cast_num(CLOCKS_PER_SEC)));
     return 1;
 }
 
@@ -300,7 +300,7 @@ static void set_field(toku_State *T, const char *key, int value, int delta) {
         if (t_unlikely(value > TOKU_INTEGER_MAX - delta))
             tokuL_error(T, "field '%s' is out-of-bound", key);
     #endif
-    toku_push_integer(T, (toku_Integer)value + delta);
+    toku_push_integer(T, cast_Integer(value) + delta);
     toku_set_field_str(T, -2, key);
 }
 
@@ -353,7 +353,7 @@ static int get_field(toku_State *T, const char *key, int dfl, int delta) {
         res -= delta;
     }
     toku_pop(T, 1);
-    return (int)res;
+    return cast_int(res);
 }
 
 
@@ -377,9 +377,9 @@ static const char *check_option(toku_State *T, const char *conv,
 
 
 static time_t t_checktime (toku_State *T, int index) {
-    t_time t = t_totime(T, index);
-    tokuL_check_arg(T, (time_t)t == t, index, "time out-of-bounds");
-    return (time_t)t;
+    t_timet t = t_totime(T, index);
+    tokuL_check_arg(T, cast(time_t, t) == t, index, "time out-of-bounds");
+    return cast(time_t, t);
 }
 
 
@@ -446,7 +446,7 @@ static int os_time(toku_State *T) {
         t = mktime(&ts);
         set_all_fields(T, &ts); /* update fields with normalized values */
     }
-    if (t != (time_t)(t_time)t || t == (time_t)(-1))
+    if (t != cast(time_t, cast(t_timet, t)) || t == cast(time_t, -1))
         return tokuL_error(T,
                 "time result cannot be represented in this installation");
     t_push_time(T, t);
@@ -457,7 +457,7 @@ static int os_time(toku_State *T) {
 static int os_difftime(toku_State *T) {
     time_t t1 = t_checktime(T, 0);
     time_t t2 = t_checktime(T, 1);
-    toku_push_number(T, (toku_Number)difftime(t1, t2));
+    toku_push_number(T, cast_num(difftime(t1, t2)));
     return 1;
 }
 
@@ -469,7 +469,7 @@ static int os_exit(toku_State *T) {
     if (toku_is_bool(T, 0))
         status = (toku_to_bool(T, 0) ? EXIT_SUCCESS : EXIT_FAILURE);
     else
-        status = (int)tokuL_opt_integer(T, 0, EXIT_SUCCESS);
+        status = cast_int(tokuL_opt_integer(T, 0, EXIT_SUCCESS));
     if (toku_to_bool(T, 1))
         toku_close(T); /* close the state before exiting */
     if (T) exit(status); /* 'if' to avoid warnings for unreachable 'return' */

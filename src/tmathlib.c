@@ -117,7 +117,7 @@ static int m_floor(toku_State *T) {
 static int m_fmod(toku_State *T) {
     if (toku_is_integer(T, 0) && toku_is_integer(T, 1)) {
         toku_Integer d = toku_to_integer(T, 1); /* denominator */
-        if ((toku_Unsigned)d + 1u <= 1u) { /* special cases: -1 or 0 */
+        if (t_castS2U(d) + 1u <= 1u) { /* special cases: -1 or 0 */
             tokuL_check_arg(T, d != 0, 1, "zero");
             toku_push_integer(T, 0); /* avoid overflow with 0x80000... / -1 */
         } else
@@ -511,7 +511,7 @@ static int m_srand(toku_State *T) {
 
 /* project random number into the [0..n] interval */
 static toku_Unsigned project(toku_State *T, MT19937 *ctx, toku_Unsigned ran,
-                                                      toku_Unsigned n) {
+                                                          toku_Unsigned n) {
     if (ispow2(n)) /* 'n' is power of 2? */
         return ran & n;
     else {

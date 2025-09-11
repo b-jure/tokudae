@@ -110,7 +110,7 @@ static int utf8_len(toku_State *T) {
             toku_push_integer(T, posi); /* ... and current position */
             return 2;
         }
-        posi = (toku_Integer)(s1 - s);
+        posi = cast_Integer(s1 - s);
         n++;
     }
     toku_push_integer(T, n);
@@ -153,9 +153,9 @@ static int utf8_codepoint(toku_State *T) {
 
 
 static void push_utf8char(toku_State *T, int arg) {
-    toku_Unsigned code = (toku_Unsigned)tokuL_check_integer(T, arg);
+    toku_Unsigned code = t_castS2U(tokuL_check_integer(T, arg));
     tokuL_check_arg(T, code <= MAXUTF, arg, "value out of range");
-    toku_push_fstring(T, "%U", (long)code);
+    toku_push_fstring(T, "%U", cast_long(code));
 }
 
 

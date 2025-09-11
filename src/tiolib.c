@@ -110,7 +110,7 @@ static int checkmode(const char *mode) {
 
 #define t_fseek(f,o,w)		fseeko(f,o,w)
 #define t_ftell(f)		ftello(f)
-#define t_seeknum		off_t
+#define t_seeknumt		off_t
 
 #elif defined(TOKU_USE_WINDOWS) && !defined(_CRTIMP_TYPEINFO) \
    && defined(_MST_VER) && (_MST_VER >= 1400)	/* }{ */
@@ -118,14 +118,14 @@ static int checkmode(const char *mode) {
 /* Windows (but not DDK) and Visual C++ 2005 or higher */
 #define t_fseek(f,o,w)		_fseeki64(f,o,w)
 #define t_ftell(f)		_ftelli64(f)
-#define t_seeknum		__int64
+#define t_seeknumt		__int64
 
 #else				/* }{ */
 
 /* ISO C definitions */
 #define t_fseek(f,o,w)		fseek(f,o,w)
 #define t_ftell(f)		ftell(f)
-#define t_seeknum		long
+#define t_seeknumt		long
 
 #endif				/* } */
 
@@ -737,13 +737,13 @@ static int f_seek(toku_State *T) {
     static const char *whence_names[] = { "set", "cur", "end", NULL };
     FILE *f = tofile(T);
     int opt = tokuL_check_option(T, 1, "cur", whence_names);
-    t_seeknum offset = (t_seeknum)tokuL_opt_integer(T, 2, 0);
+    t_seeknumt offset = cast(t_seeknumt, tokuL_opt_integer(T, 2, 0));
     int res = fseek(f, offset, whence[opt]);
     if (t_unlikely(res))
         return tokuL_fileresult(T, 0, NULL); /* error */
     else {
         /* 't_ftell' shouldn't fail as 'fseek' was successful */
-        toku_push_integer(T, (toku_Integer)t_ftell(f));
+        toku_push_integer(T, cast_Integer(t_ftell(f)));
         return 1;
     }
 }

@@ -1553,7 +1553,7 @@ void tokuC_binimmediate(FunctionState *fs, ExpInfo *e1, int imm, Binopr opr,
                       int line) {
     ExpInfo e2;
     e2.et = EXP_INT;
-    e2.u.i = (toku_Integer)imm;
+    e2.u.i = cast_Integer(imm);
     toku_assert(isIMM(imm) || isIMML(imm));
     codebinI(fs, e1, &e2, opr, line);
 }

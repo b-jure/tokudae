@@ -2,6 +2,7 @@
 
 #include "tokudae.h"
 #include "tokudaeaux.h"
+#include "tokudaelimits.h"
 
 static int id(toku_State *T) {
     return toku_getntop(T);
@@ -31,8 +32,8 @@ TOKUMOD_API int onefunction(toku_State *T) {
 
 TOKUMOD_API int anotherfunc(toku_State *T) {
     tokuL_check_version(T);
-    toku_push_fstring(T, "%d%%%d\n", (int)toku_to_integer(T, 0),
-                                     (int)toku_to_integer(T, 1));
+    toku_push_fstring(T, "%d%%%d\n", cast_int(toku_to_integer(T, 0)),
+                                     cast_int(toku_to_integer(T, 1)));
     return 1;
 } 
 
