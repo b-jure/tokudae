@@ -485,7 +485,7 @@ static void read_string(Lexer *lx, Literal *k) {
 
 /* reads a literal character */
 static int read_char(Lexer *lx, Literal *k) {
-    int c;
+    int c = 0; /* to prevent warnings */
     save_and_advance(lx); /* skip ' */
 repeat:
     switch (lx->c) {

@@ -206,9 +206,10 @@ static int callbinTM(toku_State *T, const TValue *v1, const TValue *v2,
     int t1 = ttypetag(v1);
     if (t1 != TOKU_VINSTANCE || t1 != ttypetag(v2))
         return 0; /* error is invoked by caller */
-    else if (insval(v1)->oclass != insval(v2)->oclass)
+    else if (insval(v1)->oclass != insval(v2)->oclass) {
         tokuD_classerror(T, event); /* instances have differing classes */
-    else {
+        return 0; /* to avoid warnings */
+    } else {
         const TValue *fn = tokuTM_objget(T, v1, event);
         if (notm(fn)) { /* metamethod not found? */
             if (t1 != TOKU_VINSTANCE) /* objects are userdata? */

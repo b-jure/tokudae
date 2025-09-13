@@ -42,6 +42,10 @@ static const char *const CLIBS = "__CLIBS";
 #define setprogdir(T)       ((void)0)
 
 
+/* cast void* to a Tokudae function */
+#define cast_Tfunc(p)	    cast(toku_CFunction, cast_func(p))
+
+
 /*
 ** Unload library 'lib' and return 0.
 ** In case of error, returns non-zero plus an error string
@@ -68,17 +72,6 @@ static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym);
 #if defined(TOKU_USE_DLOPEN)  /* { */
 
 #include <dlfcn.h>
-
-/*
-** Macro to convert pointer-to-void* to pointer-to-function. This cast
-** is undefined according to ISO C, but POSIX assumes that it works.
-** (The '__extension__' in gnu compilers is only to avoid warnings.)
-*/
-#if defined(__GNUC__)
-#define cast_Tfunc(p) (__extension__ (toku_CFunction)(p))
-#else
-#define cast_Tfunc(p) ((toku_CFunction)(p))
-#endif
 
 
 static int csys_unloadlib(toku_State *T, void *lib) {

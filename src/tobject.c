@@ -124,7 +124,7 @@ int tokuO_arithmraw(toku_State *T, const TValue *a, const TValue *b,
             return 0; /* fail */
         }
         case TOKU_OP_DIV: case TOKU_OP_POW: { /* for floats */
-            toku_Number n1, n2;
+            toku_Number n1 = 0, n2 = 0; /* to avoid warnings on MSVC */
             if (tonumber(a, n1) && tonumber(b, n2)) {
                 setfval(res, numarithm(T, n1, n2, op));
                 return 1;
@@ -132,7 +132,7 @@ int tokuO_arithmraw(toku_State *T, const TValue *a, const TValue *b,
             return 0; /* fail */
         }
         default: { /* other operations */
-            toku_Number n1, n2;
+            toku_Number n1 = 0, n2 = 0; /* to avoid warnings on MSVC */
             if (ttisint(a) && ttisint(b)) {
                 setival(res, intarithm(T, ival(a), ival(b), op));
                 return 1;

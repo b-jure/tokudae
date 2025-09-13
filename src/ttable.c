@@ -233,8 +233,7 @@ static int eqkey(const TValue *k, const Node *n, int deadok) {
         default: /* rest of the objects are compared by pointer identity */
             toku_assert(iscollectable(k));
             return (gcoval(k) == keygcoval(n));
-        }
-    return 0;
+    }
 }
 
 

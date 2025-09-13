@@ -803,10 +803,13 @@ static int s_substr(toku_State *T) {
     toku_Integer i = tokuL_opt_integer(T, 1, 0);
     toku_Integer j = tokuL_opt_integer(T, 2, -1);
     if (toku_to_bool(T, 3)) { /* positions must be absolute? */
-        if (!(i < 0 || j < 0 || j < i))
-            posi = t_castS2U(i), posj = t_castS2U(j);
-        else /* otherwise force to push empty string */
-            posi = 1, posj = 0;
+        if (!(i < 0 || j < 0 || j < i)) {
+            posi = cast_sizet(t_castS2U(i));
+            posj = cast_sizet(t_castS2U(j));
+        } else { /* otherwise force to push empty string */
+            posi = 1;
+            posj = 0;
+        }
     } else if (-cast_sz2S(l) <= j) {
         posi = posrelStart(i, l),
         posj = posrelEnd(j, l);

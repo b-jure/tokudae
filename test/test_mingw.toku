@@ -494,7 +494,7 @@ local fn run_test(filepath) {
     local oktc = __opts.termcodes and __opts.noprint and !__opts.warnings;
     if (oktc and isatty()) {
         stdout.write(fmt("Currently running '%s'...", YELLOW(filepath)));
-        stdout.lflush();
+        stdout.flush();
     }
     local stat, msg, code, c;
     if __opts.run_isolated

@@ -1004,7 +1004,7 @@ t_sinline void pushtable(toku_State *T, int b) {
 */
 
 #define op_arithKf_aux(T,v1,v2,fop) { \
-    toku_Number n1, n2; \
+    toku_Number n1 = 0, n2 = 0; /* to prevent warnings on MSVC */ \
     if (tonumber(v1, n1) && tonumber(v2, n2)) { \
         setfval(v1, fop(T, n1, n2)); \
     } else tokuD_aritherror(T, v1, v2); }
@@ -1042,11 +1042,11 @@ t_sinline void pushtable(toku_State *T, int b) {
 /* arithmetic operations with immediate operand for floats */
 #define op_arithIf(T,fop) { \
     TValue *v = peek(0); \
+    toku_Number n = 0; /* to prevent warnings on MSVC */ \
     int imm; \
     savestate(T); \
     imm = fetch_l(); \
     imm = IMML(imm); \
-    toku_Number n; \
     if (tonumber(v, n)) { \
         toku_Number fimm = cast_num(imm); \
         setfval(v, fop(T, n, fimm)); \
@@ -1075,7 +1075,7 @@ t_sinline void pushtable(toku_State *T, int b) {
 
 
 #define op_arithf_aux(T,res,v1,v2,fop) { \
-    toku_Number n1; toku_Number n2; \
+    toku_Number n1 = 0, n2 = 0; /* to prevent warnings on MSVC */ \
     if (tonumber(v1, n1) && tonumber(v2, n2)) { \
         setfval(res, fop(T, n1, n2)); \
         sp--; /* v2 */ \
@@ -1194,7 +1194,8 @@ t_sinline void pushtable(toku_State *T, int b) {
 
 /* order operations with immediate operand */
 #define op_orderI(T,iop,fop) { \
-    int cond, imm; \
+    int cond = 0; /* to prevent warnings */ \
+    int imm; \
     savestate(T); \
     imm = fetch_l(); \
     imm = IMML(imm); \

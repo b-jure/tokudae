@@ -12,21 +12,16 @@ setlocal enabledelayedexpansion
 
 set LOGFILE=log.txt
 
-:: if you change this, then also change the ':installfiles' subroutine
-set COPYCMD=Copy-Item
+:: (un)install commands (if you change this don't forget to update the routines)
+set INSTALL=Copy-Item
+set UNINSTALL=Remove-Item
 
 :: Version and release
 set V=1.0
 set R=!V!.0
 
-:: Paths
+:: Install root
 set INSTALL_ROOT=C:\Program Files\tokudae\!V!
-set INSTALL_BIN=!INSTALL_ROOT!\bin
-set INSTALL_INC=!INSTALL_ROOT!\include
-set INSTALL_LIB=!INSTALL_ROOT!\lib
-set INSTALL_DOC=!INSTALL_ROOT!\doc
-set INSTALL_TMOD=!INSTALL_ROOT!\tokudae
-set INSTALL_CMOD=!INSTALL_LIB!\tokudae
 
 :: Targets
 set TOKUDAE_T=tokudae.exe
@@ -35,7 +30,7 @@ set TOKUDAE_E=tokudae1.exp
 set TOKUDAE_L=tokudae1.lib
 
 :: Warning flags
-set WDISABLED=/wd4324 /wd4310 /wd4709 /wd4334
+set WDISABLED=/wd4324 /wd4310 /wd4709 /wd4334 /wd4456 /wd4457
 set WARNINGS=/W4 /WX !WDISABLED!
 
 :: User flags
@@ -88,11 +83,15 @@ echo BEGIN >> !LOGFILE!
 :: handle commands
 if "%1"=="" goto build;
 if "%1"=="install" goto install;
+if "%1"=="local" goto local;
+if "%1"=="uninstall" goto uninstall;
 if "%1"=="clean" goto clean;
 :: otherwise invalid command
-echo Usage: winmake.bat [clean | install]
+echo Usage: winmake.bat [ clean ^| install ^| uninstall ^| local ]
 echo - if no arguments are provided, this recompiles and builds the DLL and the executable
-echo - 'install' installs the targets and header files onto the system (skips build)
+echo - 'install' installs the tokudae distribution files onto the system (skips build)
+echo - 'uninstall' uninstall the tokudae distribution files from the system
+echo - 'local' installs the tokudae distribution locally under directory '.\local'
 echo - 'clean' removes build artifacts such as .obj files and build targets
 exit /b 1
 
@@ -137,33 +136,46 @@ if errorlevel 1 (
     exit /b 1
 )
 call :log "build complete (!TOKUDAE_T!, !TOKUDAE_A!, !TOKUDAE_L!, !TOKUDAE_E!)"
-goto end
+goto end;
 
-:: install headers, libraries and binaries
+:: install tokudae distribution locally
+:local
+set INSTALL_ROOT=".\local"
+goto install;
+goto end;
+
+:: install tokudae distribution onto the system
 :install
 call :log "installing into !INSTALL_ROOT!"
+set INSTALL_BIN=!INSTALL_ROOT!\bin
+set INSTALL_INC=!INSTALL_ROOT!\include
+set INSTALL_LIB=!INSTALL_ROOT!\lib
+set INSTALL_DOC=!INSTALL_ROOT!\doc
+set INSTALL_TMOD=!INSTALL_ROOT!\tokudae
+set INSTALL_CMOD=!INSTALL_LIB!\tokudae
 :: create missing directories
 if not exist "!INSTALL_ROOT!" mkdir "!INSTALL_ROOT!"
 if not exist "!INSTALL_BIN!" mkdir "!INSTALL_BIN!"
 if not exist "!INSTALL_INC!" mkdir "!INSTALL_INC!"
 if not exist "!INSTALL_LIB!" mkdir "!INSTALL_LIB!"
-if not exist "!INSTALL_DOC!" mkdir "!INSTALL_DOC!"
 if not exist "!INSTALL_TMOD!" mkdir "!INSTALL_TMOD!"
 if not exist "!INSTALL_CMOD!" mkdir "!INSTALL_CMOD!"
+if not exist "!INSTALL_DOC!" mkdir "!INSTALL_DOC!"
 :: install files
 call :installfiles "!INSTALL_BIN!" !TO_BIN! 
 call :installfiles "!INSTALL_INC!" !TO_INC! 
 call :installfiles "!INSTALL_LIB!" !TO_LIB! 
 call :installfiles "!INSTALL_DOC!" !TO_DOC! 
 call :log "installation complete"
-goto end
+goto end;
 
+:: install routine
 :installfiles
-set dest=!%~1!
+set dest=%~1
 :nextarg
 if "%2"=="" goto :eof
 call :log "installing (%2) into (!dest!)..."
-powershell -Command "Copy-Item -Path '%2' -Destination '!dest!' >> !LOGFILE!"
+powershell -Command "!INSTALL! -Path '%2' -Destination '!dest!' >> !LOGFILE!"
 if errorlevel 1 (
     echo END >> !LOGFILE!
     call :logerror "error while trying to install '%2'"
@@ -173,13 +185,20 @@ shift
 goto nextarg;
 goto :eof
 
+:: uninstall files
+:uninstall
+call :log "uninstalling (!INSTALL_ROOT!)..."
+powershell -Command "!UNINSTALL! -Recurse '!INSTALL_ROOT!' -ErrorAction SilentlyContinue"
+call :log "uninstall complete"
+goto end;
+
 :: clean build artifacts
 :clean
 call :log "cleaning build artifacts..."
-del /q !ALL_O! 2>nul
-del /q !ALL_T! 2>nul
+powershell -Command "$env:ALL_O -split '\s+' | !UNINSTALL! -ErrorAction SilentlyContinue"
+powershell -Command "$env:ALL_T -split '\s+' | !UNINSTALL! -ErrorAction SilentlyContinue"
 call :log "clean complete"
-goto end
+goto end;
 
 :: log routine
 :log
