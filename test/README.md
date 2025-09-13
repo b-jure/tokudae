@@ -8,5 +8,5 @@ This also holds special directories which are used by tests and so they
 are to be ignored, these directories start with `_`, such as `_libs`
 (they are not considered to be a testsuite).
 
-For more information do `./test_{platform}.toku -h` or see `test.toku`.
+For more information do `./test_{platform}.toku -h` or see `test_{platform}.toku`.
 (The `test_windows.toku` must be run as `..\tokudae.exe test_windows.toku`.)
