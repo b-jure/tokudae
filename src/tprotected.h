@@ -13,7 +13,7 @@
 
 
 /* type for functions with error handler */
-typedef void (*ProtectedFn)(toku_State *T, void *uterdata);
+typedef void (*ProtectedFn)(toku_State *T, void *userdata);
 
 
 /* save/restore stack position */

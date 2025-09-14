@@ -669,7 +669,7 @@ const char *tokuS_pushfstring(toku_State *T, const char *fmt, ...) {
 #define addstr(a,b,l)	(memcpy(a,b,(l) * sizeof(char)), a += (l))
 
 
-void tokuS_trimstr(char *restrict out, size_t lout, const char *s, size_t l) {
+void tokuS_trimstr(char *out, size_t lout, const char *s, size_t l) {
     const char *nl = strchr(s, '\n'); /* find first new line */
     lout -= LL(DOTS) + 1; /* save space for '...' and '\0' */
     if (l < lout && nl == NULL) /* no newlines? */
@@ -685,7 +685,7 @@ void tokuS_trimstr(char *restrict out, size_t lout, const char *s, size_t l) {
 }
 
 
-void tokuS_chunkid(char *restrict out, const char *source, size_t srclen) {
+void tokuS_chunkid(char *out, const char *source, size_t srclen) {
     size_t bufflen = TOKU_IDSIZE; /* free space in buffer */
     if (*source == '=') { /* 'literal' source */
         if (srclen <= bufflen) /* small enough? (excluding '=') */

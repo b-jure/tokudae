@@ -96,7 +96,7 @@ int tokuO_n2i(toku_Number n, toku_Integer *i, N2IMode mode) {
 /* try to convert value to 'toku_Integer' */
 int tokuO_tointeger(const TValue *o, toku_Integer *i, int mode) {
     if (ttisflt(o))
-        return tokuO_n2i(fval(o), i, mode);
+        return tokuO_n2i(fval(o), i, cast(N2IMode, mode));
     else if (ttisint(o)) {
         *i = ival(o);
         return 1;

@@ -10,6 +10,9 @@ setlocal enabledelayedexpansion
 :: -DTOKUI_HARDMEMTESTS => Forces a full collection at all points where the collector can run.
 :: -DTOKUI_HARDSTACKTESTS => Forces a reallocation of the stack at every point where the stack can be reallocated.
 
+:: Recommended macro to define for debug builds
+:: -TOKU_USE_APICHECK => enables asserts in the API (consistency checks)
+
 set LOGFILE=log.txt
 
 :: (un)install commands (if you change this don't forget to update the routines)

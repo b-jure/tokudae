@@ -2,10 +2,16 @@
 # of the version being tested
 TOKU_DIR = ../../src
 
+ifeq ($(strip $(CC)),)
 CC = gcc
+else ifeq ($(strip $(CC)),cc)
+CC = gcc
+else ifeq ($(strip $(CC)),g++)
+CFLAGS = -Wno-missing-field-initializers -Wno-literal-suffix
+endif
 
 # compilation should generate Dynamic-Link Libraries
-CFLAGS = -Wall -std=c99 -O2 -I$(TOKU_DIR) -fPIC -shared
+CFLAGS += -Wall -O2 -I$(TOKU_DIR) -fPIC -shared
 
 # libraries used by the tests
 all: lib1.so lib11.so lib2.so lib21.so lib2-v2.so

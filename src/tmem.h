@@ -26,8 +26,8 @@
         cast_int((TOKU_MAXSIZET/sizeof(t))))
 
 
-#define tokuM_new(T,t)          tokuM_malloc_(T, sizeof(t), 0u)
-#define tokuM_newarray(T,s,t)   tokuM_malloc_(T, (s)*sizeof(t), 0u)
+#define tokuM_new(T,t)          cast(t*, tokuM_malloc_(T, sizeof(t), 0u))
+#define tokuM_newarray(T,s,t)   cast(t*, tokuM_malloc_(T, (s)*sizeof(t), 0u))
 #define tokuM_newobj(T,tag,sz)  tokuM_malloc_(T, (sz), cast_ubyte(tag))
 
 #define tokuM_free(T,p)         tokuM_free_(T, p, sizeof(*(p)))

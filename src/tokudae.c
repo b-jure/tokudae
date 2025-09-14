@@ -697,7 +697,7 @@ static void create_arg_lists(toku_State *T, char **argv, int argc, int script) {
 */
 static int pmain(toku_State *T) {
     int argc = cast_int(toku_to_integer(T, -2));
-    char **argv = toku_to_userdata(T, -1);
+    char **argv = cast(char**, toku_to_userdata(T, -1));
     int script;
     int args = collect_args(argv, &script);
     int optlimit = (script > 0 ? script : argc);

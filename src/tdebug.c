@@ -315,7 +315,7 @@ static int symbexec(const Proto *p, int lastpc, int sp) {
                 symsp -= GET_ARG_L(i, 2);
                 break;
             default: {
-                OpCode op = *i;
+                OpCode op = cast(OpCode, *i);
                 int delta = getopDelta(op);
                 toku_assert(delta != VD); /* default case can't handle VD */
                 if (tokuC_opproperties[op].chgsp) { /* changes symsp? */

@@ -1688,7 +1688,7 @@ static int codeaddnegI(FunctionState *fs, ExpInfo *e1, ExpInfo *e2,
 ** Finalize code for binary operations, after reading 2nd operand.
 */
 void tokuC_binary(FunctionState *fs, ExpInfo *e1, ExpInfo *e2, Binopr opr,
-                                                             int line) {
+                                                               int line) {
     int swapped = 0;
     if (oprisfoldable(opr) && constfold(fs, e1, e2, cast_int(opr + TOKU_OP_ADD)))
         return; /* done (folded) */
@@ -1718,7 +1718,7 @@ void tokuC_binary(FunctionState *fs, ExpInfo *e1, ExpInfo *e2, Binopr opr,
             tokuC_dischargevars(fs, e1);
             tokuC_dischargevars(fs, e2);
             swapexp(e1, e2);
-            opr = (opr - OPR_GT) + OPR_LT;
+            opr = cast(Binopr, (opr - OPR_GT) + OPR_LT);
             swapped = 1;
             /* fall through */
         case OPR_LT: case OPR_LE:

@@ -99,7 +99,7 @@ static void cleargraylists(GState *gs) {
 /* create new object and append it to 'objects' */
 GCObject *tokuG_newoff(toku_State *T, size_t sz, int tt_, size_t offset) {
     GState *gs = G(T);
-    char *p = tokuM_newobj(T, novariant(tt_), sz);
+    char *p = cast_charp(tokuM_newobj(T, novariant(tt_), sz));
     GCObject *o = cast(GCObject*, p + offset);
     o->mark = tokuG_white(gs); /* mark as white */
     o->tt_ = cast_ubyte(tt_);

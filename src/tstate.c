@@ -188,7 +188,7 @@ static void initGCparams(GState *gs) {
 TOKU_API toku_State *toku_newstate(toku_Alloc falloc, void *ud, unsigned seed) {
     GState *gs;
     toku_State *T;
-    XSG *xsg = falloc(NULL, ud, 0, sizeof(XSG));
+    XSG *xsg = cast(XSG *, falloc(NULL, ud, 0, sizeof(XSG)));
     if (t_unlikely(xsg == NULL)) return NULL;
     gs = &xsg->gs;
     T = &xsg->xs.t;

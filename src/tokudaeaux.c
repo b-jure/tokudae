@@ -911,16 +911,18 @@ TOKULIB_API void tokuL_unref(toku_State *T, int l, int ref) {
 ** Buffer manipulation
 ** ======================================================================== */
 
+#define tobox(e)    cast(UserBox *, e)
+
 typedef struct UserBox {
     void *p; /* data */
     size_t sz; /* size of 'p' (data) */
 } UserBox;
 
 
-static void *resizebox(toku_State *T, int idx, size_t newsz) {
+static char *resizebox(toku_State *T, int idx, size_t newsz) {
     void *ud;
     toku_Alloc falloc = toku_getallocf(T, &ud);
-    UserBox *box = (UserBox *)toku_to_userdata(T, idx);
+    UserBox *box = tobox(toku_to_userdata(T, idx));
     void *newblock = falloc(box->p, ud, box->sz, newsz);
     if (t_unlikely(newblock == NULL && newsz > 0)) {
         toku_push_literal(T, "out of memory");
@@ -928,7 +930,7 @@ static void *resizebox(toku_State *T, int idx, size_t newsz) {
     }
     box->p = newblock;
     box->sz = newsz;
-    return newblock;
+    return cast_charp(newblock);
 }
 
 
@@ -939,7 +941,7 @@ static int boxgc(toku_State *T) {
 
 
 static void newbox(toku_State *T) {
-    UserBox *box = toku_push_userdata(T, sizeof(*box), 0);
+    UserBox *box = tobox(toku_push_userdata(T, sizeof(*box), 0));
     box->p = NULL;
     box->sz = 0;
     toku_push_table(T, 2); /* push metatable */
@@ -979,7 +981,7 @@ TOKULIB_API void tokuL_buff_init(toku_State *T, tokuL_Buffer *B) {
 #define checkbufflevel(B, idx) \
         toku_assert(buffonstack(B) \
                 ? toku_to_userdata((B)->T, idx) != NULL \
-                : toku_to_userdata((B)->T, idx) == (void*)(B))
+                : toku_to_userdata((B)->T, idx) == cast_voidp(B))
 
 
 /* calculate new buffer size */
@@ -1006,7 +1008,7 @@ static char *buffensure(tokuL_Buffer *B, size_t sz, int boxindex) {
         toku_State *T = B->T;
         size_t newsize = newbuffsize(B, sz);
         if (buffonstack(B)) { /* already have 'UserBox'? */
-            newb = resizebox(T, boxindex, newsize); /* resize it and done */
+            newb = resizebox(T, boxindex, newsize); /* resize it */
         } else {
             toku_remove(T, boxindex); /* remove placeholder */
             newbox(T); /* create new user box on top */

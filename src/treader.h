@@ -46,7 +46,7 @@ TOKUI_FUNC size_t tokuR_readn(BuffReader* br, size_t n);
 #define tokuR_buffpopn(b,n)     ((b)->len -= cast_sizet(n))
 
 #define tokuR_buffresize(T,b,s) \
-    { (b)->str = tokuM_saferealloc(T, (b)->str, (b)->size, s); \
+    { (b)->str = cast_charp(tokuM_saferealloc(T, (b)->str, (b)->size, s)); \
       (b)->size = s; }
 
 #define tokuR_freebuffer(T,b)   tokuR_buffresize(T, b, 0)

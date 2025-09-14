@@ -132,7 +132,7 @@ t_sinline void getlistfield(List *l, int lf, TValue *r) {
             } else /* otherwise empty list */
                 setnilval(r);
             break;
-        case LFX: case LFY: case LFZ: /* get 1st, 2nd or 3rd element */
+        case LFX: case LFY: case LFZ: { /* get 1st, 2nd or 3rd element */
             int i = lf - LFX;
             toku_assert(0 <= i);
             if (i < l->len) { /* 'i' in bounds? */
@@ -140,6 +140,7 @@ t_sinline void getlistfield(List *l, int lf, TValue *r) {
             } else /* otherwise 'i' out of bounds */
                 setnilval(r);
             break;
+        }
         default: toku_assert(0); /* unreachable */
     }
 }

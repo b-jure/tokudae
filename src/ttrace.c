@@ -56,10 +56,13 @@ static void posfix(void) {
 }
 
 
-static int traceOp(OpCode op) {
+static int traceOp_(OpCode op) {
     posfix_spaces(printf("%-12s", getopName(op)));
     return SIZE_INSTR;
 }
+
+#define castop(e)       cast(OpCode, e)
+#define traceOp(pi)     traceOp_(castop(pi))
 
 
 static int traceS(int s) {
@@ -83,7 +86,7 @@ static int traceI(const Proto *p, const Instruction *pc) {
 
 
 static void traceIS(const Proto *p, const Instruction *pc) {
-    OpCode op = *pc;
+    OpCode op = castop(*pc);
     prefix(p, pc);
     pc += traceOp(op);
     traceS(*pc);
@@ -92,7 +95,7 @@ static void traceIS(const Proto *p, const Instruction *pc) {
 
 
 static void traceISS(const Proto *p, const Instruction *pc) {
-    OpCode op = *pc;
+    OpCode op = castop(*pc);
     prefix(p, pc);
     pc += traceOp(op);
     pc += traceS(*pc);
@@ -102,7 +105,7 @@ static void traceISS(const Proto *p, const Instruction *pc) {
 
 
 static void traceIL(const Proto *p, const Instruction *pc) {
-    OpCode op = *pc;
+    OpCode op = castop(*pc);
     prefix(p, pc);
     pc += traceOp(op);
     traceL(pc);
@@ -111,7 +114,7 @@ static void traceIL(const Proto *p, const Instruction *pc) {
 
 
 static void traceILS(const Proto *p, const Instruction *pc) {
-    OpCode op = *pc;
+    OpCode op = castop(*pc);
     prefix(p, pc);
     pc += traceOp(op);
     pc += traceL(pc);
@@ -121,7 +124,7 @@ static void traceILS(const Proto *p, const Instruction *pc) {
 
 
 static void traceILL(const Proto *p, const Instruction *pc) {
-    OpCode op = *pc;
+    OpCode op = castop(*pc);
     prefix(p, pc);
     pc += traceOp(op);
     pc += traceL(pc);
@@ -131,7 +134,7 @@ static void traceILL(const Proto *p, const Instruction *pc) {
 
 
 static void traceILLL(const Proto *p, const Instruction *pc) {
-    OpCode op = *pc;
+    OpCode op = castop(*pc);
     prefix(p, pc);
     pc += traceOp(op);
     pc += traceL(pc);
@@ -142,7 +145,7 @@ static void traceILLL(const Proto *p, const Instruction *pc) {
 
 
 static void traceILLS(const Proto *p, const Instruction *pc) {
-    OpCode op = *pc;
+    OpCode op = castop(*pc);
     prefix(p, pc);
     pc += traceOp(op);
     pc += traceL(pc);

@@ -477,9 +477,12 @@ static void add_seed_element(toku_State *T, SeedArray *sa) {
 }
 
 
+#define toprng(e)      cast(MT19937 *, e)
+
+
 static int m_srand(toku_State *T) {
     SeedArray sa = {0};
-    MT19937 *ctx = cast(MT19937 *, toku_to_userdata(T, toku_upvalueindex(0)));
+    MT19937 *ctx = toprng(toku_to_userdata(T, toku_upvalueindex(0)));
     int t = toku_type(T, 0);
     if (t != TOKU_T_NONE) { /* have at least one argument? */
         if (t == TOKU_T_NUMBER) { /* seed with integer? */
@@ -538,7 +541,7 @@ static toku_Unsigned project(toku_State *T, MT19937 *ctx, toku_Unsigned ran,
 
 
 static int m_rand(toku_State *T) {
-    MT19937 *ctx = toku_to_userdata(T, toku_upvalueindex(0));
+    MT19937 *ctx = toprng(toku_to_userdata(T, toku_upvalueindex(0)));
     Rand64 ran = genrand_integer(T, ctx);
     toku_Integer low, up;
     toku_Unsigned p;
@@ -570,7 +573,7 @@ static int m_rand(toku_State *T) {
 
 
 static int m_randf(toku_State *T) {
-    MT19937 *ctx = toku_to_userdata(T, toku_upvalueindex(0));
+    MT19937 *ctx = toprng(toku_to_userdata(T, toku_upvalueindex(0)));
     toku_push_number(T, Rf2N(genrand_float(T, ctx)));
     return 1;
 }
@@ -588,7 +591,7 @@ static const tokuL_Entry randfuncs[] = {
 ** Register the random functions and initialize their state.
 */
 static void set_rand_funcs(toku_State *T) {
-    MT19937 *ctx = toku_push_userdata(T, sizeof(*ctx), 0);
+    MT19937 *ctx = toprng(toku_push_userdata(T, sizeof(*ctx), 0));
     init_ctx_default(T, ctx);
     tokuL_set_funcs(T, randfuncs, 1);
 }

@@ -446,7 +446,7 @@ static void initexp(ExpInfo *e, expt et, int info) {
 
 
 /* 'voidexp' but in C99 initializer syntax */
-#define INIT_EXP        { .t = NOJMP, .f = NOJMP, .et = EXP_VOID }
+#define INIT_EXP        { .et = EXP_VOID, .t = NOJMP, .f = NOJMP }
 
 
 static void initvar(FunctionState *fs, ExpInfo *e, int vidx) {
@@ -825,13 +825,14 @@ static void superkw(Lexer *lx, ExpInfo *e) {
 
 static void primaryexp(Lexer *lx, ExpInfo *e) {
     switch (lx->t.tk) {
-        case '(':
+        case '(': {
             int linenum = lx->line;
             tokuY_scan(lx); /* skip '(' */
             expr(lx, e);
             expectmatch(lx, ')', '(', linenum);
             tokuC_exp2val(lx->fs, e);
             break;
+        }
         case TK_NAME:
             var(lx, str_expectname(lx), e);
             break;
@@ -1731,6 +1732,9 @@ static void classstm(Lexer *lx, int linenum) {
 }
 
 
+typedef enum { CNONE, CDFLT, CASE, CMATCH, CMISMATCH } SwitchCase;
+
+
 /* 'switch' statement state. */
 typedef struct {
     TValue v; /* constant expression value */
@@ -1742,7 +1746,7 @@ typedef struct {
     t_ubyte havefalse; /* if switch has 'false' case */
     int firstli; /* first literal value in parser state 'literals' array */
     int jmp; /* jump that needs patch if 'case' expression is not 'CMATCH' */
-    enum { CNONE, CDFLT, CASE, CMATCH, CMISMATCH } c; /* cases */
+    SwitchCase c; /* current case */
 } SwitchState;
 
 
@@ -2108,9 +2112,9 @@ static void condbody(Lexer *lx, CondBodyState *cb) {
 static void ifstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     CondBodyState cb = {
-        .e = INIT_EXP, .isif = 1,
+        .e = INIT_EXP,
         .opT = OP_TESTPOP, .opJ = OP_JMP,
-        .pcCond = currPC, .pcClause = NOJMP,
+        .isif = 1, .pcCond = currPC, .pcClause = NOJMP,
     };
     storecontext(fs, &cb.ctxbefore);
     tokuY_scan(lx); /* skip 'if' */
@@ -2139,9 +2143,9 @@ static void whilestm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     struct LoopState ls;
     CondBodyState cb = {
-        .e = INIT_EXP, .isif = 0,
+        .e = INIT_EXP,
         .opT = OP_TESTPOP, .opJ = OP_JMPS,
-        .pcCond = currPC, .pcClause = NOJMP,
+        .isif = 0, .pcCond = currPC, .pcClause = NOJMP,
     };
     tokuY_scan(lx); /* skip 'while' */
     enterloop(fs, &ls, 0);
@@ -2311,9 +2315,9 @@ static void forstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     struct LoopState ls;
     CondBodyState cb = {
-        .e = INIT_EXP, .isif = 0,
+        .e = INIT_EXP,
         .opT = OP_TESTPOP, .opJ = OP_JMPS,
-        .pcClause = NOJMP
+        .isif = 0, .pcClause = NOJMP
     };
     Scope s;
     int linenum, opt, oldsp;

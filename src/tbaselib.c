@@ -839,16 +839,17 @@ static int b_tonum(toku_State *T) {
         tokuL_check_arg(T, 2 <= i && i <= 36, 1, "base out of range [2,36]");
         if (strtoint(s, t_castS2U(i), &n, &of) == s + l) { /* conversion ok? */
             toku_push_integer(T, n); /* push the conversion number */
-        done:
-            if (of) {
-                toku_push_integer(T, of);
-                return 2; /* return number + over(under)flow flag (-1|1) */
-            }
-            return 1; /* return only number */ 
+            goto done;
         }
     }
+    of = 0; /* skip 'if' */
     tokuL_push_fail(T); /* conversion failed */
-    return 1;
+done:
+    if (of) {
+        toku_push_integer(T, of);
+        return 2; /* return number + over(under)flow flag (-1|1) */
+    }
+    return 1; /* return fail or number */ 
 }
 
 

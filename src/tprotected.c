@@ -52,10 +52,9 @@ typedef struct toku_longjmp {
 /* C++ exceptions */
 #define TOKUI_THROW(T,c)	throw(c)
 
-static void TOKUI_TRY(toku_State *T, toku_longjmp *c, ProtectedFn *f,
-                                                      void *ud) {
+static void TOKUI_TRY(toku_State *T, toku_longjmp *c, ProtectedFn f, void *ud) {
     try {
-        f(L, ud); /* call function protected */
+        f(T, ud); /* call function protected */
     }
     catch (toku_longjmp *c1) { /* Tokudae error */
         if (c1 != c) /* not the correct level? */

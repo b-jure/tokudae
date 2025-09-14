@@ -44,6 +44,9 @@
 #endif
 
 
+/* cast OpCode to TM */
+#define asTM(op)    cast(TM, op)
+
 
 /*
 ** 't_intfitsf' checks whether a given integer is in the range that
@@ -153,10 +156,10 @@ toku_Number tokuV_modf(toku_State *T, toku_Number x, toku_Number y) {
 ** Perform binary arithmetic operations on objects, this function is free
 ** to call metamethods in cases where raw arithmetics are not possible.
 */
-void tokuV_binarithm(toku_State *T, const TValue *v1,
-                                const TValue *v2, SPtr res, int op) {
+void tokuV_binarithm(toku_State *T, const TValue *v1, const TValue *v2,
+                     SPtr res, int op) {
     if (!tokuO_arithmraw(T, v1, v2, s2v(res), op))
-        tokuTM_trybin(T, v1, v2, res, (op - TOKU_OP_ADD) + TM_ADD);
+        tokuTM_trybin(T, v1, v2, res, asTM((op-TOKU_OP_ADD) + TM_ADD));
 }
 
 
@@ -168,7 +171,7 @@ void tokuV_unarithm(toku_State *T, const TValue *v, SPtr res, int op) {
     TValue aux;
     setival(&aux, 0);
     if (!tokuO_arithmraw(T, v, &aux, s2v(T->sp.p - 1), op))
-        tokuTM_tryunary(T, v, res, (op - TOKU_OP_UNM) + TM_UNM);
+        tokuTM_tryunary(T, v, res, asTM((op - TOKU_OP_UNM) + TM_UNM));
 }
 
 
@@ -1475,7 +1478,7 @@ returning: /* trap already set */
                 TM ev;
                 savestate(T);
                 toku_assert(mt != NULL);
-                ev = fetch_s();
+                ev = asTM(fetch_s());
                 key = eventstring(T, ev);
                 toku_assert(cast_uint(ev) < TM_NUM);
                 tokuV_fastset(mt, key, v, hres, tokuH_psetstr);
@@ -1519,7 +1522,7 @@ returning: /* trap already set */
                 TValue *v2 = peek(0);
                 savestate(T);
                 /* operands are already swapped */
-                Protect(tokuTM_trybin(T, v1, v2, sp-2, fetch_s()));
+                Protect(tokuTM_trybin(T, v1, v2, sp-2, asTM(fetch_s())));
                 sp--;
                 vm_break;
             }

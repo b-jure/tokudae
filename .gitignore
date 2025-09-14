@@ -8,6 +8,7 @@ install
 *.old
 
 # Object files
+src/*.o
 *.o
 *.ko
 *.obj
