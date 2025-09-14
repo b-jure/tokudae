@@ -21,8 +21,8 @@ set ALL_O=lib1.obj lib11.obj lib2.obj lib21.obj lib22.obj
 
 :: libraries used by the tests
 set ALL_A=lib1.dll lib11.dll lib2.dll lib21.dll lib2-v2.dll
-set ALL_L=lib1.lib lib11.lib lib2.lib lib21.lib lib2-v2.lib
-set ALL_E=lib1.exp lib11.exp lib2.exp lib21.exp lib2-v2.exp
+set ALL_L=lib1.lib lib11.lib lib2.lib lib21.lib lib22.lib
+set ALL_E=lib1.exp lib11.exp lib2.exp lib21.exp lib22.exp
 
 echo BEGIN >> !LOGFILE!
 if "%1"=="clean" goto clean;
