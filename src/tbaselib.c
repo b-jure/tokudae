@@ -1057,7 +1057,7 @@ static void set_internal_test_flags(toku_State *T) {
 }
 
 
-TOKUMOD_API int tokuopen_basic(toku_State *T) {
+int tokuopen_basic(toku_State *T) {
     /* open lib into global instance */
     toku_push_globaltable(T);
     tokuL_set_funcs(T, basic_funcs, 0);

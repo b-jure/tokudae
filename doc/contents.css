@@ -1,0 +1,27 @@
+@import url("tokudae.css");
+
+table {
+    border: none;
+    border-spacing: 0;
+    border-collapse: collapse;
+}
+
+td {
+    vertical-align: top;
+    padding: 0;
+    text-align: left;
+    line-height: 1.25;
+    width: 15%;
+}
+
+details.example > summary {
+    color: var(--gruvbox-yellow);
+}
+
+ul {
+    list-style-type: none;
+}
+
+ul.contents {
+    padding: 0;
+}

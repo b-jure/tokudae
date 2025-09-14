@@ -390,7 +390,7 @@ static tokuL_Entry lstlib[] = {
 };
 
 
-TOKUMOD_API int tokuopen_list(toku_State *T) {
+int tokuopen_list(toku_State *T) {
     tokuL_push_lib(T, lstlib);
     return 1;
 }

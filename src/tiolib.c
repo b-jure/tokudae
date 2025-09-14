@@ -843,7 +843,7 @@ static void create_stdfile(toku_State *T, FILE *f, const char *k,
 }
 
 
-TOKUMOD_API int tokuopen_io(toku_State *T) {
+int tokuopen_io(toku_State *T) {
     tokuL_push_lib(T, iolib); /* 'io' table */
     create_metatable(T);
     /* create (and set) default files */

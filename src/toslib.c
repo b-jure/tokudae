@@ -506,7 +506,7 @@ static const tokuL_Entry syslib[] = {
 };
 
 
-TOKUMOD_API int tokuopen_os(toku_State *T) {
+int tokuopen_os(toku_State *T) {
     tokuL_push_lib(T, syslib);
     return 1;
 }

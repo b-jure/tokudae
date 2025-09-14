@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width"/>
         <title>Tokudae 1.0 Reference Manual - contents</title>
         <link rel="stylesheet" type="text/css" href="manual.css">
+        <link rel="stylesheet" type="text/css" href="contents.css">
     </head>
     <body>
         <h1>Tokudae 1.0 Reference Manual</h1>
@@ -17,46 +18,704 @@
         </div>
         <small>
             <p>
-            Copyright &copy; 2020&ndash;2024 Lua.org, PUC-Rio;
-            2024&ndash;2025 Jure Bagić.
+            Copyright &copy; 2020&ndash;2024 Lua.org, PUC-Rio
+            <br/>
+            Copyright &copy; 2024&ndash;2025 Jure Bagić
             </p>
         </small>
-
 
 
         <h2><a name="contents">Contents</a></h2>
         <ul class="contents menubar">
             <li><a href="manual.html">1 &ndash; Introduction</a></li>
+            <br/>
             <li><a href="manual.html#2">2 &ndash; Basic Concepts</a></li>
             <ul>
                 <li><a href="manual.html#2.1">2.1 &ndash; Values and Types</a></li>
-                <li><a href="manual.html#2.2">2.2 &ndash; Global Table</a> </li>
+                <li><a href="manual.html#2.2">2.2 &ndash; Environments and the Global Environment</a></li>
+                <li><a href="manual.html#2.3">2.3 &ndash; Error Handling</a></li>
+                <li><a href="manual.html#2.4">2.4 &ndash; Metatables and Metamethods</a></li>
+                <li><a href="manual.html#2.5">2.5 &ndash; Garbage Collection</a></li>
+                <ul>
+                    <li><a href="manual.html#2.5.1">2.5.1 &ndash; Incremental Garbage Collection</a></li>
+                    <li><a href="manual.html#2.5.2">2.5.2 &ndash; Garbage-Collection Metamethods</a></li>
+                </ul>
             </ul>
+            <br/>
             <li><a href="manual.html#3">3 &ndash; The Language</a></li>
+            <ul>
+                <li><a href="manual.html#3.1">3.1 &ndash; Lexical Conventions</a></li>
+                <li><a href="manual.html#3.2">3.2 &ndash; Variables</a></li>
+                <li><a href="manual.html#3.3">3.3 &ndash; Declarations and Statements</a></li>
+                <ul>
+                    <li><a href="manual.html#3.3.1">3.3.1 &ndash; Blocks</a></li>
+                    <li><a href="manual.html#3.3.2">3.3.2 &ndash; Chunks</a></li>
+                    <li><a href="manual.html#3.3.3">3.3.3 &ndash; Compound and Regular Assignment</a></li>
+                    <li><a href="manual.html#3.3.4">3.3.4 &ndash; Control Structures</a></li>
+                    <li><a href="manual.html#3.3.5">3.3.5 &ndash; Foreach Statement</a></li>
+                    <li><a href="manual.html#3.3.6">3.3.6 &ndash; Function Calls as Statements</a></li>
+                    <li><a href="manual.html#3.3.7">3.3.7 &ndash; Local Declarations</a></li>
+                    <li><a href="manual.html#3.3.8">3.3.8 &ndash; To-be-closed Variables</a></li>
+                </ul>
+                <li><a href="manual.html#3.4">3.4 &ndash; Expressions</a></li>
+                <ul>
+                    <li><a href="manual.html#3.4.1">3.4.1 &ndash; Arithmetic Operators</a></li>
+                    <li><a href="manual.html#3.4.2">3.4.2 &ndash; Bitwise Operators</a></li>
+                    <li><a href="manual.html#3.4.3">3.4.3 &ndash; Coercions and Conversions</a></li>
+                    <li><a href="manual.html#3.4.4">3.4.4 &ndash; Relational Operators</a></li>
+                    <li><a href="manual.html#3.4.5">3.4.5 &ndash; Logical Operators</a></li>
+                    <li><a href="manual.html#3.4.6">3.4.6 &ndash; Concatenation</a></li>
+                    <li><a href="manual.html#3.4.7">3.4.7 &ndash; Precedence</a></li>
+                    <li><a href="manual.html#3.4.8">3.4.8 &ndash; Table and List definition</a></li>
+                    <li><a href="manual.html#3.4.9">3.4.9 &ndash; Function Calls</a></li>
+                    <li><a href="manual.html#3.4.10">3.4.10 &ndash; Function Definitions</a></li>
+                    <li><a href="manual.html#3.4.11">3.4.11 &ndash; Lists of expressions, multiple results, and adjustment</a></li>
+                    <li><a href="manual.html#3.4.12">3.4.12 &ndash; Class Definitions and Instances</a></li>
+                </ul>
+                <li><a href="manual.html#3.5">3.5 &ndash; Visibility Rules</a></li>
+            </ul>
+            <br/>
             <li><a href="manual.html#4">4 &ndash; The Application Programming Interface</a></li>
+            <ul>
+                <li><a href="manual.html#4.1">4.1 &ndash; The Stack</a></li>
+                <ul>
+                    <li><a href="manual.html#4.1.1">4.1.1 &ndash; Stack Size</a></li>
+                    <li><a href="manual.html#4.1.2">4.1.2 &ndash; Valid and Acceptable Indices</a></li>
+                    <li><a href="manual.html#4.1.3">4.1.3 &ndash; Pointers to strings</a></li>
+                </ul>
+                <li><a href="manual.html#4.2">4.2 &ndash; C Closures</a></li>
+                <li><a href="manual.html#4.3">4.3 &ndash; C Table and C List</a></li>
+                <li><a href="manual.html#4.4">4.4 &ndash; Error Handling in C</a></li>
+                <ul>
+                    <li><a href="manual.html#4.4.1">4.4.1 &ndash; Status Codes</a></li>
+                </ul>
+                <li><a href="manual.html#4.5">4.5 &ndash; Functions and Types</a></li>
+            </ul>
+            <br/>
             <li><a href="manual.html#5">5 &ndash; The Auxiliary Library</a></li>
+            <ul>
+                <li><a href="manual.html#5.1">5.1 &ndash; Functions and Types</a></li>
+            </ul>
+            <br/>
             <li><a href="manual.html#6">6 &ndash; The Standard Libraries</a></li>
             <ul>
-                <li><a href="manual.html#6.1">6.1 &ndash; Basic Library</a></li>
-                <li><a href="manual.html#6.2">6.2 &ndash; String Library</a> </li>
-                <li><a href="manual.html#6.3">6.3 &ndash; UTF-8 Library</a> </li>
-                <li><a href="manual.html#6.4">6.4 &ndash; Math Library</a> </li>
-                <li><a href="manual.html#6.5">6.5 &ndash; I/O Library</a> </li>
-                <li><a href="manual.html#6.6">6.6 &ndash; OS Library</a> </li>
+                <li><a href="manual.html#6.1">6.1 &ndash; Loading the Libraries in C code</a></li>
+                <li><a href="manual.html#6.2">6.2 &ndash; Basic Library</a></li>
+                <li><a href="manual.html#6.3">6.3 &ndash; Package Library</a></li>
+                <li><a href="manual.html#6.4">6.4 &ndash; String Library</a></li>
+                <li><a href="manual.html#6.5">6.5 &ndash; Math Library</a></li>
+                <li><a href="manual.html#6.6">6.6 &ndash; Input and Output Library</a></li>
+                <li><a href="manual.html#6.7">6.7 &ndash; Operating System Library</a></li>
+                <li><a href="manual.html#6.8">6.8 &ndash; Regular Expression Library</a></li>
+                <li><a href="manual.html#6.9">6.9 &ndash; UTF-8 Library</a></li>
+                <li><a href="manual.html#6.10">6.10 &ndash; List Library</li>
+                <li><a href="manual.html#6.11">6.11 &ndash; Debug Library</li>
             </ul>
+            <br/>
+            <li><a href="manual.html#7">7 &ndash; Tokudae Standalone</a></li>
+            <br/>
+            <li><a href="manual.html#8">8 &ndash; The Complete Syntax of Tokudae</a></li>
         </ul>
 
 
-
         <h2><a name="index">Index</a></h2>
-        <table class="menubar" width="100%">
-            <tr>
-                <td></td>
-                <h3><a name="functions">Tokudae functions</a></h3>
-                <p></p>
-                <a href="manual.html#6.1">basic</a><br/>
-                <a href="manual.html#__G">__G</a><br/>
-                <a href="manual.html#__VERSION">__VERSION</a><br/>
-            </tr>
+        <details open class="example">
+            <summary>Tokudae</summary>
+            <table class="menubar" width="100%">
+                <tr>
+                    <td>
+                        <h4>Basic Library</h4>
+                        <p>
+                        <a href="manual.html#6.2">basic</a><br/>
+                        <a href="manual.html#__G">__G</a><br/>
+                        <a href="manual.html#__VERSION">__VERSION</a><br/>
+                        <a href="manual.html#__POSIX">__POSIX</a><br/>
+                        <a href="manual.html#__WINDOWS">__WINDOWS</a><br/>
+                        <a href="manual.html#assert">assert</a><br/>
+                        <a href="manual.html#clone">clone</a><br/>
+                        <a href="manual.html#error">error</a><br/>
+                        <a href="manual.html#fields">fields</a><br/>
+                        <a href="manual.html#gc">gc</a><br/>
+                        <a href="manual.html#getargs">getargs</a><br/>
+                        <a href="manual.html#getclass">getclass</a><br/>
+                        <a href="manual.html#getmetatable">getmetatable</a><br/>
+                        <a href="manual.html#getmethods">getmethods</a><br/>
+                        <a href="manual.html#getsuper">getsuper</a><br/>
+                        <a href="manual.html#indices">indices</a><br/>
+                        <a href="manual.html#len">len</a><br/>
+                        <a href="manual.html#loadfile">loadfile</a><br/>
+                        <a href="manual.html#load">load</a><br/>
+                        <a href="manual.html#nextfield">nextfield</a><br/>
+                        <a href="manual.html#pcall">pcall</a><br/>
+                        <a href="manual.html#printf">printf</a><br/>
+                        <a href="manual.html#print">print</a><br/>
+                        <a href="manual.html#range">range</a><br/>
+                        <a href="manual.html#rawequal">rawequal</a><br/>
+                        <a href="manual.html#rawget">rawget</a><br/>
+                        <a href="manual.html#rawset">rawset</a><br/>
+                        <a href="manual.html#runfile">runfile</a><br/>
+                        <a href="manual.html#setmetatable">setmetatable</a><br/>
+                        <a href="manual.html#setmethods">setmethods</a><br/>
+                        <a href="manual.html#tonum">tonum</a><br/>
+                        <a href="manual.html#tostr">tostr</a><br/>
+                        <a href="manual.html#typeof">typeof</a><br/>
+                        <a href="manual.html#unwrapmethod">unwrapmethod</a><br/>
+                        <a href="manual.html#warn">warn</a><br/>
+                        <a href="manual.html#xpcall">xpcall</a><br/>
+                        </p>
+                        <h4>Package Library</h4>
+                        <p>
+                        <a href="manual.html#6.3">package</a><br/>
+                        <a href="manual.html#package.config">package.config</a><br/>
+                        <a href="manual.html#package.cpath">package.cpath</a><br/>
+                        <a href="manual.html#package.loaded">package.loaded</a><br/>
+                        <a href="manual.html#package.path">package.path</a><br/>
+                        <a href="manual.html#package.preload">package.preload</a><br/>
+                        <a href="manual.html#package.searchers">package.searchers</a><br/>
+                        <a href="manual.html#package.loadlib">package.loadlib</a><br/>
+                        <a href="manual.html#package.searchpath">package.searchpath</a><br/>
+                        <a href="manual.html#import">import</a><br/>
+                        </p>
+                    </td>
+                    <td>
+                        <h4>I/O Library</h4>
+                        <p>
+                        <a href="manual.html#6.6">io</a><br/>
+                        <a href="manual.html#io.close">io.close</a><br/>
+                        <a href="manual.html#io.flush">io.flush</a><br/>
+                        <a href="manual.html#io.input">io.input</a><br/>
+                        <a href="manual.html#io.lines">io.lines</a><br/>
+                        <a href="manual.html#io.open">io.open</a><br/>
+                        <a href="manual.html#io.output">io.output</a><br/>
+                        <a href="manual.html#io.popen">io.popen</a><br/>
+                        <a href="manual.html#io.read">io.read</a><br/>
+                        <a href="manual.html#io.tmpfile">io.tmpfile</a><br/>
+                        <a href="manual.html#io.type">io.type</a><br/>
+                        <a href="manual.html#io.write">io.write</a><br/>
+                        <a href="manual.html#file.close">file.close</a><br/>
+                        <a href="manual.html#file.flush">file.flush</a><br/>
+                        <a href="manual.html#file.lines">file.lines</a><br/>
+                        <a href="manual.html#file.read">file.read</a><br/>
+                        <a href="manual.html#file.seek">file.seek</a><br/>
+                        <a href="manual.html#file.setvbuf">file.setvbuf</a><br/>
+                        <a href="manual.html#file.write">file.write</a><br/>
+                        </p>
+                        <h4>String Library</h4>
+                        <p>
+                        <a href="manual.html#6.4">string</a><br/>
+                        <a href="manual.html#string.ascii_letters">string.ascii_letters</a><br/>
+                        <a href="manual.html#string.ascii_lowercase">string.ascii_lowercase</a><br/>
+                        <a href="manual.html#string.ascii_uppercase">string.ascii_uppercase</a><br/>
+                        <a href="manual.html#string.digits">string.digits</a><br/>
+                        <a href="manual.html#string.hexdigits">string.hexdigits</a><br/>
+                        <a href="manual.html#string.octdigits">string.octdigits</a><br/>
+                        <a href="manual.html#string.printable">string.printable</a><br/>
+                        <a href="manual.html#string.punctuation">string.punctuation</a><br/>
+                        <a href="manual.html#string.whitespace">string.whitespace</a><br/>
+                        <a href="manual.html#string.byte">string.byte</a><br/>
+                        <a href="manual.html#string.bytes">string.bytes</a><br/>
+                        <a href="manual.html#string.char">string.char</a><br/>
+                        <a href="manual.html#string.cmp">string.cmp</a><br/>
+                        <a href="manual.html#string.cspan">string.cspan</a><br/>
+                        <a href="manual.html#string.find">string.find</a><br/>
+                        <a href="manual.html#string.fmt">string.fmt</a><br/>
+                        <a href="manual.html#string.join">string.join</a><br/>
+                        <a href="manual.html#string.repeat">string.repeat</a><br/>
+                        <a href="manual.html#string.replace">string.replace</a><br/>
+                        <a href="manual.html#string.reverse">string.reverse</a><br/>
+                        <a href="manual.html#string.rfind">string.rfind</a><br/>
+                        <a href="manual.html#string.rsplit">string.rsplit</a><br/>
+                        <a href="manual.html#string.span">string.span</a><br/>
+                        <a href="manual.html#string.split">string.split</a><br/>
+                        <a href="manual.html#string.startswith">string.startswith</a><br/>
+                        <a href="manual.html#string.substr">string.substr</a><br/>
+                        <a href="manual.html#string.swaplower">string.swaplower</a><br/>
+                        <a href="manual.html#string.swapupper">string.swapupper</a><br/>
+                        <a href="manual.html#string.tolower">string.tolower</a><br/>
+                        <a href="manual.html#string.toupper">string.toupper</a><br/>
+                        </p>
+                    </td>
+                    <td>
+                        <h4>Math Library</h4>
+                        <p>
+                        <a href="manual.html#6.5">math</a><br/>
+                        <a href="manual.html#math.huge">math.huge</a><br/>
+                        <a href="manual.html#math.maxint">math.maxint</a><br/>
+                        <a href="manual.html#math.minint">math.minint</a><br/>
+                        <a href="manual.html#math.pi">math.pi</a><br/>
+                        <a href="manual.html#math.abs">math.abs</a><br/>
+                        <a href="manual.html#math.acos">math.acos</a><br/>
+                        <a href="manual.html#math.asin">math.asin</a><br/>
+                        <a href="manual.html#math.atan">math.atan</a><br/>
+                        <a href="manual.html#math.ceil">math.ceil</a><br/>
+                        <a href="manual.html#math.cos">math.cos</a><br/>
+                        <a href="manual.html#math.deg">math.deg</a><br/>
+                        <a href="manual.html#math.exp">math.exp</a><br/>
+                        <a href="manual.html#math.floor">math.floor</a><br/>
+                        <a href="manual.html#math.fmod">math.fmod</a><br/>
+                        <a href="manual.html#math.log">math.log</a><br/>
+                        <a href="manual.html#math.max">math.max</a><br/>
+                        <a href="manual.html#math.min">math.min</a><br/>
+                        <a href="manual.html#math.modf">math.modf</a><br/>
+                        <a href="manual.html#math.rad">math.rad</a><br/>
+                        <a href="manual.html#math.randf">math.randf</a><br/>
+                        <a href="manual.html#math.rand">math.rand</a><br/>
+                        <a href="manual.html#math.sin">math.sin</a><br/>
+                        <a href="manual.html#math.sqrt">math.sqrt</a><br/>
+                        <a href="manual.html#math.srand">math.srand</a><br/>
+                        <a href="manual.html#math.tan">math.tan</a><br/>
+                        <a href="manual.html#math.toint">math.toint</a><br/>
+                        <a href="manual.html#math.type">math.type</a><br/>
+                        <a href="manual.html#math.ult">math.ult</a><br/>
+                        </p>
+                        <h4>OS Library</h4>
+                        <p>
+                        <a href="manual.html#6.7">os</a><br/>
+                        <a href="manual.html#os.clock">os.clock</a><br/>
+                        <a href="manual.html#os.date">os.date</a><br/>
+                        <a href="manual.html#os.difftime">os.difftime</a><br/>
+                        <a href="manual.html#os.execute">os.execute</a><br/>
+                        <a href="manual.html#os.exit">os.exit</a><br/>
+                        <a href="manual.html#os.getenv">os.getenv</a><br/>
+                        <a href="manual.html#os.remove">os.remove</a><br/>
+                        <a href="manual.html#os.rename">os.rename</a><br/>
+                        <a href="manual.html#os.setenv">os.setenv</a><br/>
+                        <a href="manual.html#os.setlocale">os.setlocale</a><br/>
+                        <a href="manual.html#os.time">os.time</a><br/>
+                        <a href="manual.html#os.tmpname">os.tmpname</a><br/>
+                        </p>
+                    </td>
+                    <td>
+                        <h4>Regex Library</h4>
+                        <p>
+                        <a href="manual.html#6.8">reg</a><br/>
+                        <a href="manual.html#reg.find">reg.find</a><br/>
+                        <a href="manual.html#reg.gmatch">reg.gmatch</a><br/>
+                        <a href="manual.html#reg.gsub">reg.gsub</a><br/>
+                        <a href="manual.html#reg.match">reg.match</a><br/>
+                        </p>
+                        <h4>UTF-8 Library</h4>
+                        <p>
+                        <a href="manual.html#6.9">utf8</a><br/>
+                        <a href="manual.html#utf8.charpattern">utf8.charpattern</a><br/>
+                        <a href="manual.html#utf8.char">utf8.char</a><br/>
+                        <a href="manual.html#utf8.codepoint">utf8.codepoint</a><br/>
+                        <a href="manual.html#utf8.codes">utf8.codes</a><br/>
+                        <a href="manual.html#utf8.len">utf8.len</a><br/>
+                        <a href="manual.html#utf8.offset">utf8.offset</a><br/>
+                        </p>
+                        <h4>List Library</h4>
+                        <p>
+                        <a href="manual.html#6.10">list</a><br/>
+                        <a href="manual.html#list.concat">list.concat</a><br/>
+                        <a href="manual.html#list.flatten">list.flatten</a><br/>
+                        <a href="manual.html#list.insert">list.insert</a><br/>
+                        <a href="manual.html#list.isordered">list.isordered</a><br/>
+                        <a href="manual.html#list.move">list.move</a><br/>
+                        <a href="manual.html#list.new">list.new</a><br/>
+                        <a href="manual.html#list.remove">list.remove</a><br/>
+                        <a href="manual.html#list.shrink">list.shrink</a><br/>
+                        <a href="manual.html#list.sort">list.sort</a><br/>
+                        </p>
+                        <h4>Debug Library</h4>
+                        <p>
+                        <a href="manual.html#6.11">debug</a><br/>
+                        <a href="manual.html#debug.cstacklimit">debug.cstacklimit</a><br/>
+                        <a href="manual.html#debug.maxstack">debug.maxstack</a><br/>
+                        <a href="manual.html#debug.debug">debug.debug</a><br/>
+                        <a href="manual.html#debug.getclist">debug.getclist</a><br/>
+                        <a href="manual.html#debug.getctable">debug.getctable</a><br/>
+                        <a href="manual.html#debug.gethook">debug.gethook</a><br/>
+                        <a href="manual.html#debug.getinfo">debug.getinfo</a><br/>
+                        <a href="manual.html#debug.getlocal">debug.getlocal</a><br/>
+                        <a href="manual.html#debug.getupvalue">debug.getupvalue</a><br/>
+                        <a href="manual.html#debug.getuservalue">debug.getuservalue</a><br/>
+                        <a href="manual.html#debug.sethook">debug.sethook</a><br/>
+                        <a href="manual.html#debug.setlocal">debug.setlocal</a><br/>
+                        <a href="manual.html#debug.setupvalue">debug.setupvalue</a><br/>
+                        <a href="manual.html#debug.setuservalue">debug.setuservalue</a><br/>
+                        <a href="manual.html#debug.stackinuse">debug.stackinuse</a><br/>
+                        <a href="manual.html#debug.traceback">debug.traceback</a><br/>
+                        <a href="manual.html#debug.upvalueid">debug.upvalueid</a><br/>
+                        <a href="manual.html#debug.upvaluejoin">debug.upvaluejoin</a><br/>
+                        </p>
+                    </td>
+                    <td>
+                        <h4>Metamethods</h4>
+                        <p>
+                        <a href="manual.html#2.4">__add</a><br/>
+                        <a href="manual.html#2.4">__band</a><br/>
+                        <a href="manual.html#2.4">__bnot</a><br/>
+                        <a href="manual.html#2.4">__bor</a><br/>
+                        <a href="manual.html#2.4">__bxor</a><br/>
+                        <a href="manual.html#2.4">__call</a><br/>
+                        <a href="manual.html#2.4">__concat</a><br/>
+                        <a href="manual.html#2.4">__div</a><br/>
+                        <a href="manual.html#2.4">__eq</a><br/>
+                        <a href="manual.html#2.4">__getidx</a><br/>
+                        <a href="manual.html#2.4">__idiv</a><br/>
+                        <a href="manual.html#2.4">__init</a><br/>
+                        <a href="manual.html#2.4">__le</a><br/>
+                        <a href="manual.html#2.4">__lt</a><br/>
+                        <a href="manual.html#2.4">__mod</a><br/>
+                        <a href="manual.html#2.4">__mul</a><br/>
+                        <a href="manual.html#2.4">__pow</a><br/>
+                        <a href="manual.html#2.4">__setidx</a><br/>
+                        <a href="manual.html#2.4">__shl</a><br/>
+                        <a href="manual.html#2.4">__shr</a><br/>
+                        <a href="manual.html#2.4">__sub</a><br/>
+                        <a href="manual.html#2.4">__unm</a><br/>
+                        </p>
+                        <h4>Environment Variables</h4>
+                        <p>
+                        <a href="manual.html#TOKU_CPATH_1_0">TOKU_CPATH_1_0</a><br/>
+                        <a href="manual.html#TOKU_CPATH">TOKU_CPATH</a><br/>
+                        <a href="manual.html#TOKU_INIT_1_0">TOKU_INIT_1_0</a><br/>
+                        <a href="manual.html#TOKU_INIT">TOKU_INIT</a><br/>
+                        <a href="manual.html#TOKU_PATH_1_0">TOKU_PATH_1_0</a><br/>
+                        <a href="manual.html#TOKU_PATH">TOKU_PATH</a><br/>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </details>
+        <details open class="example">
+            <summary>C API</summary>
+            <table class="menubar" width="100%">
+                <tr>
+                    <td>
+                        <h4>Constants</h4>
+                        <a href="manual.html#TOKU_CLIST_GLOBALS">TOKU_CLIST_GLOBALS</a><br/>
+                        <a href="manual.html#TOKU_CLIST_INDEX">TOKU_CLIST_INDEX</a><br/>
+                        <a href="manual.html#TOKU_CLIST_MAINTHREAD">TOKU_CLIST_MAINTHREAD</a><br/>
+                        <a href="manual.html#TOKU_CTABLE_INDEX">TOKU_CTABLE_INDEX</a><br/>
+                        <a href="manual.html#TOKU_EXTRASPACE">TOKU_EXTRASPACE</a><br/>
+                        <a href="manual.html#TOKU_FILEHANDLE">TOKU_FILEHANDLE</a><br/>
+                        <a href="manual.html#TOKU_GC_CHECK">TOKU_GC_CHECK</a><br/>
+                        <a href="manual.html#TOKU_GC_COLLECT">TOKU_GC_COLLECT</a><br/>
+                        <a href="manual.html#TOKU_GC_COUNTBYTES">TOKU_GC_COUNTBYTES</a><br/>
+                        <a href="manual.html#TOKU_GC_COUNT">TOKU_GC_COUNT</a><br/>
+                        <a href="manual.html#TOKU_GC_ISRUNNING">TOKU_GC_ISRUNNING</a><br/>
+                        <a href="manual.html#TOKU_GC_PARAM">TOKU_GC_PARAM</a><br/>
+                        <a href="manual.html#TOKU_GCP_PAUSE">TOKU_GCP_PAUSE</a><br/>
+                        <a href="manual.html#TOKU_GCP_STEPMUL">TOKU_GCP_STEPMUL</a><br/>
+                        <a href="manual.html#TOKU_GCP_STEPSIZE">TOKU_GCP_STEPSIZE</a><br/>
+                        <a href="manual.html#TOKU_GC_RESTART">TOKU_GC_RESTART</a><br/>
+                        <a href="manual.html#TOKU_GC_STEP">TOKU_GC_STEP</a><br/>
+                        <a href="manual.html#TOKU_GC_STOP">TOKU_GC_STOP</a><br/>
+                        <a href="manual.html#TOKU_HOOK_CALL">TOKU_HOOK_CALL</a><br/>
+                        <a href="manual.html#TOKU_HOOK_LINE">TOKU_HOOK_LINE</a><br/>
+                        <a href="manual.html#TOKU_HOOK_RET">TOKU_HOOK_RET</a><br/>
+                        <a href="manual.html#TOKU_IDSIZE">TOKU_IDSIZE</a><br/>
+                        <a href="manual.html#TOKU_INTEGER_MAX">TOKU_INTEGER_MAX</a><br/>
+                        <a href="manual.html#TOKU_INTEGER_MIN">TOKU_INTEGER_MIN</a><br/>
+                        <a href="manual.html#TOKUL_BUFFERSIZE">TOKUL_BUFFERSIZE</a><br/>
+                        <a href="manual.html#TOKU_LOADED_TABLE">TOKU_LOADED_TABLE</a><br/>
+                        <a href="manual.html#TOKU_MASK_CALL">TOKU_MASK_CALL</a><br/>
+                        <a href="manual.html#TOKU_MASK_COUNT">TOKU_MASK_COUNT</a><br/>
+                        <a href="manual.html#TOKU_MASK_LINE">TOKU_MASK_LINE</a><br/>
+                        <a href="manual.html#TOKU_MASK_RET">TOKU_MASK_RET</a><br/>
+                        <a href="manual.html#TOKU_MINSTACK">TOKU_MINSTACK</a><br/>
+                        <a href="manual.html#TOKU_MULTRET">TOKU_MULTRET</a><br/>
+                        <a href="manual.html#TOKU_N2SBUFFSZ">TOKU_N2SBUFFSZ</a><br/>
+                        <a href="manual.html#TOKU_NOREF">TOKU_NOREF</a><br/>
+                        <a href="manual.html#TOKU_NUMBER_MIN">TOKU_NUMBER_MIN</a><br/>
+                        <a href="manual.html#TOKU_OP_ADD">TOKU_OP_ADD</a><br/>
+                        <a href="manual.html#TOKU_OP_BAND">TOKU_OP_BAND</a><br/>
+                        <a href="manual.html#TOKU_OP_BNOT">TOKU_OP_BNOT</a><br/>
+                        <a href="manual.html#TOKU_OP_BOR">TOKU_OP_BOR</a><br/>
+                        <a href="manual.html#TOKU_OP_BSHL">TOKU_OP_BSHL</a><br/>
+                        <a href="manual.html#TOKU_OP_BSHR">TOKU_OP_BSHR</a><br/>
+                        <a href="manual.html#TOKU_OP_BXOR">TOKU_OP_BXOR</a><br/>
+                        <a href="manual.html#TOKU_OP_DIV">TOKU_OP_DIV</a><br/>
+                        <a href="manual.html#TOKU_OP_IDIV">TOKU_OP_IDIV</a><br/>
+                        <a href="manual.html#TOKU_OP_MOD">TOKU_OP_MOD</a><br/>
+                        <a href="manual.html#TOKU_OP_MUL">TOKU_OP_MUL</a><br/>
+                        <a href="manual.html#TOKU_OP_POW">TOKU_OP_POW</a><br/>
+                        <a href="manual.html#TOKU_OP_SUB">TOKU_OP_SUB</a><br/>
+                        <a href="manual.html#TOKU_OP_UNM">TOKU_OP_UNM</a><br/>
+                        <a href="manual.html#TOKU_ORD_EQ">TOKU_ORD_EQ</a><br/>
+                        <a href="manual.html#TOKU_ORD_LE">TOKU_ORD_LE</a><br/>
+                        <a href="manual.html#TOKU_ORD_LT">TOKU_ORD_LT</a><br/>
+                        <a href="manual.html#TOKU_PRELOAD_TABLE">TOKU_PRELOAD_TABLE</a><br/>
+                        <a href="manual.html#TOKU_REFNIL">TOKU_REFNIL</a><br/>
+                        <a href="manual.html#TOKU_STATUS_EERROR">TOKU_STATUS_EERROR</a><br/>
+                        <a href="manual.html#TOKU_STATUS_EFILE">TOKU_STATUS_EFILE</a><br/>
+                        <a href="manual.html#TOKU_STATUS_EMEM">TOKU_STATUS_EMEM</a><br/>
+                        <a href="manual.html#TOKU_STATUS_ERUNTIME">TOKU_STATUS_ERUNTIME</a><br/>
+                        <a href="manual.html#TOKU_STATUS_ESYNTAX">TOKU_STATUS_ESYNTAX</a><br/>
+                        <a href="manual.html#TOKU_STATUS_OK">TOKU_STATUS_OK</a><br/>
+                        <a href="manual.html#TOKU_T_BMETHOD">TOKU_T_BMETHOD</a><br/>
+                        <a href="manual.html#TOKU_T_BOOL">TOKU_T_BOOL</a><br/>
+                        <a href="manual.html#TOKU_T_CLASS">TOKU_T_CLASS</a><br/>
+                        <a href="manual.html#TOKU_T_FUNCTION">TOKU_T_FUNCTION</a><br/>
+                        <a href="manual.html#TOKU_T_INSTANCE">TOKU_T_INSTANCE</a><br/>
+                        <a href="manual.html#TOKU_T_LIGHTUSERDATA">TOKU_T_LIGHTUSERDATA</a><br/>
+                        <a href="manual.html#TOKU_T_LIST">TOKU_T_LIST</a><br/>
+                        <a href="manual.html#TOKU_T_NIL">TOKU_T_NIL</a><br/>
+                        <a href="manual.html#TOKU_T_NONE">TOKU_T_NONE</a><br/>
+                        <a href="manual.html#TOKU_T_NUMBER">TOKU_T_NUMBER</a><br/>
+                        <a href="manual.html#TOKU_T_STRING">TOKU_T_STRING</a><br/>
+                        <a href="manual.html#TOKU_T_TABLE">TOKU_T_TABLE</a><br/>
+                        <a href="manual.html#TOKU_T_THREAD">TOKU_T_THREAD</a><br/>
+                        <a href="manual.html#TOKU_T_USERDATA">TOKU_T_USERDATA</a><br/>
+                        <a href="manual.html#TOKU_USE_APICHECK">TOKU_USE_APICHECK</a><br/>
+                    </td>
+                    <td>
+                        <h4>Types</h4>
+                        <p>
+                        <a href="manual.html#toku_Alloc">toku_Alloc</a><br/>
+                        <a href="manual.html#toku_CFunction">toku_CFunction</a><br/>
+                        <a href="manual.html#toku_Debug">toku_Debug</a><br/>
+                        <a href="manual.html#toku_Hook">toku_Hook</a><br/>
+                        <a href="manual.html#toku_Integer">toku_Integer</a><br/>
+                        <a href="manual.html#toku_Number">toku_Number</a><br/>
+                        <a href="manual.html#toku_Reader">toku_Reader</a><br/>
+                        <a href="manual.html#toku_State">toku_State</a><br/>
+                        <a href="manual.html#toku_Unsigned">toku_Unsigned</a><br/>
+                        <a href="manual.html#toku_WarnFunction">toku_WarnFunction</a><br/>
+                        </p>
+                        <h4>Auxiliary Types</h4>
+                        <p>
+                        <a href="manual.html#tokuL_Buffer">tokuL_Buffer</a><br/>
+                        <a href="manual.html#tokuL_Entry">tokuL_Entry</a><br/>
+                        <a href="manual.html#tokuL_Stream">tokuL_Stream</a><br/>
+                        </p>
+                        <h4>Functions</h4>
+                        <p>
+                        <a href="manual.html#toku_absindex">toku_absindex</a><br/>
+                        <a href="manual.html#toku_arith">toku_arith</a><br/>
+                        <a href="manual.html#toku_atpanic">toku_atpanic</a><br/>
+                        <a href="manual.html#toku_call">toku_call</a><br/>
+                        <a href="manual.html#toku_checkstack">toku_checkstack</a><br/>
+                        <a href="manual.html#toku_closeslot">toku_closeslot</a><br/>
+                        <a href="manual.html#toku_close">toku_close</a><br/>
+                        <a href="manual.html#toku_compare">toku_compare</a><br/>
+                        <a href="manual.html#toku_concat">toku_concat</a><br/>
+                        <a href="manual.html#toku_copy">toku_copy</a><br/>
+                        <a href="manual.html#toku_error">toku_error</a><br/>
+                        <a href="manual.html#toku_gc">toku_gc</a><br/>
+                        <a href="manual.html#toku_getallocf">toku_getallocf</a><br/>
+                        <a href="manual.html#toku_get_cfield_str">toku_get_cfield_str</a><br/>
+                        <a href="manual.html#toku_get_cindex">toku_get_cindex</a><br/>
+                        <a href="manual.html#toku_get_class">toku_get_class</a><br/>
+                        <a href="manual.html#toku_getextraspace">toku_getextraspace</a><br/>
+                        <a href="manual.html#toku_get_field_int">toku_get_field_int</a><br/>
+                        <a href="manual.html#toku_get_field_str">toku_get_field_str</a><br/>
+                        <a href="manual.html#toku_get_fieldtable">toku_get_fieldtable</a><br/>
+                        <a href="manual.html#toku_get_field">toku_get_field</a><br/>
+                        <a href="manual.html#toku_get_global_str">toku_get_global_str</a><br/>
+                        <a href="manual.html#toku_gethookcount">toku_gethookcount</a><br/>
+                        <a href="manual.html#toku_gethookmask">toku_gethookmask</a><br/>
+                        <a href="manual.html#toku_gethook">toku_gethook</a><br/>
+                        <a href="manual.html#toku_get_index">toku_get_index</a><br/>
+                        <a href="manual.html#toku_getinfo">toku_getinfo</a><br/>
+                        <a href="manual.html#toku_getlocal">toku_getlocal</a><br/>
+                        <a href="manual.html#toku_get_metatable">toku_get_metatable</a><br/>
+                        <a href="manual.html#toku_get_methodtable">toku_get_methodtable</a><br/>
+                        <a href="manual.html#toku_get_method">toku_get_method</a><br/>
+                        <a href="manual.html#toku_getntop">toku_getntop</a><br/>
+                        <a href="manual.html#toku_get_raw">toku_get_raw</a><br/>
+                        <a href="manual.html#toku_get_self">toku_get_self</a><br/>
+                        <a href="manual.html#toku_getstack">toku_getstack</a><br/>
+                        <a href="manual.html#toku_get_superclass">toku_get_superclass</a><br/>
+                        <a href="manual.html#toku_get">toku_get</a><br/>
+                        <a href="manual.html#toku_gettop">toku_gettop</a><br/>
+                        <a href="manual.html#toku_getupvalue">toku_getupvalue</a><br/>
+                        <a href="manual.html#toku_get_uservalue">toku_get_uservalue</a><br/>
+                        <a href="manual.html#toku_insert">toku_insert</a><br/>
+                        <a href="manual.html#toku_is_bool">toku_is_bool</a><br/>
+                        <a href="manual.html#toku_is_boundmethod">toku_is_boundmethod</a><br/>
+                        <a href="manual.html#toku_is_cfunction">toku_is_cfunction</a><br/>
+                        <a href="manual.html#toku_is_class">toku_is_class</a><br/>
+                        <a href="manual.html#toku_is_fulluserdata">toku_is_fulluserdata</a><br/>
+                        <a href="manual.html#toku_is_function">toku_is_function</a><br/>
+                        <a href="manual.html#toku_is_instance">toku_is_instance</a><br/>
+                        <a href="manual.html#toku_is_integer">toku_is_integer</a><br/>
+                        <a href="manual.html#toku_is_lightuserdata">toku_is_lightuserdata</a><br/>
+                        <a href="manual.html#toku_is_list">toku_is_list</a><br/>
+                        <a href="manual.html#toku_is_nil">toku_is_nil</a><br/>
+                        <a href="manual.html#toku_is_noneornil">toku_is_noneornil</a><br/>
+                        <a href="manual.html#toku_is_none">toku_is_none</a><br/>
+                        <a href="manual.html#toku_is_number">toku_is_number</a><br/>
+                        <a href="manual.html#toku_is_string">toku_is_string</a><br/>
+                        <a href="manual.html#toku_is_table">toku_is_table</a><br/>
+                        <a href="manual.html#toku_is_thread">toku_is_thread</a><br/>
+                        <a href="manual.html#toku_is_udatamethod">toku_is_udatamethod</a><br/>
+                        <a href="manual.html#toku_is_userdata">toku_is_userdata</a><br/>
+                        <a href="manual.html#toku_len">toku_len</a><br/>
+                        <a href="manual.html#toku_lenudata">toku_lenudata</a><br/>
+                        </p>
+                    </td>
+                    <td>
+                        <p>
+                        <br/><br/>
+                        <a href="manual.html#toku_load">toku_load</a><br/>
+                        <a href="manual.html#toku_newstate">toku_newstate</a><br/>
+                        <a href="manual.html#toku_newthread">toku_newthread</a><br/>
+                        <a href="manual.html#toku_nextfield">toku_nextfield</a><br/>
+                        <a href="manual.html#toku_numbertocstring">toku_numbertocstring</a><br/>
+                        <a href="manual.html#toku_numuservalues">toku_numuservalues</a><br/>
+                        <a href="manual.html#toku_pcall">toku_pcall</a><br/>
+                        <a href="manual.html#toku_pop">toku_pop</a><br/>
+                        <a href="manual.html#toku_push_bool">toku_push_bool</a><br/>
+                        <a href="manual.html#toku_push_boundmethod">toku_push_boundmethod</a><br/>
+                        <a href="manual.html#toku_push_cclosure">toku_push_cclosure</a><br/>
+                        <a href="manual.html#toku_push_cfunction">toku_push_cfunction</a><br/>
+                        <a href="manual.html#toku_push_class">toku_push_class</a><br/>
+                        <a href="manual.html#toku_push_clist">toku_push_clist</a><br/>
+                        <a href="manual.html#toku_push_ctable">toku_push_ctable</a><br/>
+                        <a href="manual.html#toku_push_fstring">toku_push_fstring</a><br/>
+                        <a href="manual.html#toku_push_globaltable">toku_push_globaltable</a><br/>
+                        <a href="manual.html#toku_push_instance">toku_push_instance</a><br/>
+                        <a href="manual.html#toku_push_integer">toku_push_integer</a><br/>
+                        <a href="manual.html#toku_push_lightuserdata">toku_push_lightuserdata</a><br/>
+                        <a href="manual.html#toku_push_list">toku_push_list</a><br/>
+                        <a href="manual.html#toku_push_literal">toku_push_literal</a><br/>
+                        <a href="manual.html#toku_push_lstring">toku_push_lstring</a><br/>
+                        <a href="manual.html#toku_push_mainthread">toku_push_mainthread</a><br/>
+                        <a href="manual.html#toku_push_nil">toku_push_nil</a><br/>
+                        <a href="manual.html#toku_push_number">toku_push_number</a><br/>
+                        <a href="manual.html#toku_push_string">toku_push_string</a><br/>
+                        <a href="manual.html#toku_push_table">toku_push_table</a><br/>
+                        <a href="manual.html#toku_push_thread">toku_push_thread</a><br/>
+                        <a href="manual.html#toku_push">toku_push</a><br/>
+                        <a href="manual.html#toku_push_userdata">toku_push_userdata</a><br/>
+                        <a href="manual.html#toku_push_vfstring">toku_push_vfstring</a><br/>
+                        <a href="manual.html#toku_rawequal">toku_rawequal</a><br/>
+                        <a href="manual.html#toku_register">toku_register</a><br/>
+                        <a href="manual.html#toku_remove">toku_remove</a><br/>
+                        <a href="manual.html#toku_replace">toku_replace</a><br/>
+                        <a href="manual.html#toku_resetthread">toku_resetthread</a><br/>
+                        <a href="manual.html#toku_rotate">toku_rotate</a><br/>
+                        <a href="manual.html#toku_setallocf">toku_setallocf</a><br/>
+                        <a href="manual.html#toku_set_cfield_str">toku_set_cfield_str</a><br/>
+                        <a href="manual.html#toku_set_cindex">toku_set_cindex</a><br/>
+                        <a href="manual.html#toku_set_field_int">toku_set_field_int</a><br/>
+                        <a href="manual.html#toku_set_field_str">toku_set_field_str</a><br/>
+                        <a href="manual.html#toku_set_fieldtable">toku_set_fieldtable</a><br/>
+                        <a href="manual.html#toku_set_field">toku_set_field</a><br/>
+                        <a href="manual.html#toku_set_global_str">toku_set_global_str</a><br/>
+                        <a href="manual.html#toku_sethook">toku_sethook</a><br/>
+                        <a href="manual.html#toku_set_index">toku_set_index</a><br/>
+                        <a href="manual.html#toku_setlocal">toku_setlocal</a><br/>
+                        <a href="manual.html#toku_set_metatable">toku_set_metatable</a><br/>
+                        <a href="manual.html#toku_set_methodtable">toku_set_methodtable</a><br/>
+                        <a href="manual.html#toku_setntop">toku_setntop</a><br/>
+                        <a href="manual.html#toku_set_raw">toku_set_raw</a><br/>
+                        <a href="manual.html#toku_set_superclass">toku_set_superclass</a><br/>
+                        <a href="manual.html#toku_set">toku_set</a><br/>
+                        <a href="manual.html#toku_setupvalue">toku_setupvalue</a><br/>
+                        <a href="manual.html#toku_set_uservalue">toku_set_uservalue</a><br/>
+                        <a href="manual.html#toku_setwarnf">toku_setwarnf</a><br/>
+                        <a href="manual.html#toku_shrinklist">toku_shrinklist</a><br/>
+                        <a href="manual.html#toku_stackinuse">toku_stackinuse</a><br/>
+                        <a href="manual.html#toku_status">toku_status</a><br/>
+                        <a href="manual.html#toku_stringtonumber">toku_stringtonumber</a><br/>
+                        <a href="manual.html#toku_to_bool">toku_to_bool</a><br/>
+                        <a href="manual.html#toku_to_cfunction">toku_to_cfunction</a><br/>
+                        <a href="manual.html#toku_toclose">toku_toclose</a><br/>
+                        <a href="manual.html#toku_to_integer">toku_to_integer</a><br/>
+                        <a href="manual.html#toku_to_integerx">toku_to_integerx</a><br/>
+                        <a href="manual.html#toku_to_lstring">toku_to_lstring</a><br/>
+                        <a href="manual.html#toku_to_number">toku_to_number</a><br/>
+                        <a href="manual.html#toku_to_numberx">toku_to_numberx</a><br/>
+                        <a href="manual.html#toku_to_pointer">toku_to_pointer</a><br/>
+                        <a href="manual.html#toku_to_string">toku_to_string</a><br/>
+                        <a href="manual.html#toku_to_thread">toku_to_thread</a><br/>
+                        <a href="manual.html#toku_to_userdata">toku_to_userdata</a><br/>
+                        <a href="manual.html#toku_typename">toku_typename</a><br/>
+                        <a href="manual.html#toku_type">toku_type</a><br/>
+                        <a href="manual.html#toku_upvalueid">toku_upvalueid</a><br/>
+                        <a href="manual.html#toku_upvalueindex">toku_upvalueindex</a><br/>
+                        <a href="manual.html#toku_upvaluejoin">toku_upvaluejoin</a><br/>
+                        <a href="manual.html#toku_version">toku_version</a><br/>
+                        <a href="manual.html#toku_warning">toku_warning</a><br/>
+                        <a href="manual.html#toku_xmove">toku_xmove</a><br/>
+                        </p>
+                    </td>
+                    <td>
+                        <h4>Standard Library</h4>
+                        <p>
+                        <a href="manual.html#tokuL_openlibs">tokuL_openlibs</a><br/>
+                        <a href="manual.html#tokuL_openlibsx">tokuL_openlibsx</a><br/>
+                        </p>
+                        <h4>Auxiliary Functions</h4>
+                        <p>
+                        <a href="manual.html#tokuL_buffadd">tokuL_buffadd</a><br/>
+                        <a href="manual.html#tokuL_buff_endsz">tokuL_buff_endsz</a><br/>
+                        <a href="manual.html#tokuL_buff_end">tokuL_buff_end</a><br/>
+                        <a href="manual.html#tokuL_buff_ensure">tokuL_buff_ensure</a><br/>
+                        <a href="manual.html#tokuL_buff_initsz">tokuL_buff_initsz</a><br/>
+                        <a href="manual.html#tokuL_buff_init">tokuL_buff_init</a><br/>
+                        <a href="manual.html#tokuL_bufflen">tokuL_bufflen</a><br/>
+                        <a href="manual.html#tokuL_buff_prep">tokuL_buff_prep</a><br/>
+                        <a href="manual.html#tokuL_buffptr">tokuL_buffptr</a><br/>
+                        <a href="manual.html#tokuL_buff_push_gsub">tokuL_buff_push_gsub</a><br/>
+                        <a href="manual.html#tokuL_buff_push_lstring">tokuL_buff_push_lstring</a><br/>
+                        <a href="manual.html#tokuL_buff_push_stack">tokuL_buff_push_stack</a><br/>
+                        <a href="manual.html#tokuL_buff_push_string">tokuL_buff_push_string</a><br/>
+                        <a href="manual.html#tokuL_buff_push">tokuL_buff_push</a><br/>
+                        <a href="manual.html#tokuL_buffsub">tokuL_buffsub</a><br/>
+                        <a href="manual.html#tokuL_callmeta">tokuL_callmeta</a><br/>
+                        <a href="manual.html#tokuL_check_any">tokuL_check_any</a><br/>
+                        <a href="manual.html#tokuL_check_arg">tokuL_check_arg</a><br/>
+                        <a href="manual.html#tokuL_check_integer">tokuL_check_integer</a><br/>
+                        <a href="manual.html#tokuL_check_lstring">tokuL_check_lstring</a><br/>
+                        <a href="manual.html#tokuL_check_number">tokuL_check_number</a><br/>
+                        <a href="manual.html#tokuL_check_option">tokuL_check_option</a><br/>
+                        <a href="manual.html#tokuL_check_stack">tokuL_check_stack</a><br/>
+                        <a href="manual.html#tokuL_check_string">tokuL_check_string</a><br/>
+                        <a href="manual.html#tokuL_check_type">tokuL_check_type</a><br/>
+                        <a href="manual.html#tokuL_check_userdata">tokuL_check_userdata</a><br/>
+                        <a href="manual.html#tokuL_check_version">tokuL_check_version</a><br/>
+                        <a href="manual.html#tokuL_error_arg">tokuL_error_arg</a><br/>
+                        <a href="manual.html#tokuL_error">tokuL_error</a><br/>
+                        <a href="manual.html#tokuL_error_type">tokuL_error_type</a><br/>
+                        <a href="manual.html#tokuL_execresult">tokuL_execresult</a><br/>
+                        <a href="manual.html#tokuL_expect_arg">tokuL_expect_arg</a><br/>
+                        <a href="manual.html#tokuL_fileresult">tokuL_fileresult</a><br/>
+                        <a href="manual.html#tokuL_get_metafield">tokuL_get_metafield</a><br/>
+                        <a href="manual.html#tokuL_get_metatable">tokuL_get_metatable</a><br/>
+                        <a href="manual.html#tokuL_get_subtable">tokuL_get_subtable</a><br/>
+                        <a href="manual.html#tokuL_gsub">tokuL_gsub</a><br/>
+                        <a href="manual.html#tokuL_importf">tokuL_importf</a><br/>
+                        <a href="manual.html#tokuL_intop">tokuL_intop</a><br/>
+                        <a href="manual.html#tokuL_loadbuffer">tokuL_loadbuffer</a><br/>
+                        <a href="manual.html#tokuL_loadfile">tokuL_loadfile</a><br/>
+                        <a href="manual.html#tokuL_loadstring">tokuL_loadstring</a><br/>
+                        <a href="manual.html#tokuL_makeseed">tokuL_makeseed</a><br/>
+                        <a href="manual.html#tokuL_new_metatable">tokuL_new_metatable</a><br/>
+                        <a href="manual.html#tokuL_newstate">tokuL_newstate</a><br/>
+                        <a href="manual.html#tokuL_opt_integer">tokuL_opt_integer</a><br/>
+                        <a href="manual.html#tokuL_opt_lstring">tokuL_opt_lstring</a><br/>
+                        <a href="manual.html#tokuL_opt_number">tokuL_opt_number</a><br/>
+                        <a href="manual.html#tokuL_opt_string">tokuL_opt_string</a><br/>
+                        <a href="manual.html#tokuL_opt">tokuL_opt</a><br/>
+                        <a href="manual.html#tokuL_push_fail">tokuL_push_fail</a><br/>
+                        <a href="manual.html#tokuL_push_libtable">tokuL_push_libtable</a><br/>
+                        <a href="manual.html#tokuL_push_lib">tokuL_push_lib</a><br/>
+                        <a href="manual.html#tokuL_ref">tokuL_ref</a><br/>
+                        <a href="manual.html#tokuL_set_funcs">tokuL_set_funcs</a><br/>
+                        <a href="manual.html#tokuL_set_metatable">tokuL_set_metatable</a><br/>
+                        <a href="manual.html#tokuL_test_userdata">tokuL_test_userdata</a><br/>
+                        <a href="manual.html#tokuL_to_fulluserdata">tokuL_to_fulluserdata</a><br/>
+                        <a href="manual.html#tokuL_to_lstring">tokuL_to_lstring</a><br/>
+                        <a href="manual.html#tokuL_traceback">tokuL_traceback</a><br/>
+                        <a href="manual.html#tokuL_typename">tokuL_typename</a><br/>
+                        <a href="manual.html#tokuL_unref">tokuL_unref</a><br/>
+                        <a href="manual.html#tokuL_where">tokuL_where</a><br/>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </details>
+
+
+        <p class="footer">
+        <br/><br/>
+        Last update:
+        Sun Sep 14 01:48:14 UTC 2025
+        </p>
     </body>
 </html>

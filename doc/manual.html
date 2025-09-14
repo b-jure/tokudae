@@ -12,7 +12,7 @@
             <p>
             Copyright &copy; 1994&ndash;2024 Lua.org, PUC-Rio
             <br/>
-            Copyright &copy; 2024&ndash;2025 Jure Bagić.
+            Copyright &copy; 2024&ndash;2025 Jure Bagić
             </p>
         </small>
         <div class="menubar">
@@ -3041,8 +3041,9 @@ typedef struct toku_Debug {
             </li>
             <li>
                 <b><code>shortsrc</code>: </b>
-                a "printable" version of <code>source</code>, to be used in
-                error messages.
+                a "printable" version of <code>source</code> of maximum size
+                <a name="TOKU_IDSIZE"><code>TOKU_IDSIZE</code></a>
+                (see <code>tokudaeconf.h</code>), to be used in error messages.
             </li>
             <li>
                 <b><code>defline</code>: </b>
@@ -3593,11 +3594,11 @@ typedef struct toku_Debug {
                 performs exponentiation (<code>**</code>)
             </li>
             <li>
-                <b><a name="TOKU_OP_SHL"><code>TOKU_OP_SHL</code></a>: </b>
+                <b><a name="TOKU_OP_BSHL"><code>TOKU_OP_BSHL</code></a>: </b>
                 performs left shift (<code>&lt;&lt;</code>)
             </li>
             <li>
-                <b><a name="TOKU_OP_SHR"><code>TOKU_OP_SHR</code></a>: </b>
+                <b><a name="TOKU_OP_BSHR"><code>TOKU_OP_BSHR</code></a>: </b>
                 performs right shift (<code>&gt;&gt;</code>)
             </li>
             <li>
@@ -4506,41 +4507,41 @@ typedef struct toku_Debug {
         option.
         <ul>
             <li>
-                <b><code>TOKU_GC_STOP</code>: </b>
+                <b><a name="TOKU_GC_STOP"><code>TOKU_GC_STOP</code></a>: </b>
                 Stops the garbage collector.
             </li>
             <li>
-                <b><code>TOKU_GC_RESTART</code>: </b>
+                <b><a name="TOKU_GC_RESTART"><code>TOKU_GC_RESTART</code></a>: </b>
                 Restarts the garbage collector.
             </li>
             <li>
-                <b><code>TOKU_GC_CHECK</code>: </b>
+                <b><a name="TOKU_GC_CHECK"><code>TOKU_GC_CHECK</code></a>: </b>
                 Resets the check flag, setting it to 0 and returns the
                 previous value of the check flag. Check flag is set to 1 if
                 the collector has swept any object (unmarked reachable one or
                 collected it) since the last time check was made.
             </li>
             <li>
-                <b><code>TOKU_GC_COLLECT</code>: </b>
+                <b><a name="TOKU_GC_COLLECT"><code>TOKU_GC_COLLECT</code></a>: </b>
                 Performs a full garbage-collection cycle.
             </li>
             <li>
-                <b><code>TOKU_GC_COUNT</code>: </b>
+                <b><a name="TOKU_GC_COUNT"><code>TOKU_GC_COUNT</code></a>: </b>
                 Returns the current amount of memory (in Kbytes) in use by
                 Tokudae.
             </li>
             <li>
-                <b><code>TOKU_GC_COUNTBYTES</code>: </b>
+                <b><a name="TOKU_GC_COUNTBYTES"><code>TOKU_GC_COUNTBYTES</code></a>: </b>
                 Returns the remainder of dividing the current amount of bytes
                 of memory in use by Tokudae by 1024.
             </li>
             <li>
-                <b><code>TOKU_GC_STEP</code> (int stepsize): </b>
+                <b><a name="TOKU_GC_STEP"><code>TOKU_GC_STEP</code></a> (int stepsize): </b>
                 Performs a step of garbage collection, corresponding to the
                 allocation of <code>stepsize</code> Kbytes.
             </li>
             <li>
-                <b><code>TOKU_GC_PARAM</code> (int param, int value): </b>
+                <b><a name="TOKU_GC_PARAM"><code>TOKU_GC_PARAM</code></a> (int param, int value): </b>
                 Changes and/or returns the value of a parameter of the
                 collector. If <code>value</code> is -1, the call only returns
                 the current value. The argument <code>param</code> must be
@@ -4561,7 +4562,7 @@ typedef struct toku_Debug {
                 </ul>
             </li>
             <li>
-                <b><code>TOKU_GC_ISRUNNING</code>: </b>
+                <b><a name="TOKU_GC_ISRUNNING"><code>TOKU_GC_ISRUNNING</code></a>: </b>
                 Returns a boolean that tells whether the collector is running
                 (i.e., not stopped).
             </li>
@@ -5049,7 +5050,8 @@ while (toku_nextfield(T, t) != 0) {
         <br/><br/>
         By default, this area has the size of a pointer to void, but you can
         recompile Tokudae with a different size for this area.
-        (See <code>TOKU_EXTRASPACE</code> in <code>tokudaeconf.h</code>.)
+        (See <a name="TOKU_EXTRASPACE"><code>TOKU_EXTRASPACE</code></a> in
+        <code>tokudaeconf.h</code>.)
         </p>
 
         <!-- toku_getntop -->
@@ -6259,9 +6261,10 @@ typedef struct tokuL_Stream {
         I/O library.
         <br/><br/>
         A file handle is implemented as a full userdata,
-        with a metatable called <code>TOKU_FILEHANDLE</code>
+        with a metatable called
+        <a name="TOKU_FILEHANDLE"><code>TOKU_FILEHANDLE</code></a>
         (where <code>TOKU_FILEHANDLE</code> is a macro with the actual
-        metatable's name).
+        metatable's name, see <code>tokudaeaux.h</code>).
         The metatable is created by the I/O library
         (see <a href="#tokuL_new_metatable"><code>tokuL_new_metatable</code></a>).
         <br/><br/>
@@ -6346,7 +6349,7 @@ typedef struct tokuL_Stream {
 
         <hr><h3><a name="tokuL_openlibsx"><code>tokuL_openlibsx</code></a></h3><p>
         <span class="apii">[-0, +0, <em>e</em>]</span>
-        <pre>void tokuL_openlibsx (toku_State *T, int load, int preload);</pre>
+        <pre>void tokuL_openlibsx (toku_State *T, int libload, int libpreload);</pre>
         <p>
         Opens (loads) and preloads selected standard libraries into the state
         <code>T</code>.
@@ -6357,8 +6360,8 @@ typedef struct tokuL_Stream {
         provided by the <em>package</em> library.
         If a program does not load that library, it will be unable to import anything.)
         <br/><br/>
-        The integer <code>load</code> selects which libraries to load;
-        the integer <code>preload</code> selects which to preload,
+        The integer <code>libload</code> selects which libraries to load;
+        the integer <code>libpreload</code> selects which to libpreload,
         among those not loaded.
         Both are masks formed by a bitwise OR of the following constants:
         <ul>
@@ -7333,7 +7336,7 @@ assert(rawequal(method1, method2));</pre>
         </p>
 
         <!-- rawget -->
-        <hr/><h3><a name=rawget""><code>rawget (v, index[, any])</code></a></h3>
+        <hr/><h3><a name="rawget"><code>rawget (v, index[, any])</code></a></h3>
         <p>
         Gets the real value of <code>v[index]</code>,
         without calling the <code>__getidx</code> metamethod.
@@ -9513,7 +9516,7 @@ math.srand({ a = 69, ["420"] = || :: {}, ok = "1337"});</pre>
         </p>
 
         <!-- math.rand -->
-        <hr/><h3><a name="math.rand"><code>math.rand ([m [, n]])</code></a></h3>
+        <hr/><h3><a name="math.rand"><code>math.rand ([m[, n]])</code></a></h3>
         <p>
         Returns a pseudo-random integer with uniform distribution.
         When called without arguments, the "random" integer is in range
@@ -9658,6 +9661,23 @@ assert(!math.type("10"));
 assert(!math.type(true));
 assert(!math.type(false));
 assert(!math.type(nil));</pre>
+        </details>
+        </p>
+
+        <!-- math.log -->
+        <hr/><h3><a name="math.log"><code>math.log (x[, base])</code></a></h3>
+        <p>
+        Returns the logarithm of <code>x</code> in the given base.
+        The default for <code>base</code> is <em>e</em>
+        (so that the function returns the natural logarithm of <code>x</code>).
+        <details class = "example">
+            <summary>Example</summary>
+            <pre>
+/// logarithm base 10
+assert(math.log(100, 10) == 2);
+
+/// logarithm base 2
+assert(math.log(8, 2) == 3);</pre>
         </details>
         </p>
 
@@ -10168,7 +10188,7 @@ assert(!st and typeof(msg) == "string");</pre>
         </p>
 
         <!-- file.setvbuf -->
-        <hr/><h3><a name="file.setvbuf"><code>file.setvbuf (mode [, size])</code></a></h3>
+        <hr/><h3><a name="file.setvbuf"><code>file.setvbuf (mode[, size])</code></a></h3>
         <p>
         Sets the buffering mode for a file.
         There are three available modes:
@@ -12321,13 +12341,10 @@ assert(!res and err == l);</pre>
         </p>
 
 
-
-
         <p class="footer">
+        <br/><br/>
         Last update:
-        Fri Sep  5 07:27:51 AM UTC 2025
+        Sun Sep 14 01:48:14 UTC 2025
         </p>
-        <!-- Last change: release of Tokudae 1.0.0 -->
-
     </body>
 </html>

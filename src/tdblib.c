@@ -456,7 +456,7 @@ static const tokuL_Entry dblib[] = {
 };
 
 
-TOKUMOD_API int tokuopen_debug(toku_State *T) {
+int tokuopen_debug(toku_State *T) {
     tokuL_push_lib(T, dblib);
     toku_push_integer(T, TOKUI_MAXCCALLS);
     toku_set_field_str(T, -2, "cstacklimit");

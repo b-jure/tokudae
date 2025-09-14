@@ -630,7 +630,7 @@ const tokuL_Entry mathlib[] = {
 };
 
 
-TOKUMOD_API int tokuopen_math(toku_State *T) {
+int tokuopen_math(toku_State *T) {
     tokuL_push_lib(T, mathlib);
     toku_push_number(T, PI);
     toku_set_field_str(T, -2, "pi");
