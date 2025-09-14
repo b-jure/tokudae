@@ -49,8 +49,14 @@ INSTALL_DATA = $(INSTALL) -m 0644
 # Recommended macro to define for debug builds
 # -TOKU_USE_APICHECK => enables asserts in the API (consistency checks)
 
+# handy when compiling with g++
+ifeq ($(strip $(CC)),)
 CC = gcc
-CFLAGS = -std=c99 -Wfatal-errors -Wall -Wextra -Werror -Wconversion $(SYSCFLAGS) $(MYCFLAGS)
+else ifeq ($(strip $(CC)),g++)
+CFLAGS = -Wno-missing-field-initializers -Wno-literal-suffix
+endif
+
+CFLAGS = -Wfatal-errors -Wall -Wextra -Werror -Wconversion $(SYSCFLAGS) $(MYCFLAGS)
 LDFLAGS = $(SYSLDFLAGS) $(MYLDFLAGS)
 LIBS = -lm $(SYSLIBS) $(MYLIBS)
 
@@ -82,7 +88,12 @@ CMCFLAGS=
 # {=========================================================================
 # 			Archiver and Other Utilities
 # ==========================================================================
+ifeq ($(CC),g++)
+AR = g++ -shared -o
+else
 AR = gcc -shared -o
+endif
+
 RANLIB = strip --strip-unneeded
 RM = rm -f
 MKDIR = mkdir -p
