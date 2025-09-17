@@ -18,11 +18,11 @@ local out = os.tmpname();
 local progname = cliargs[0] or __G.__prog;
 print("progname: "..progname);
 
-local prepfile = fn(s, mod, p) {
+local prepfile = |s, mod, p| {
     mod = mod and "wb" or "w";  /// mod true means binary files
     p = p or prog;              /// file to write the program
     local f = io.open(p, mod);
-    f.write(s);
+    assert(f.write(s));
     assert(f.close());
 };
 
@@ -399,8 +399,9 @@ prepfile(s);
 RUN([=[tokudae -e"__PROMPT=\"\"; __PROMPT2=\"\";" -i < %s > %s]=], prog, out);
 checkprogout("101\n13\t22\n\n");
 
-prepfile([=[#comment in 1st line without \n at the end]=]);
-RUN("tokudae %s", prog);
+prepfile(string.dump(load("print(3);")), true);
+RUN("tokudae %s > %s", prog, out);
+checkout("3\n");
 
 /// close tokudae with an open file
 prepfile(string.fmt([=[io.output(%q); io.write("alo");]=], out));

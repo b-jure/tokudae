@@ -9,27 +9,27 @@
 
 #include "tokudaeprefix.h"
 
-#include "tlist.h"
+#include "tapi.h"
 #include "tdebug.h"
 #include "tfunction.h"
 #include "tgc.h"
+#include "tlist.h"
+#include "tmarshal.h"
 #include "tmem.h"
 #include "tmeta.h"
-#include "tprotected.h"
-#include "tokudae.h"
+#include "tobject.h"
+#include "tobject.h"
 #include "tokudaeconf.h"
-#include "tokudaelimits.h"
-#include "ttable.h"
-#include "tobject.h"
 #include "tokudae.h"
+#include "tokudae.h"
+#include "tokudaelimits.h"
+#include "tprotected.h"
 #include "treader.h"
-#include "tobject.h"
 #include "tstate.h"
 #include "tstring.h"
-#include "tvm.h"
-#include "stdarg.h"
+#include "ttable.h"
 #include "ttrace.h"
-#include "tapi.h"
+#include "tvm.h"
 
 
 /* first pseudo-index for upvalues */
@@ -1281,7 +1281,7 @@ TOKU_API int toku_error(toku_State *T) {
 
 
 /* {======================================================================
-** Call/Load Toku chunks
+** Call/Load/Dump Tokudae chunks
 ** ======================================================================= */
 
 #define checkresults(T,nargs,nres) \
@@ -1294,7 +1294,8 @@ TOKU_API void toku_call(toku_State *T, int nargs, int nresults) {
     SPtr func;
     toku_lock(T);
     api_checknelems(T, nargs + 1); /* args + func */
-    api_check(T, T->status == TOKU_STATUS_OK, "can't do calls on non-normal thread");
+    api_check(T, T->status == TOKU_STATUS_OK,
+                 "can't do calls on non-normal thread");
     checkresults(T, nargs, nresults);
     func = T->sp.p - nargs - 1;
     tokuV_call(T, func, nresults);
@@ -1341,13 +1342,13 @@ TOKU_API int toku_pcall(toku_State *T, int nargs, int nresults, int absmsgh) {
 
 
 TOKU_API int toku_load(toku_State *T, toku_Reader reader, void *userdata,
-                       const char *chunkname) {
-    BuffReader br;
+                       const char *chunkname, const char *mode) {
+    BuffReader Z;
     int status;
     toku_lock(T);
     if (!chunkname) chunkname = "?";
-    tokuR_init(T, &br, reader, userdata);
-    status = tokuPR_parse(T, &br, chunkname);
+    tokuR_init(T, &Z, reader, userdata);
+    status = tokuPR_parse(T, &Z, chunkname, mode);
     if (status == TOKU_STATUS_OK) {  /* no errors? */
         TClosure *cl = clTval(s2v(T->sp.p - 1)); /* get new function */
         if (cl->nupvals >= 1) { /* does it have an upvalue? */
@@ -1357,6 +1358,25 @@ TOKU_API int toku_load(toku_State *T, toku_Reader reader, void *userdata,
             tokuG_barrier(T, cl->upvals[0], gt);
         }
     }
+    toku_unlock(T);
+    return status;
+}
+
+
+// TODO: add docs (also update debug API, and load in basic library)
+/*
+** Dump a Tokudae function, calling 'fw' to write its parts. Ensure
+** the stack returns with its original size.
+*/
+TOKU_API int toku_dump(toku_State *T, toku_Writer fw, void *data, int strip) {
+    int status;
+    ptrdiff_t otop = savestack(T, T->sp.p); /* original top */
+    TValue *f = s2v(T->sp.p - 1); /* function to be dumped */
+    toku_lock(T);
+    api_checknelems(T, 1); /* function */
+    api_check(T, ttisTclosure(f), "Tokudae function expected");
+    status = tokuZ_dump(T, clTval(f)->p, fw, data, strip);
+    T->sp.p = restorestack(T, otop);  /* restore top */
     toku_unlock(T);
     return status;
 }
@@ -1651,7 +1671,7 @@ static const char *aux_upvalue(const TValue *func, int n, TValue **val,
             *val = f->upvals[n]->v.p;
             if (owner) *owner = obj2gco(f->upvals[n]);
             name = p->upvals[n].name;
-            return check_exp(name, getstr(name));
+            return (name == NULL) ? "(no name)" : getstr(name);
         }
         default: return NULL; /* not a closure */
     }

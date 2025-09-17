@@ -164,8 +164,9 @@ static void freestate(toku_State *T) {
     }
     tokuM_freearray(T, G(T)->strtab.hash, cast_sizet(G(T)->strtab.size));
     freestack(T);
+    /* only global state remains, free it */
     toku_assert(gettotalbytes(gs) == sizeof(XSG));
-    gs->falloc(fromstate(T), gs->ud_alloc, sizeof(XSG), 0); /* free state */
+    (*gs->falloc)(fromstate(T), gs->ud_alloc, sizeof(XSG), 0);
 }
 
 

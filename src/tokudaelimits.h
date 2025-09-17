@@ -12,15 +12,15 @@
 
 
 typedef size_t          t_umem;
-#define TOKU_MAXUMEM    ((t_umem)(~(t_umem)(0)))
+#define TOKU_MAXUMEM    cast_umem(~cast_umem(0))
 typedef ptrdiff_t       t_mem;
-#define TOKU_MAXMEM     ((t_mem)(TOKU_MAXUMEM >> 1))
+#define TOKU_MAXMEM     cast_mem(TOKU_MAXUMEM >> 1)
 
 
 typedef unsigned char   t_ubyte;
-#define TOKU_MAXUBYTE   ((t_ubyte)(~(t_ubyte)(0)))
+#define TOKU_MAXUBYTE   cast_ubyte(~cast_ubyte(0))
 typedef signed char     t_byte;
-#define TOKU_MAXBYTE    ((t_ubyte)(TOKU_MAXUBYTE >> 1))
+#define TOKU_MAXBYTE    cast_ubyte(TOKU_MAXUBYTE >> 1)
 
 
 /* 
@@ -36,7 +36,7 @@ typedef unsigned long   t_ulong;
 
 
 /* maximum value for 'size_t' */
-#define TOKU_MAXSIZET	((size_t)(~(size_t)0))
+#define TOKU_MAXSIZET	cast_sizet(~cast_sizet(0))
 
 
 /*
@@ -55,29 +55,29 @@ typedef unsigned long   t_ulong;
 #define T_P2I   uintmax_t
 #endif
 
-#define pointer2uint(p)     cast_uint((T_P2I)(p) & UINT_MAX)
+#define pointer2uint(p)     cast_uint(cast(T_P2I, (p)) & UINT_MAX)
 
 
 /* internal assertions for debugging */
 #if defined(TOKUI_ASSERT)
 #undef NDEBUG
 #include <assert.h>
-#define toku_assert(e)        assert(e)
+#define toku_assert(e)      assert(e)
 #endif
 
 #if defined(toku_assert)
 #define check_exp(c,e)      (toku_assert(c),(e))
 #else
-#define toku_assert(e)      ((void)0)
+#define toku_assert(e)      UNUSED(0)
 #define check_exp(c,e)      (e)
 #endif
 
 /* C API assertions */
 #if !defined(tokui_checkapi)
-#define tokui_checkapi(T,e)       ((void)T, toku_assert(e))
+#define tokui_checkapi(T,e)     (UNUSED(T), toku_assert(e))
 #endif
 
-#define api_check(T,e,err)      tokui_checkapi(T,(e) && err)
+#define api_check(T,e,err)      tokui_checkapi(T, (e) && err)
 
 
 
@@ -176,8 +176,8 @@ typedef t_ubyte Instruction;
 ** Tokudae core (C API).
 */
 #if !defined(toku_lock)
-#define toku_lock(T)            ((void)0)
-#define toku_unlock(T)          ((void)0)
+#define toku_lock(T)        UNUSED(0)
+#define toku_unlock(T)      UNUSED(0)
 #endif
 
 
@@ -187,19 +187,19 @@ typedef t_ubyte Instruction;
 ** thread is created/deleted and/or state is opened/closed.
 */
 #if !defined(tokui_userstateopen)
-#define tokui_userstateopen(T)        ((void)(T))
+#define tokui_userstateopen(T)          UNUSED(T)
 #endif
 
 #if !defined(tokui_userstateclose)
-#define tokui_userstateclose(T)       ((void)(T))
+#define tokui_userstateclose(T)         UNUSED(T)
 #endif
 
 #if !defined(tokui_userstatethread)
-#define tokui_userstatethread(T,C1)   ((void)(T))
+#define tokui_userstatethread(T,C1)     UNUSED(T)
 #endif
 
 #if !defined(tokui_userstatefree)
-#define tokui_userstatefree(T,C1)     ((void)(T))
+#define tokui_userstatefree(T,C1)       UNUSED(T)
 #endif
 
 
@@ -209,7 +209,7 @@ typedef t_ubyte Instruction;
 ** warnings.
 */
 #if !defined(UNUSED)
-#define UNUSED(x)       ((void)(x))
+#define UNUSED(x)           ((void)(x))
 #endif
 
 
@@ -220,6 +220,7 @@ typedef t_ubyte Instruction;
 #define cast_voidp(e)       cast(void *,(e))
 #define cast_num(e)         cast(toku_Number,(e))
 #define cast_Integer(e)     cast(toku_Integer,(e))
+#define cast_Unsigned(e)    cast(toku_Unsigned,(e))
 #define cast_ubyte(e)       cast(t_ubyte,(e))
 #define cast_ubytep(e)      cast(t_ubyte *,(e))
 #define cast_byte(e)        cast(t_byte,(e))
@@ -228,6 +229,8 @@ typedef t_ubyte Instruction;
 #define cast_ulong(e)       cast(t_ulong,(e))
 #define cast_int(e)         cast(int,(e))
 #define cast_uint(e)        cast(t_uint,(e))
+#define cast_float(e)       cast(float,(e))
+#define cast_double(e)      cast(double,(e))
 #define cast_umem(e)        cast(t_umem,(e))
 #define cast_mem(e)         cast(t_mem,(e))
 #define cast_charp(e)       cast(char *,(e))
@@ -276,9 +279,9 @@ typedef void (*voidf)(void);
 ** (The '__extension__' in gnu compilers is only to avoid warnings.)
 */
 #if defined(__GNUC__)
-#define cast_func(p) (__extension__ (voidf)(p))
+#define cast_func(p)    (__extension__ (voidf)(p))
 #else
-#define cast_func(p) ((voidf)(p))
+#define cast_func(p)    ((voidf)(p))
 #endif
 
 
@@ -286,9 +289,19 @@ typedef void (*voidf)(void);
 ** Check if 'x' is a power of 2.
 ** The second macro also takes care of the zero edge case.
 */
-#if !defined(ispow2)
-#define ispow2(x)       (((x) & ((x)-1)) == 0)
-#define ispow2n0(x)     ((x) && ispow2(x))
+#if !defined(t_ispow2)
+#define t_ispow2(x)         (((x) & ((x)-1)) == 0)
+#define t_ispow2n0(x)       ((x) && t_ispow2(x))
+#endif
+
+
+#if !defined(t_fastmod)
+#define t_fastmod(x,y)      ((x) & ((y) - 1))
+#endif
+
+
+#if !defined(t_nbits)
+#define t_nbits(x)          cast_int(sizeof(x) * CHAR_BIT)
 #endif
 
 
@@ -304,24 +317,24 @@ typedef void (*voidf)(void);
 
 /* modulo 'a - floor(a/b)*b' */
 #define t_nummod(T,a,b,m) \
-        { (void)(T); (m) = t_mathop(fmod)(a, b); \
+        { UNUSED(T); (m) = t_mathop(fmod)(a, b); \
           if (((m) > 0) ? (b) < 0 : ((m) < 0 && (b) > 0)) (m) += (b); }
 
-#define t_numdiv(T, a, b)       ((void)(T), (a)/(b))
+#define t_numdiv(T, a, b)       (UNUSED(T), (a)/(b))
 
-#define t_numidiv(T, a, b)      ((void)(T), t_floor(t_numdiv(T,a,b)))
+#define t_numidiv(T, a, b)      (UNUSED(T), t_floor(t_numdiv(T,a,b)))
 
 #define t_numpow(T, a, b) \
-        ((void)(T), (b) == 2 ? (a)*(a) : t_mathop(pow)(a, b))
+        (UNUSED(T), (b) == 2 ? (a)*(a) : t_mathop(pow)(a, b))
 
 #endif
 
 
 #if !defined(t_numadd)
-#define t_numadd(T, a, b)       ((void)(T), (a) + (b))
-#define t_numsub(T, a, b)       ((void)(T), (a) - (b))
-#define t_nummul(T, a, b)       ((void)(T), ((a) * (b)))
-#define t_numunm(T, a)          ((void)(T), -(a))
+#define t_numadd(T, a, b)       (UNUSED(T), (a) + (b))
+#define t_numsub(T, a, b)       (UNUSED(T), (a) - (b))
+#define t_nummul(T, a, b)       (UNUSED(T), ((a) * (b)))
+#define t_numunm(T, a)          (UNUSED(T), -(a))
 #endif
 
 
@@ -344,7 +357,7 @@ typedef void (*voidf)(void);
 ** Macro to control inclusion of some hard tests on stack reallocation.
 */
 #if !defined(TOKUI_HARDSTACKTESTS)
-#define condmovestack(T,pre,pos)    ((void)0)
+#define condmovestack(T,pre,pos)    UNUSED(0)
 #else
 /* realloc stack keeping its size */
 #define condmovestack(T,pre,pos)  \
@@ -353,10 +366,10 @@ typedef void (*voidf)(void);
 
 
 #if !defined(TOKUI_HARDMEMTESTS)
-#define condchangemem(T,pre,pos,emg)	((void)0)
+#define condchangemem(T,pre,pos,emg)	UNUSED(0)
 #else
 #define condchangemem(T,pre,pos,emg)  \
-	{ if (gcrunning(G(T))) { pre; tokuG_fullinc(T, emg); pos; } }
+    { if (gcrunning(G(T))) { pre; tokuG_fullinc(T, emg); pos; } }
 #endif
 
 

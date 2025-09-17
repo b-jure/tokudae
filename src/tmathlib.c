@@ -515,7 +515,7 @@ static int m_srand(toku_State *T) {
 /* project random number into the [0..n] interval */
 static toku_Unsigned project(toku_State *T, MT19937 *ctx, toku_Unsigned ran,
                                                           toku_Unsigned n) {
-    if (ispow2(n)) /* 'n' is power of 2? */
+    if (t_ispow2(n)) /* 'n' is power of 2? */
         return ran & n;
     else {
         toku_Unsigned lim = n;

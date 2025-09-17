@@ -340,7 +340,7 @@ static int pushargs(toku_State *T) {
 }
 
 
-static int run_script(toku_State *T, char **argv) {
+static int handle_script(toku_State *T, char **argv) {
     int status;
     const char *filename = argv[0];
     if (strcmp(filename, "-") == 0 && strcmp(argv[-1], "--") != 0)
@@ -354,7 +354,7 @@ static int run_script(toku_State *T, char **argv) {
 }
 
 
-static int handle_csinit(toku_State *T) {
+static int handle_tokudaeinit(toku_State *T) {
     const char *name = "=" TOKU_INITVARVERSION;
     const char *init = getenv(name + 1);
     if (init == NULL) {
@@ -495,7 +495,7 @@ static void toku_initreadline(toku_State *T) {
 
 static const char *getprompt(toku_State *T, int firstline) {
     if (toku_get_global_str(T, firstline ? "__PROMPT" : "__PROMPT2") == TOKU_T_NIL)
-        return (firstline ? TOKU_PROMPT1 : TOKU_PROMPT2); /* use the default */
+        return (firstline ? TOKU_PROMPT1 : TOKU_PROMPT2); /* use default */
     else { /* apply 'to_string' over the value */
         const char *p = tokuL_to_lstring(T, -1, NULL);
         toku_remove(T, -2);  /* remove original value */
@@ -720,13 +720,13 @@ static int pmain(toku_State *T) {
     create_arg_lists(T, argv, argc, script); /* create 'cliargs' and 'args' */
     toku_gc(T, TOKU_GC_RESTART); /* start GC */
     if (!(args & arg_E)) { /* no option '-E'? */
-        if (handle_csinit(T) != TOKU_STATUS_OK) /* run TOKU_INIT */
+        if (handle_tokudaeinit(T) != TOKU_STATUS_OK) /* run TOKU_INIT */
             return 0; /* error running TOKU_INIT */
     }
     if (!run_args(T, argv, optlimit)) /* execute arguments -e and -l */
         return 0; /* something failed */
     if (script > 0) { /* execute main script (if there is one) */
-        if (run_script(T, argv + script) != TOKU_STATUS_OK)
+        if (handle_script(T, argv + script) != TOKU_STATUS_OK)
             return 0; /* interrupt in case of error */
     }
     if (args & arg_i) /* '-i' option? */

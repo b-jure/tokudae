@@ -497,6 +497,25 @@ testloadfile(nil, nil);
 /* loading file with initial comment without end of line */
 testloadfile("# a non-ending comment", nil);
 
+/* loading binary file */
+io.output(io.open(fname, "wb"));
+assert(io.write(string.dump(|| :: return 10, "\0alo\255", "hi")));
+io.close();
+a, b, c = assert(loadfile(fname))();
+assert(a == 10 and b == "\0alo\255" and c == "hi");
+assert(os.remove(fname));
+
+
+{
+    io.open(fname, "w").write("return 10").close();
+    local s, m = loadfile(fname, "b");
+    assert(!s and string.find(m, "a text chunk"));
+    io.open(fname, "w").write("\27 return 10;").close();
+    s, m = loadfile(fname, "t");
+    assert(!s and string.find(m, "a binary chunk"));
+    assert(os.remove(fname));
+}
+
 
 io.output(fname);
 assert(io.write("qualquer coisa\n"));

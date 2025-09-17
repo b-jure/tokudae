@@ -11,16 +11,18 @@
 
 #include <setjmp.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "tprotected.h"
-#include "tmem.h"
-#include "tparser.h"
-#include "tobject.h"
 #include "tfunction.h"
+#include "tgc.h"
+#include "tmarshal.h"
+#include "tmem.h"
+#include "tobject.h"
+#include "tparser.h"
+#include "tprotected.h"
 #include "treader.h"
 #include "tstate.h"
 #include "tstring.h"
-#include "tgc.h"
 
 
 
@@ -182,8 +184,8 @@ struct PCloseData {
 
 /* auxiliary function to call 'tokuF_close' in protected mode */
 static void closep(toku_State *T, void *ud) {
-    struct PCloseData *pcd = (struct PCloseData*)ud;
-    tokuF_close(T, pcd->level, pcd->status);
+    struct PCloseData *cd = cast(struct PCloseData *, ud);
+    tokuF_close(T, cd->level, cd->status);
 }
 
 
@@ -192,12 +194,13 @@ int tokuPR_close(toku_State *T, ptrdiff_t level, int status) {
     CallFrame *old_cf = T->cf;
     t_ubyte old_allowhook = T->allowhook;
     for (;;) { /* keep closing upvalues until no more errors */
-        struct PCloseData pcd = {
+        struct PCloseData cd = {
             .level = restorestack(T, level),
-            .status = status };
-        status = tokuPR_rawcall(T, closep, &pcd);
+            .status = status
+        };
+        status = tokuPR_rawcall(T, closep, &cd);
         if (t_likely(status == TOKU_STATUS_OK))
-            return pcd.status;
+            return cd.status;
         else { /* error occurred; restore saved state and repeat */
             T->cf = old_cf;
             T->allowhook = old_allowhook;
@@ -208,32 +211,52 @@ int tokuPR_close(toku_State *T, ptrdiff_t level, int status) {
 
 /* auxiliary structure to call 'tokuP_parse' in protected mode */
 struct PParseData {
-    BuffReader *br;
+    BuffReader *Z;
     Buffer buff;
-    ParserState ps;
-    const char *source;
+    DynData dyd;
+    const char *name;
+    const char *mode;
 };
+
+
+static void checkmode(toku_State *T, const char *mode, const char *x) {
+    if (t_unlikely(strchr(mode, x[0]) == NULL)) {
+        tokuS_pushfstring(T,
+                "attempt to load a %s chunk (mode is '%s')", x, mode);
+        tokuPR_throw(T, TOKU_STATUS_ESYNTAX);
+    }
+}
 
 
 /* auxiliary function to call 'tokuP_pparse' in protected mode */
 static void pparse(toku_State *T, void *userdata) {
-    struct PParseData *ppd = cast(struct PParseData *, userdata);
-    TClosure *cl = tokuP_parse(T, ppd->br, &ppd->buff, &ppd->ps, ppd->source);
+    TClosure *cl;
+    struct PParseData *p = cast(struct PParseData *, userdata);
+    const char *mode = p->mode ? p->mode : "bt";
+    int c = zgetc(p->Z);
+    if (c == TOKU_SIGNATURE[0]) { /* binary chunk? */
+        checkmode(T, mode, "binary");
+        cl = tokuZ_undump(T, p->Z, p->name);
+    } else { /* otherwise text */
+        checkmode(T, mode, "text");
+        cl = tokuP_parse(T, p->Z, &p->buff, &p->dyd, p->name, c);
+    }
     toku_assert(cl->nupvals == cl->p->sizeupvals);
     tokuF_initupvals(T, cl);
 }
 
 
 /* call 'tokuP_parse' in protected mode */
-int tokuPR_parse(toku_State *T, BuffReader *br, const char *name) {
+int tokuPR_parse(toku_State *T, BuffReader *Z, const char *name,
+                                               const char *mode) {
     int status;
-    struct PParseData pd = { .br = br, .source = name };
+    struct PParseData p = { .Z = Z, .name = name, .mode = mode };
     incnnyc(T);
-    status = tokuPR_call(T, pparse, &pd, savestack(T, T->sp.p), T->errfunc);
-    tokuR_freebuffer(T, &pd.buff);
-    tokuM_freearray(T, pd.ps.actlocals.arr, cast_uint(pd.ps.actlocals.size));
-    tokuM_freearray(T, pd.ps.literals.arr, cast_uint(pd.ps.literals.size));
-    tokuM_freearray(T, pd.ps.gt.arr, cast_uint(pd.ps.gt.size));
+    status = tokuPR_call(T, pparse, &p, savestack(T, T->sp.p), T->errfunc);
+    tokuR_freebuffer(T, &p.buff);
+    tokuM_freearray(T, p.dyd.actlocals.arr, cast_sizet(p.dyd.actlocals.size));
+    tokuM_freearray(T, p.dyd.literals.arr, cast_sizet(p.dyd.literals.size));
+    tokuM_freearray(T, p.dyd.gt.arr, cast_sizet(p.dyd.gt.size));
     decnnyc(T);
     return status;
 }

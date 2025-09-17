@@ -30,7 +30,7 @@
 ** order to unroll certain loops. As sz is of type int there is no
 ** need to check if it is less than INT_MAX.
 */
-#define listszinvariant(sz)     (4 <= (sz) && ispow2(sz))
+#define listszinvariant(sz)     (4 <= (sz) && t_ispow2(sz))
 
 
 t_sinline void ensure(toku_State *T, List *l, int space) {

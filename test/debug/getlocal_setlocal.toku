@@ -144,7 +144,7 @@ local fn setloclist(f, l, el, ...) {
         local env = {};
         a = 5; b = 6;
         debug.setlocal(2, 3, env);
-    ]=], "", { debug = db })();
+    ]=], "", "t", { debug = db })();
     assert(a == nil and b == nil);
 }
 

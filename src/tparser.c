@@ -129,7 +129,7 @@ typedef struct FuncContext {
 
 
 static void storecontext(FunctionState *fs, FuncContext *ctx) {
-    ctx->ps_actlocals = fs->lx->ps->actlocals.len;
+    ctx->ps_actlocals = fs->lx->dyd->actlocals.len;
     ctx->ninstpc = fs->ninstpc;
     ctx->prevpc = fs->prevpc;
     ctx->prevline = fs->prevline;
@@ -141,7 +141,7 @@ static void storecontext(FunctionState *fs, FuncContext *ctx) {
     ctx->nlocals = fs->nlocals;
     ctx->nupvals = fs->nupvals;
     ctx->lasttarget = fs->lasttarget;
-    ctx->lastgoto = fs->lx->ps->gt.len;
+    ctx->lastgoto = fs->lx->dyd->gt.len;
     ctx->ismethod = fs->ismethod;
     ctx->nonilmerge = fs->nonilmerge;
     ctx->iwthabs = fs->iwthabs;
@@ -152,7 +152,7 @@ static void storecontext(FunctionState *fs, FuncContext *ctx) {
 
 
 static void loadcontext(FunctionState *fs, FuncContext *ctx) {
-    fs->lx->ps->actlocals.len = ctx->ps_actlocals;
+    fs->lx->dyd->actlocals.len = ctx->ps_actlocals;
     fs->ninstpc = ctx->ninstpc;
     fs->prevpc = ctx->prevpc;
     fs->prevline = ctx->prevline;
@@ -164,7 +164,7 @@ static void loadcontext(FunctionState *fs, FuncContext *ctx) {
     fs->nlocals = ctx->nlocals;
     fs->nupvals = ctx->nupvals;
     fs->lasttarget = ctx->lasttarget;
-    fs->lx->ps->gt.len = ctx->lastgoto;
+    fs->lx->dyd->gt.len = ctx->lastgoto;
     fs->ismethod = ctx->ismethod;
     fs->nonilmerge = ctx->nonilmerge;
     fs->iwthabs = ctx->iwthabs;
@@ -303,7 +303,7 @@ void tokuP_checklimit(FunctionState *fs, int n, int limit, const char *what) {
 
 /* get local variable, 'vidx' is compiler index */
 static LVar *getlocalvar(FunctionState *fs, int vidx) {
-    return &fs->lx->ps->actlocals.arr[fs->firstlocal + vidx];
+    return &fs->lx->dyd->actlocals.arr[fs->firstlocal + vidx];
 }
 
 
@@ -346,7 +346,7 @@ static void contadjust(FunctionState *fs, int push) {
 ** Adds a new 'break' jump into the goto list.
 */
 static int newbreakjump(Lexer *lx, int pc, int bk, int close) {
-    GotoList *gl = &lx->ps->gt;
+    GotoList *gl = &lx->dyd->gt;
     int n = gl->len;
     tokuM_growarray(lx->T, gl->arr, gl->size, n, INT_MAX, "pending jumps", Goto);
     gl->arr[n].pc = pc;
@@ -403,8 +403,8 @@ static int newpendingjump(Lexer *lx, int bk, int close, int adjust) {
 ** Remove local variables up to specified level.
 */
 static void removelocals(FunctionState *fs, int tolevel) {
-    fs->lx->ps->actlocals.len -= fs->nactlocals - tolevel;
-    toku_assert(fs->lx->ps->actlocals.len >= 0);
+    fs->lx->dyd->actlocals.len -= fs->nactlocals - tolevel;
+    toku_assert(fs->lx->dyd->actlocals.len >= 0);
     while (fs->nactlocals > tolevel) /* set debug information */
         getlocalinfo(fs, --fs->nactlocals)->endpc = currPC;
 }
@@ -415,7 +415,7 @@ static void removelocals(FunctionState *fs, int tolevel) {
 */
 static void patchpendingjumps(FunctionState *fs, Scope *s) {
     Lexer *lx = fs->lx;
-    GotoList *gl = &lx->ps->gt;
+    GotoList *gl = &lx->dyd->gt;
     int igt = s->firstgoto; /* first goto in the finishing block */
     toku_assert(haspendingjumps(s));
     while (igt < gl->len) {
@@ -430,7 +430,7 @@ static void patchpendingjumps(FunctionState *fs, Scope *s) {
         }
         igt++; /* get next */
     }
-    lx->ps->gt.len = s->firstgoto; /* remove pending goto jumps */
+    lx->dyd->gt.len = s->firstgoto; /* remove pending goto jumps */
 }
 
 
@@ -505,7 +505,7 @@ static void enterscope(FunctionState *fs, Scope *s, int cf) {
         s->havetbcvar = 0;
     }
     s->nactlocals = fs->nactlocals;
-    s->firstgoto = fs->lx->ps->gt.len;
+    s->firstgoto = fs->lx->dyd->gt.len;
     s->haveupval = 0;
     s->prev = fs->scope;
     fs->scope = s;
@@ -561,7 +561,7 @@ static void open_func(Lexer *lx, FunctionState *fs, Scope *s) {
     fs->lx = lx;
     lx->fs = fs;
     fs->prevline = p->defline;
-    fs->firstlocal = lx->ps->actlocals.len;
+    fs->firstlocal = lx->dyd->actlocals.len;
     p->source = lx->src;
     tokuG_objbarrier(T, p, p->source);
     p->maxstack = 2; /* stack slots 0/1 are always valid */
@@ -638,18 +638,18 @@ static void expr(Lexer *lx, ExpInfo *e);
 /* adds local variable to the 'actlocals' */
 static int addlocal(Lexer *lx, OString *name, int linenum) {
     FunctionState *fs = lx->fs;
-    ParserState *ps = lx->ps;
+    DynData *dyd = lx->dyd;
     LVar *local;
-    tokuP_checklimit(fs, ps->actlocals.len + 1 - fs->firstlocal, MAXVARS,
+    tokuP_checklimit(fs, dyd->actlocals.len + 1 - fs->firstlocal, MAXVARS,
                          "locals");
-    tokuM_growarray(lx->T, ps->actlocals.arr, ps->actlocals.size,
-                           ps->actlocals.len, INT_MAX, "locals", LVar);
-    local = &ps->actlocals.arr[ps->actlocals.len++];
+    tokuM_growarray(lx->T, dyd->actlocals.arr, dyd->actlocals.size,
+                           dyd->actlocals.len, INT_MAX, "locals", LVar);
+    local = &dyd->actlocals.arr[dyd->actlocals.len++];
     local->s.kind = VARREG;
     local->s.pidx = -1; /* mark uninitialized */
     local->s.linenum = linenum;
     local->s.name = name;
-    return ps->actlocals.len - fs->firstlocal - 1;
+    return dyd->actlocals.len - fs->firstlocal - 1;
 }
 
 
@@ -1541,7 +1541,7 @@ static void checkcollision(Lexer *lx, OString *name) {
         LVar *lv = getlocalvar(fs, var.u.var.vidx);
         lx->line = lx->lastline; /* adjust line for error */
         tokuP_semerror(lx, tokuS_pushfstring(lx->T,
-                    "redefinition of local variable '%s' on line %d",
+                    "redefinition of local variable '%s' defined on line %d",
                     getstr(name), lv->s.linenum));
     }
 }
@@ -1764,9 +1764,9 @@ static const char *literal2text(toku_State *T, LiteralInfo *li) {
 
 /* find literal info 'li' in 'literals' */
 static int findliteral(Lexer *lx, LiteralInfo *li, int first) {
-    ParserState *ps = lx->ps;
-    for (int i = first; i < ps->literals.len; i++) { /* O(n) */
-        LiteralInfo *curr = &ps->literals.arr[i];
+    DynData *dyd = lx->dyd;
+    for (int i = first; i < dyd->literals.len; i++) { /* O(n) */
+        LiteralInfo *curr = &dyd->literals.arr[i];
         if (li->tt != curr->tt) /* types don't match? */
             continue; /* skip */
         switch (li->tt) {
@@ -1864,13 +1864,13 @@ static void checkduplicate(Lexer *lx, SwitchState *ss, ExpInfo *e,
 
 
 static void addliteralinfo(Lexer *lx, SwitchState *ss, ExpInfo *e) {
-    ParserState *ps = lx->ps;
+    DynData *dyd = lx->dyd;
     LiteralInfo li;
     checkduplicate(lx, ss, e, &li);
-    tokuP_checklimit(lx->fs, ps->literals.len, MAX_CODE, "switch cases");
-    tokuM_growarray(lx->T, ps->literals.arr, ps->literals.size,
-                  ps->literals.len, MAX_CODE, "switch literals", LiteralInfo);
-    ps->literals.arr[ps->literals.len++] = li;
+    tokuP_checklimit(lx->fs, dyd->literals.len, MAX_CODE, "switch cases");
+    tokuM_growarray(lx->T, dyd->literals.arr, dyd->literals.size,
+                    dyd->literals.len, MAX_CODE, "switch literals", LiteralInfo);
+    dyd->literals.arr[dyd->literals.len++] = li;
 }
 
 
@@ -1921,11 +1921,11 @@ static t_ubyte codeconstexp(FunctionState *fs, ExpInfo *e) {
 
 
 static void removeliterals(Lexer *lx, int nliterals) {
-    ParserState *ps = lx->ps;
-    if (ps->literals.len < ps->literals.size / 3) /* too many literals? */
-        tokuM_shrinkarray(lx->T, ps->literals.arr, ps->literals.size,
-                        ps->literals.size / 2, LiteralInfo);
-    ps->literals.len = nliterals;
+    DynData *dyd = lx->dyd;
+    if (dyd->literals.len < dyd->literals.size / 3) /* too many literals? */
+        tokuM_shrinkarray(lx->T, dyd->literals.arr, dyd->literals.size,
+                          dyd->literals.size / 2, LiteralInfo);
+    dyd->literals.len = nliterals;
 }
 
 
@@ -2017,7 +2017,7 @@ static void switchstm(Lexer *lx) {
     Scope *prev = fs->switchscope;
     SwitchState ss = {
         .isconst = 0, .nomatch = 1,
-        .firstli = lx->ps->literals.len,
+        .firstli = lx->dyd->literals.len,
         .jmp = NOJMP,
         .c = CNONE
     };
@@ -2510,10 +2510,9 @@ static void mainfunc(FunctionState *fs, Lexer *lx) {
 }
 
 
-/* parse source code */
-TClosure *tokuP_parse(toku_State *T, BuffReader *br, Buffer *buff,
-                     ParserState *ps, const char *source) {
-    Lexer lx;
+TClosure *tokuP_parse(toku_State *T, BuffReader *Z, Buffer *buff,
+                      DynData *dyd, const char *name, int firstchar) {
+    Lexer lx = {0};
     FunctionState fs = {0};
     TClosure *cl = tokuF_newTclosure(T, 1);
     setclTval2s(T, T->sp.p, cl); /* anchor main function closure */
@@ -2523,16 +2522,15 @@ TClosure *tokuP_parse(toku_State *T, BuffReader *br, Buffer *buff,
     tokuT_incsp(T);
     fs.p = cl->p = tokuF_newproto(T);
     tokuG_objbarrier(T, cl, cl->p);
-    fs.p->source = tokuS_new(T, source);
+    fs.p->source = tokuS_new(T, name);
     tokuG_objbarrier(T, fs.p, fs.p->source);
     lx.buff = buff;
-    lx.ps = ps;
-    tokuY_setinput(T, &lx, br, fs.p->source);
-    toku_assert(!ps->gt.len && !ps->literals.len && !ps->actlocals.len);
+    lx.dyd = dyd;
+    tokuY_setinput(T, &lx, Z, fs.p->source, firstchar);
     mainfunc(&fs, &lx);
     toku_assert(!fs.prev && fs.nupvals == 1 && !lx.fs);
     /* all scopes should be correctly finished */
-    toku_assert(ps->actlocals.len == 0 && ps->gt.len == 0);
+    toku_assert(dyd->actlocals.len == 0 && dyd->gt.len == 0);
     T->sp.p--; /* remove scanner table */
-    return cl;
+    return cl; /* (closure is also on the stack) */
 }

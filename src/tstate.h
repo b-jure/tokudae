@@ -16,13 +16,13 @@
 
 
 /* 
-** Increment number of netted non-yield-able calls.
+** Increment number of nested non-yield-able calls.
 ** The counter it located in the upper 2 bytes of 'nCcalls'.
-** (At of current version, every call is non-yield-able.)
+** (As of current version, every call is non-yield-able.)
 */
 #define incnnyc(T)      ((T)->nCcalls += 0x10000)
 
-/* decrement number of netted non-yieldable calls */
+/* decrement number of nested non-yieldable calls */
 #define decnnyc(T)      ((T)->nCcalls -= 0x10000)
 
 

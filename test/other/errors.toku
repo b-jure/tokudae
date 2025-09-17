@@ -257,6 +257,20 @@ checkmessage("reg.gsub(\"s\", \"s\", setmetatable);", "'setmetatable'");
 
 __G.aaa = nil;
 
+/// errors in functions without debug info
+{
+    local f = |a| { return a + 1 };
+    f = assert(load(string.dump(f, true)));
+    assert(f(3) == 4);
+    checkerr("^%?:%?:", f, {});
+
+    /// code with a move to a local var ('OP_MOV A B' with A<B)
+    f = || { local a; a = {}; return a + 2 };
+    /// no debug info (so that 'a' is unknown)
+    f = assert(load(string.dump(f, true)));
+    /// symbolic execution should not get lost
+    checkerr("^%?:%?:.*table value", f);
+}
 
 /// testing size of 'source' info; size of buffer for that info is
 /// TOKU_IDSIZE, declared as 60 in tokuconf. Get one position for '\0'.

@@ -26,7 +26,7 @@ typedef struct tokuL_Entry tokuL_Entry;
 typedef struct tokuL_Buffer tokuL_Buffer;
 
 
-/* new status code for file-related errors in 'tokuL_loadfile' */
+/* new status code for file-related errors in 'tokuL_loadfilex' */
 #define TOKU_STATUS_EFILE       TOKU_STATUS_NUM
 
 
@@ -79,10 +79,11 @@ TOKULIB_API const char *tokuL_opt_lstring(toku_State *T, int idx,
 /* {=======================================================================
 ** Chunk loading
 ** ======================================================================== */
-TOKULIB_API int tokuL_loadfile(toku_State *T, const char *filename);
+TOKULIB_API int tokuL_loadfilex(toku_State *T, const char *filename,
+                                const char *mode);
 TOKULIB_API int tokuL_loadstring(toku_State *T, const char *s);
-TOKULIB_API int tokuL_loadbuffer(toku_State *T, const char *buff, size_t sz,
-                                 const char *name);
+TOKULIB_API int tokuL_loadbufferx(toku_State *T, const char *buff, size_t sz,
+                                  const char *name, const char *mode);
 /* }======================================================================= */
 
 /* {=======================================================================
@@ -110,13 +111,14 @@ TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int idx, size_t *len);
 TOKULIB_API void       *tokuL_to_fulluserdata(toku_State *T, int idx);
 TOKULIB_API void        tokuL_where(toku_State *T, int lvl);
 TOKULIB_API toku_State *tokuL_newstate(void);
-TOKULIB_API int      tokuL_get_subtable(toku_State *T, int idx, const char *k);
+TOKULIB_API int         tokuL_get_subtable(toku_State *T, int idx,
+                                           const char *k);
 TOKULIB_API void        tokuL_importf(toku_State *T, const char *modname,
                                       toku_CFunction fopen, int global);
-TOKULIB_API void        tokuL_traceback(toku_State *T, toku_State *T1, int lvl,
-                                        const char *msg);
-TOKULIB_API const char *tokuL_gsub(toku_State *T, const char *s, const char *p,
-                                   const char *r);
+TOKULIB_API void        tokuL_traceback(toku_State *T, toku_State *T1,
+                                        int level, const char *msg);
+TOKULIB_API const char *tokuL_gsub(toku_State *T, const char *s,
+                                   const char *p, const char *r);
 TOKULIB_API unsigned    tokuL_makeseed(toku_State *T);
 
 struct tokuL_Entry {
@@ -164,6 +166,10 @@ TOKULIB_API void tokuL_unref(toku_State *T, int l, int ref);
     (tokuL_check_version(T), tokuL_push_libtable(T,l), tokuL_set_funcs(T,l,0))
 
 #define tokuL_get_metatable(T,tname)    toku_get_cfield_str(T, (tname))
+
+#define tokuL_loadfile(T,fname)     tokuL_loadfilex(T, fname, NULL)
+
+#define tokuL_loadbuffer(T,b,sz,name)   tokuL_loadbufferx(T, b, sz, name, NULL)
 
 
 /*

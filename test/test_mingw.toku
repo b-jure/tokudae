@@ -456,9 +456,9 @@ local fn showmem() {
 };
 
 
-local fn loginfo(msg)  :: stdout.write(fmt("[%s]: %s\n", YELLOW("INFO"), msg));
-local fn loginput(msg) :: stdout.write(fmt("[%s]: %s\n", MAGENTA("INPUT"), msg));
-local fn logcmd(msg)   :: stdout.write(fmt("[%s]: %s\n", RED("CMD"), msg));
+local fn loginfo(msg)  :: if isatty() stdout.write(fmt("[%s]: %s\n", YELLOW("INFO"), msg));
+local fn loginput(msg) :: if isatty() stdout.write(fmt("[%s]: %s\n", MAGENTA("INPUT"), msg));
+local fn logcmd(msg)   :: if isatty() stdout.write(fmt("[%s]: %s\n", RED("CMD"), msg));
 
 
 /* temporary output file */

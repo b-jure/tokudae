@@ -4,7 +4,7 @@ local setupvalue, getupvalue = db.setupvalue, db.getupvalue;
 /// make sure load behaves correctly
 local env = {};
 a = nil; b = nil; c = nil;
-local f = assert(load("a = 1; b = 2; c = 3;", nil, env));
+local f = assert(load("a = 1; b = 2; c = 3;", nil, "t", env));
 f();
 assert(a == nil and b == nil and c == nil);
 assert(env.a == 1 and env.b == 2 and env.c == 3);

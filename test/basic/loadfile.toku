@@ -1,11 +1,11 @@
 local t = {}; /// environment
-local func, err = loadfile("basic/loadfile_script", t);
+local func, err = loadfile("basic/loadfile_script", nil, t);
 assert(!err and typeof(func) == "function");
 func();
 assert(!a and !b and !c);
 assert(t.a == 69 and t.b == 420 and t.c == 1337);
 
-#func, err = loadfile();     # uncomment to read the func from stdin
+#assert(loadfile())();  # uncomment to read the func from stdin and execute it
 
 func, err = loadfile("basic/loadfile_script_error");
 assert(err);

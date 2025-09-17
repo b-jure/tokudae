@@ -39,6 +39,7 @@ TOKUI_DEC(const char *const tokuO_typenames[TOKUI_TOTALTYPES]);
 
 #define eventstring(T,tm)   (G(T)->tmnames[tm])
 
+/* gets name of 'tm' but skips leading '__' */
 #define eventname(T,tm)     (getstr(eventstring(T, tm)) + 2)
 
 

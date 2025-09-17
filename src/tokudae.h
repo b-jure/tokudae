@@ -1,6 +1,6 @@
 /*
 ** tokudae.h
-** Tokudae - A Scripting Language inspired by Lua and C
+** Tokudae - A Scripting Language derived from Lua and C
 ** See Copyright Notice at the end of this file
 */
 
@@ -23,8 +23,11 @@
 #include "tokudaeconf.h"
 
 
+/* mark for precompiled code ('<esc>Tokudae') */
+#define TOKU_SIGNATURE      "\x1bTokudae"
+
 /* option for multiple returns in 'toku_pcall' and 'toku_call' */
-#define TOKU_MULTRET       (-1)
+#define TOKU_MULTRET        (-1)
 
 
 /*
@@ -87,16 +90,18 @@ typedef int (*toku_CFunction)(toku_State *T);
 /* type of function that de/allocates memory */
 typedef void *(*toku_Alloc)(void *ptr, void *ud, size_t osz, size_t nsz);
 
-/* type of function that reads blocks when loading Tokudae chunks */
-typedef const char *(*toku_Reader)(toku_State *T, void *data, size_t *szread);
-
 /* type of warning function */
 typedef void (*toku_WarnFunction)(void *ud, const char *msg, int tocont);
+
+/* type of function that reads or Tokudae (compiled) chunks */
+typedef const char *(*toku_Reader)(toku_State *T, void *data, size_t *szread);
+
+/* type of function for writing precompiled chunks */
+typedef int (*toku_Writer)(toku_State *T, const void *b, size_t sz, void *data);
 
 
 /* type for debug API */
 typedef struct toku_Debug toku_Debug;
-
 
 /* type of function to be called by the debugger in specific events */
 typedef void (*toku_Hook)(toku_State *T, toku_Debug *ar);
@@ -105,13 +110,13 @@ typedef void (*toku_Hook)(toku_State *T, toku_Debug *ar);
 /* {======================================================================
 ** State manipulation
 ** ======================================================================= */
-TOKU_API toku_State *toku_newstate(toku_Alloc falloc, void *ud, unsigned seed); 
-TOKU_API void           toku_close(toku_State *T);
-TOKU_API toku_State    *toku_newthread(toku_State *T);
-TOKU_API int            toku_resetthread(toku_State *T);
+TOKU_API toku_State *toku_newstate(toku_Alloc alloc, void *ud, unsigned seed); 
+TOKU_API void        toku_close(toku_State *T);
+TOKU_API toku_State *toku_newthread(toku_State *T);
+TOKU_API int         toku_resetthread(toku_State *T);
 TOKU_API toku_CFunction toku_atpanic(toku_State *T, toku_CFunction fn);
-TOKU_API void       toku_setallocf(toku_State *T, toku_Alloc falloc, void *ud); 
-TOKU_API toku_Alloc toku_getallocf(toku_State *T, void **ud); 
+TOKU_API void        toku_setallocf(toku_State *T, toku_Alloc alloc, void *ud); 
+TOKU_API toku_Alloc  toku_getallocf(toku_State *T, void **ud); 
 /* }====================================================================== */
 
 /* {======================================================================
@@ -183,7 +188,7 @@ TOKU_API int toku_compare(toku_State *T, int idx1, int idx2, int op);
 /* }====================================================================== */
 
 /* {======================================================================
-** Push functions (C -> stack)
+** Push functions (C -> Stack)
 ** ======================================================================= */
 TOKU_API void        toku_push_nil(toku_State *T); 
 TOKU_API void        toku_push_number(toku_State *T, toku_Number n); 
@@ -205,7 +210,7 @@ TOKU_API void        toku_push_boundmethod(toku_State *T, int idx);
 /* }====================================================================== */
 
 /* {======================================================================
-** Get functions (Tokudae -> stack)
+** Get functions (Tokudae -> Stack)
 ** ======================================================================= */
 TOKU_API int  toku_get(toku_State *T, int idx); 
 TOKU_API int  toku_get_raw(toku_State *T, int idx); 
@@ -227,7 +232,7 @@ TOKU_API void toku_get_fieldtable(toku_State *T, int idx);
 /* }====================================================================== */
 
 /* {======================================================================
-** Set functions (stack -> Tokudae)
+** Set functions (Stack -> Tokudae)
 ** ======================================================================= */
 TOKU_API void toku_set(toku_State *T, int idx); 
 TOKU_API void toku_set_raw(toku_State *T, int idx); 
@@ -261,12 +266,13 @@ TOKU_API int toku_error(toku_State *T);
 /* }====================================================================== */
 
 /* {======================================================================
-** Call/Load Tokudae chunks
+** Call/Load/Dump Tokudae chunks
 ** ======================================================================= */
 TOKU_API void toku_call(toku_State *T, int nargs, int nresults); 
 TOKU_API int  toku_pcall(toku_State *T, int nargs, int nresults, int absmsgh); 
 TOKU_API int  toku_load(toku_State *T, toku_Reader freader, void *userdata,
-                        const char *chunkname); 
+                        const char *chunkname, const char *mode); 
+TOKU_API int  toku_dump(toku_State *T, toku_Writer fw, void *data, int strip);
 /* }====================================================================== */
 
 /* {======================================================================
@@ -283,7 +289,7 @@ TOKU_API int  toku_load(toku_State *T, toku_Reader freader, void *userdata,
 #define TOKU_GC_PARAM           7 /* set or get GC parameter */
 #define TOKU_GC_ISRUNNING       8 /* test whether GC is running */
 
-/* parameters for incremental mode */
+/* incremental GC parameters */
 #define TOKU_GCP_PAUSE          0 /* size of GC "pause" */
 #define TOKU_GCP_STEPMUL        1 /* GC "speed" */
 #define TOKU_GCP_STEPSIZE       2 /* GC "granularity" */
@@ -425,9 +431,10 @@ struct toku_Debug {
         TOKU_RELEASE " Copyright (C) 2024-2025 Jure Bagić"
 
 
-/*----------------------------------,
- | Big Thank You to Lua Developers! |
- \________________________________*/
+ /*--------------------------------,
+| Big Thank You to Lua Developers! |
+\________________________________*/
+
 /* =======================================================================
 ** Copyright (C) 1994-2024 Lua.org, PUC-Rio.
 ** Copyright (C) 2024-2025 Jure Bagić

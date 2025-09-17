@@ -2980,6 +2980,29 @@ static void *allocator (void *ptr, void *ud, size_t osz, size_t nsz) {
         The reader function may return pieces of any size greater than zero.
         </p>
 
+        <!-- toku_Writer -->
+        <hr><h3><a name="toku_Writer"><code>toku_Writer</code></a></h3>
+        <pre>typedef int (*toku_Writer) (toku_State *T, const void *b, size_t sz, void *data);</pre>
+        <p>
+        The type of the writer function used by
+        <a href="#toku_dump"><code>toku_dump</code></a>.
+        Every time <a href="#toku_dump"><code>toku_dump</code></a>
+        produces another piece of chunk, it calls the writer,
+        passing along the buffer to be written (<code>p</code>),
+        its size (<code>sz</code>), and the <code>ud</code> parameter
+        supplied to <a href="#toku_dump"><code>toku_dump</code></a>.
+        <br/><br/>
+        After <a href="#toku_dump"><code>toku_dump</code></a> writes its
+        last piece, it will signal that by calling the writer function one
+        more time, with a <code>NULL</code> buffer (and size 0).
+        <br/><br/>
+        The writer returns an error code:
+        0&nbsp;means no errors;
+        any other value means an error and stops
+        <a href="#toku_dump"><code>toku_dump</code></a>
+        from calling the writer again.
+        </p>
+
         <!-- toku_WarnFunction -->
         <hr><h3><a name="toku_WarnFunction"><code>toku_WarnFunction</code></a></h3>
         <pre>typedef void (*toku_WarnFunction) (void *ud, const char *msg, int tocont);</pre>
@@ -4466,7 +4489,8 @@ typedef struct toku_Debug {
         <pre>int toku_load (toku_State *T,
                toku_Reader reader,
                void *userdata,
-               const char *chunkname);</pre>
+               const char *chunkname,
+               const char *mode);</pre>
         <p>
         Loads a Tokudae chunk without running it.
         If there are no errors, <code>toku_load</code> pushes the compiled chunk
@@ -4483,6 +4507,13 @@ typedef struct toku_Debug {
         is used for error messages and in debug information
         (see <a href="#toku_Debug"><code>toku_Debug</code></a>).
         <br/><br/>
+        <code>toku_load</code> automatically detects whether the chunk
+        is text or binary and loads it accordingly
+        (see program <code>tokudaec</code>).
+        The string <code>mode</code> works as in function
+        <a href="#load"><code>load</code></a>, with the addition that a
+        <code>NULL</code> value is equivalent to the string "<code>bt</code>".
+        <br/><br/>
         <code>toku_load</code> uses the stack internally, so the reader function
         must always leave the stack unmodified when returning.
         <br/><br/>
@@ -4492,6 +4523,46 @@ typedef struct toku_Debug {
         <a href="#TOKU_STATUS_EMEM"><code>TOKU_STATUS_EMEM</code></a>.
         The function may also return other values corresponding to errors
         raised by the read function (see <a href="#4.4.1">&sect;4.4.1</a>).
+        <br/><br/>
+        If the resulting function has upvalues,
+        its first upvalue is set to the value of the global environment
+        stored at index <code>TOKU_CLIST_GLOBALS</code> in the C list
+        (see <a href="#4.3">&sect;4.3</a>).
+        When loading main chunks,
+        this upvalue will be the <code>__ENV</code> variable
+        (see <a href="#2.2">&sect;2.2</a>).
+        Other upvalues are initialized with <b>nil</b>.
+        </p>
+
+        <!-- toku_dump -->
+        <hr><h3><a name="toku_dump"><code>toku_dump</code></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>int toku_load (toku_State *T,
+               toku_Writer writer,
+               void *data,
+               int strip);</pre>
+        <p>
+        Dumps a function as a binary chunk.
+        Receives a Tokudae function on the top of the stack and produces
+        a binary chunk that, if loaded again, results in a function
+        equivalent to the one dumped.
+        As it produces parts of the chunk,
+        <a href="#toku_dump"><code>toku_dump</code></a> calls function
+        <code>writer</code>
+        (see <a href="#toku_Writer"><code>toku_Writer</code></a>)
+        with the given <code>data</code> to write them.
+        <br/><br/>
+        The function <a href="#toku_dump"><code>toku_dump</code></a> fully
+        preserves the Tokudae stack through the calls to the writer function,
+        except that it may push some values for internal use
+        before the first call, and it restores the stack size to its
+        original size after the last call.
+        <br/><br/>
+        If <code>strip</code> is true, the binary representation may not
+        include all debug information about the function, to save space.
+        <br/><br/>
+        The value returned is the error code returned by the last
+        call to the writer; 0&nbsp;means no errors.
         </p>
 
         <!-- toku_gc -->
@@ -5655,15 +5726,19 @@ typedef struct tokuL_Entry {
         result, so all conversions and caveats of that function apply here.
         </p>
 
-        <hr><h3><a name="tokuL_loadfile"><code>tokuL_loadfile</code></a></h3><p>
+        <hr><h3><a name="tokuL_loadfilex"><code>tokuL_loadfilex</code></a></h3><p>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>int tokuL_loadfile (toku_State *T, const char *filename);</pre>
+        <pre>int tokuL_loadfilex (toku_State *T, const char *filename,
+                                    const char *mode);</pre>
         <p>
         Loads a file as a Tokudae chunk.
         This function uses <a href="#toku_load"><code>toku_load</code></a> to
         load the chunk in the file named <code>filename</code>.
         If <code>filename</code> is <code>NULL</code>, then it loads from
         the standard input.
+        <br/><br/>
+        The string <code>mode</code> works as in the function
+        <a href="#toku_load"><code>toku_load</code></a>.
         <br/><br/>
         This function returns the same results as
         <a href="#toku_load"><code>toku_load</code></a> or
@@ -5676,19 +5751,26 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_loadstring"><code>tokuL_loadstring</code></a></h3><p>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>void tokuL_loadstring (toku_State *T, const char *s);</pre>
+        <pre>int tokuL_loadstring (toku_State *T, const char *s);</pre>
         <p>
         Loads a string as a Tokudae chunk.
         This function uses <a href="#toku_load"><code>toku_load</code></a> to
         load the chunk in the zero-terminated string <code>s</code>.
+        <br/><br/>
+        This function returns the same results as
+        <a href="#toku_load"><code>toku_load</code></a>.
+        <br/><br/>
+        Also as <a href="#toku_load"><code>toku_load</code></a>,
+        this function only loads the chunk; it does not run it.
         </p>
 
-        <hr><h3><a name="tokuL_loadbuffer"><code>tokuL_loadbuffer</code></a></h3><p>
+        <hr><h3><a name="tokuL_loadbufferx"><code>tokuL_loadbufferx</code></a></h3><p>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>void tokuL_loadbuffer (toku_State *T,
+        <pre>int tokuL_loadbufferx (toku_State *T,
                        const char *buff,
                        size_t sz,
-                       const char *name);</pre>
+                       const char *name,
+                       const char *mode);</pre>
         <p>
         Loads a buffer as a Tokudae chunk.
         This function uses <a href="#toku_load"><code>toku_load</code></a> to
@@ -5699,6 +5781,8 @@ typedef struct tokuL_Entry {
         <a href="#toku_load"><code>toku_load</code></a>.
         <code>name</code> is the chunk name, used for debug information and
         error messages.
+        The string <code>mode</code> works as in the function
+        <a href="#toku_load"><code>toku_load</code></a>.
         </p>
 
         <hr><h3><a name="tokuL_new_metatable"><code>tokuL_new_metatable</code></a></h3><p>
@@ -6089,6 +6173,27 @@ typedef struct tokuL_Entry {
         (see <a href="#tokuL_new_metatable"><code>tokuL_new_metatable</code></a>),
         or <b>nil</b> if there is no metatable associated with that name.
         Returns the type of the pushed value.
+        </p>
+
+        <hr><h3><a name="tokuL_loadfile"><code>tokuL_loadfile</code></a></h3><p>
+        <span class="apii">[-0, +1, <em>m</em>]</span>
+        <pre>int tokuL_loadfile (toku_State *T, const char *filename);</pre>
+        <p>
+        Equivalent to
+        <a href="#tokuL_loadfilex"><code>tokuL_loadfilex</code></a>
+        with <code>mode</code> equal to <code>NULL</code>.
+        </p>
+
+        <hr><h3><a name="tokuL_loadbuffer"><code>tokuL_loadbuffer</code></a></h3><p>
+        <span class="apii">[-0, +1, <em>m</em>]</span>
+        <pre>int tokuL_loadbuffer (toku_State *T,
+                      const char *buff,
+                      size_t sz,
+                      const char *name);</pre>
+        <p>
+        Equivalent to
+        <a href="#tokuL_loadbufferx"><code>tokuL_loadbufferx</code></a>
+        with <code>mode</code> equal to <code>NULL</code>.
         </p>
 
         <hr><h3><a name="tokuL_intop"><code>tokuL_intop</code></a></h3><p>
@@ -6617,7 +6722,7 @@ gc("restart");                          /* again enable automatic collection */<
         </p>
 
         <!-- load -->
-        <hr/><h3><a name="load"><code>load (chunk[, chunkname[, env]])</code></a></h3>
+        <hr/><h3><a name="load"><code>load (chunk[, chunkname[, mode[, env]]])</code></a></h3>
         <p>
         Loads a chunk.
         <br/><br/>
@@ -6635,18 +6740,38 @@ gc("restart");                          /* again enable automatic collection */<
         When you load a main chunk, the resulting function will always have
         exactly one upvalue, the <code>__ENV</code> variable
         (see <a href="#2.2">&sect;2.2</a>).
+        However, when you load a binary chunk created from a function
+        (see <a href="#string.dump"><code>string.dump</code></a>),
+        the resulting function can have an arbitrary number of upvalues,
+        and there is no guarantee that its first upvalue will be
+        the <code>__ENV</code> variable.
+        (A non-main function may not even have an <code>__ENV</code> upvalue.)
         <br/><br/>
-        The resulting function's first upvalue is set to the value of
-        <code>env</code>, if that parameter is given, or to the value of
-        the global environment.
-        All upvalues are fresh, that is, they are not shared with any other
-        function.
-        <br/> <br/>
+        Regardless, if the resulting function has any upvalues,
+        its first upvalue is set to the value of <code>env</code>,
+        if that parameter is given,
+        or to the value of the global environment.
+        Other upvalues are initialized with <b>nil</b>.
+        All upvalues are fresh, that is,
+        they are not shared with any other function.
+        <br/><br/>
         <code>chunkname</code> is used as the name of the chunk for error
         messages and debug information
         (see <a href="#toku_Debug"><code>toku_Debug</code></a>).
         When absent, it defaults to <code>chunk</code>, if <code>chunk</code>
         is a string, or to "<code>=(load)</code>" otherwise.
+        <br/><br/>
+        The string <code>mode</code> controls whether the chunk can be
+        text or binary (that is, a precompiled chunk).
+        It may be the string "<code>b</code>" (only binary chunks),
+        "<code>t</code>" (only text chunks),
+        or "<code>bt</code>" (both binary and text).
+        The default is "<code>bt</code>".
+        <br/><br/>
+        Tokudae does not check the consistency of binary chunks.
+        Maliciously crafted binary chunks can crash the interpreter.
+        You can use the <code>mode</code> parameter to prevent loading
+        binary chunks.
         <details class = "example">
             <summary>Example</summary>
             <pre>
@@ -6662,7 +6787,7 @@ assert(a == 420);
 a = nil;
 
 /* load 'chunk' from string named "string chunk" but set environment */
-func = load(chunk, "string chunk", { assert = assert });
+func = load(chunk, "string chunk", "t", { assert = assert });
 assert(a == nil);
 assert(func() == 69);
 assert(a == nil);
@@ -6697,7 +6822,7 @@ assert(func == nil and err and typeof(err) == "string");</pre>
         </p>
 
         <!-- loadfile -->
-        <hr/><h3><a name="loadfile"><code>loadfile ([filename[, env]])</code></a></h3>
+        <hr/><h3><a name="loadfile"><code>loadfile ([filename[, mode[, env]]])</code></a></h3>
         <p>
         Similar to <a href="#load"><code>load</code></a>,
         but gets the chunk from file <code>filename</code> or from the
@@ -6717,7 +6842,7 @@ false;</pre>
             </details>
             <pre>
 local t = {};   /* environment */
-local func, err = loadfile("test.toku", t);
+local func, err = loadfile("test.toku", "t", t);
 assert(func and !err);
 func();         /* call the pre-compiled chunk */
 assert(!a and !b and !c);
@@ -9103,6 +9228,108 @@ assert(res &lt; 0 and pos == 0);</pre>
         </details>
         </p>
 
+        <!-- string.dump -->
+        <hr/><h3><a name="string.dump"><code>string.dump (function[, strip])</code></a></h3>
+        <p>
+        Returns a string containing a binary representation
+        (a <em>binary chunk</em>) of the given function,
+        so that a later <a href="#load"><code>load</code></a> on this string
+        returns a copy of the function (but with new upvalues).
+        If <code>strip</code> is a true value,
+        the binary representation may not include all debug information
+        about the function, to save space.
+        <br/><br/>
+        Functions with upvalues have only their number of upvalues saved.
+        When (re)loaded, those upvalues receive fresh instances.
+        (See the <a href="#load"><code>load</code></a> function for details
+        about how these upvalues are initialized.
+        You can use the debug library to serialize and reload the upvalues
+        of a function in a way adequate to your needs.)
+        <details class="example">
+            <summary>Example</summary>
+            <pre>
+local fn add(x,y) :: return x + y;
+
+/// dump the 'add' function and strip debug information
+local f = string.dump(add, true);
+assert(load(f)(2,2) == 4);
+
+/// no debug information
+assert(debug.getlocal(load(f), 1) == nil);</pre>
+        </details>
+        </p>
+
+        <!-- string.pack -->
+        <hr/><h3><a name="string.pack"><code>string.pack (fmt, v1, v2, &middot;&middot;&middot;)</code></a></h3>
+        <p>
+        Returns a binary string containing the values
+        <code>v1</code>, <code>v2</code>, etc.
+        serialized in binary form (packed) according to the format string
+        <code>fmt</code> (see <a href="#6.4.1">&sect;6.4.1</a>).
+        <br/><br/>
+        For example see <a href="#string.unpack"><code>string.unpack</code></a>.
+        </p>
+
+        <!-- string.pack -->
+        <hr/><h3><a name="string.packsize"><code>string.packsize (fmt)</code></a></h3>
+        <p>
+        Returns the length of a string resulting from
+        <a href="#string.pack"><code>string.pack</code></a>
+        with the given format.
+        The format string cannot have the variable-length options
+        '<code>s</code>' or '<code>z</code>'
+        (see <a href="#6.4.1">&sect;6.4.1</a>).
+        <details class="example">
+            <summary>Example</summary>
+            <pre>
+local sizeshort = packsize("h");
+local sizeint = packsize("i");
+local sizelong = packsize("l");
+local sizesize_t = packsize("T");
+local sizeTI = packsize("j");
+local sizefloat = packsize("f");
+local sizedouble = packsize("d");
+local sizenumber = packsize("n");
+local little = (pack("i2", 1) == "\1\0");
+local align = packsize("!xXi16");</pre>
+        </details>
+        </p>
+
+        <!-- string.unpack -->
+        <hr/><h3><a name="string.unpack"><code>string.unpack (fmt, s[, pos])</code></a></h3>
+        <p>
+        Returns the values packed in string <code>s</code>
+        (see <a href="#string.pack"><code>string.pack</code></a>)
+        according to the format string <code>fmt</code>
+        (see <a href="#6.4.1">&sect;6.4.1</a>).
+        An optional <code>pos</code> marks where to start reading in
+        <code>s</code> (default is 0).
+        After the read values, this function also returns the index of the
+        first unread byte in <code>s</code>.
+        <details class="example">
+            <summary>Example</summary>
+            <pre>
+assert(string.unpack("B", string.pack("B", 0xff)) == 0xff);
+assert(string.unpack("b", string.pack("b", 0x7f)) == 0x7f);
+assert(string.unpack("b", string.pack("b", -0x80)) == -0x80);
+
+assert(string.unpack("H", string.pack("H", 0xffff)) == 0xffff);
+assert(string.unpack("h", string.pack("h", 0x7fff)) == 0x7fff);
+assert(string.unpack("h", string.pack("h", -0x8000)) == -0x8000);
+
+assert(string.unpack("L", string.pack("L", 0xffffffff)) == 0xffffffff);
+assert(string.unpack("l", string.pack("l", 0x7fffffff)) == 0x7fffffff);
+assert(string.unpack("l", string.pack("l", -0x80000000)) == -0x80000000);
+
+assert(string.pack("&gt;i2 &lt;i2", 10, 20) == "\0\10\20\0");
+local a, b, c = string.unpack("&lt;i2 &gt;i2", "\10\0\0\20");
+assert(a == 10 and b == 20 and c == 4);
+
+a, b, c = string.unpack("!4 z c3", "abcdefghi\0xyz");
+assert(a == "abcdefghi" and b == "xyz" and c == 13);</pre>
+        </details>
+        </p>
+
         <!-- string.ascii_uppercase -->
         <hr/><h3><a name="string.ascii_uppercase"><code>string.ascii_uppercase</code></a></h3>
         <p>
@@ -9168,6 +9395,110 @@ assert(res &lt; 0 and pos == 0);</pre>
         <a href="#string.punctuation"><code>string.punctuation</code></a> and
         <a href="#string.whitespace"><code>string.whitespace</code></a>,
         in that order.
+        </p>
+
+
+        <h2>6.4.1 &ndash; <a name="6.4.1">Format Strings for Pack and Unpack</a></h2>
+        <p>
+        The first argument to
+        <a href="#string.pack"><code>string.pack</code></a>,
+        <a href="#string.packsize"><code>string.packsize</code></a>,
+        and <a href="#string.unpack"><code>string.unpack</code></a>
+        is a format string, which describes the layout of the structure
+        being created or read.
+        <br/><br/>
+        A format string is a sequence of conversion options.
+        The conversion options are as follows:
+        <ul>
+            <li><b><code>&lt;</code></b>: sets little endian</li>
+            <li><b><code>&gt;</code></b>: sets big endian</li>
+            <li><b><code>=</code></b>: sets native endian</li>
+            <li>
+                <b><code>![<em>n</em>]</code></b>:
+                sets maximum alignment to <code>n</code>
+                (default is native alignment)
+            </li>
+            <li><b><code>b</code></b>: a signed byte (<code>char</code>)</li>
+            <li><b><code>B</code></b>: an unsigned byte (<code>char</code>)</li>
+            <li><b><code>h</code></b>: a signed <code>short</code> (native size)</li>
+            <li><b><code>H</code></b>: an unsigned <code>short</code> (native size)</li>
+            <li><b><code>l</code></b>: a signed <code>long</code> (native size)</li>
+            <li><b><code>L</code></b>: an unsigned <code>long</code> (native size)</li>
+            <li><b><code>j</code></b>: a <code>toku_Integer</code></li>
+            <li><b><code>J</code></b>: a <code>toku_Unsigned</code></li>
+            <li><b><code>T</code></b>: a <code>size_t</code> (native size)</li>
+            <li>
+                <b><code>i[<em>n</em>]</code></b>:
+                a signed <code>int</code> with <code>n</code> bytes
+                (default is native size)
+            </li>
+            <li>
+                <b><code>I[<em>n</em>]</code></b>:
+                an unsigned <code>int</code> with <code>n</code> bytes
+                (default is native size)
+            </li>
+            <li><b><code>f</code></b>: a <code>float</code> (native size)</li>
+            <li><b><code>d</code></b>: a <code>double</code> (native size)</li>
+            <li><b><code>n</code></b>: a <code>toku_Number</code></li>
+            <li>
+                <b><code>c<em>n</em></code></b>:
+                a fixed-sized string with <code>n</code> bytes
+            </li>
+            <li><b><code>z</code></b>: a zero-terminated string</li>
+            <li>
+                <b><code>s[<em>n</em>]</code></b>:
+                a string preceded by its length coded as an unsigned integer
+                with <code>n</code> bytes (default is a <code>size_t</code>)
+            </li>
+            <li><b><code>x</code></b>: one byte of padding</li>
+            <li>
+                <b><code>X<em>op</em></code></b>:
+                an empty item that aligns according to option <code>op</code>
+                (which is otherwise ignored)
+            </li>
+            <li><b>'<code> </code>'</b>: (space) ignored</li>
+        </ul>
+        (A "<code>[<em>n</em>]</code>" means an optional integral numeral.)
+        Except for padding, spaces, and configurations
+        (options "<code>xX &lt;=&gt;!</code>"),
+        each option corresponds to an argument in
+        <a href="#string.pack"><code>string.pack</code></a>
+        or a result in
+        <a href="#string.unpack"><code>string.unpack</code></a>.
+        <br/><br/>
+        For options "<code>!<em>n</em></code>", "<code>s<em>n</em></code>",
+        "<code>i<em>n</em></code>", and "<code>I<em>n</em></code>",
+        <code>n</code> can be any integer between 1 and 16.
+        All integral options check overflows;
+        <a href="#string.pack"><code>string.pack</code></a> checks whether
+        the given value fits in the given size;
+        <a href="#string.unpack"><code>string.unpack</code></a> checks whether
+        the read value fits in a Tokudae integer.
+        For the unsigned options,
+        Tokudae integers are treated as unsigned values too.
+        <br/><br/>
+        Any format string starts as if prefixed by "<code>!1=</code>",
+        that is, with maximum alignment of 1 (no alignment)
+        and native endianness.
+        <br/><br/>
+        Native endianness assumes that the whole system is
+        either big or little endian.
+        The packing functions will not emulate correctly the behavior
+        of mixed-endian formats.
+        <br/><br/>
+        Alignment works as follows:
+        For each option,
+        the format gets extra padding until the data starts
+        at an offset that is a multiple of the minimum between the
+        option size and the maximum alignment;
+        this minimum must be a power of 2.
+        Options "<code>c</code>" and "<code>z</code>" are not aligned;
+        option "<code>s</code>" follows the alignment of its starting integer.
+        <br/><br/>
+        All padding is filled with zeros by
+        <a href="#string.pack"><code>string.pack</code></a>
+        and ignored by
+        <a href="#string.unpack"><code>string.unpack</code></a>.
         </p>
 
 

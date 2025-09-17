@@ -29,7 +29,7 @@
 static size_t posrelStart(toku_Integer pos, size_t len) {
     if (pos >= 0) /* already absolute? */
         return cast_sizet(pos);
-    else if (pos < -(toku_Integer)len) /* negative out-of-bounds 'pos'? */
+    else if (pos < -cast_Integer(len)) /* negative out-of-bounds 'pos'? */
         return 0; /* clip to 0 */
     else /* otherwise negative in-range 'pos' */
         return len + cast_sizet(pos);

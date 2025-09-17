@@ -67,9 +67,9 @@ typedef struct Lexer {
     Table *tab; /* scanner table */
     struct toku_State *T;
     struct FunctionState *fs;
-    BuffReader *br; /* buffered reader */
+    BuffReader *Z; /* buffered reader */
     Buffer *buff; /* string buffer */
-    struct ParserState *ps; /* dynamic data used by parser */
+    struct DynData *dyd; /* dynamic data used by parser */
     OString *src; /* current source name */
     OString *envn; /* environment variable */
 } Lexer;
@@ -77,8 +77,8 @@ typedef struct Lexer {
 
 #define tokuY_newliteral(lx, l)   tokuY_newstring(lx, "" (l), LL(l))
 
-TOKUI_FUNC void tokuY_setinput(toku_State *T, Lexer *lx, BuffReader *br,
-                               OString *source);
+TOKUI_FUNC void tokuY_setinput(toku_State *T, Lexer *lx, BuffReader *Z,
+                               OString *source, int firstchar);
 TOKUI_FUNC void tokuY_init(toku_State *T);
 TOKUI_FUNC const char *tokuY_tok2str(Lexer *lx, int t);
 TOKUI_FUNC OString *tokuY_newstring(Lexer *lx, const char *str, size_t len);

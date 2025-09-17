@@ -13,27 +13,26 @@
 
 
 /* end of file */
-#define TOKUEOF	    (-1)
+#define TEOF	    (-1)
 
 
 /* Return next char and progress the buffer or try fill the buffer. */
-#define brgetc(br) \
-	((br)->n-- > 0 ? cast_ubyte(*(br)->buff++) : tokuR_fill(br))
+#define zgetc(Z)    ((Z)->n-- > 0 ? cast_ubyte(*(Z)->p++) : tokuR_fill(Z))
 
 
 typedef struct {
     size_t n; /* unread bytes */
-    const char* buff; /* position in buffer */
+    const char* p; /* position in buffer */
     toku_Reader reader; /* reader function */
     void* userdata; /* user data for 'reader' */
     toku_State* T; /* 'toku_State' for 'reader' */
 } BuffReader;
 
 
-TOKUI_FUNC void tokuR_init(toku_State* T, BuffReader* br, toku_Reader freader,
+TOKUI_FUNC void tokuR_init(toku_State* T, BuffReader* Z, toku_Reader freader,
                            void* userdata);
-TOKUI_FUNC int tokuR_fill(BuffReader* br);
-TOKUI_FUNC size_t tokuR_readn(BuffReader* br, size_t n);
+TOKUI_FUNC int tokuR_fill(BuffReader* Z);
+TOKUI_FUNC size_t tokuR_read(BuffReader *Z, void *b, size_t n);
 
 
 

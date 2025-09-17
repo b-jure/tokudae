@@ -212,18 +212,13 @@ static int s_startswith(toku_State *T) {
 
 
 static int s_reverse(toku_State *T) {
-    size_t l, i;
-    tokuL_Buffer b;
+    size_t l;
+    tokuL_Buffer B;
     const char *s = tokuL_check_lstring(T, 0, &l);
-    if (l > 1) { /* non trivial string? */
-        char *p = tokuL_buff_initsz(T, &b, l);
-        char *end = p + l - 1;
-        for (i = 0; p < end; i++) {
-            *p++ = s[l-i-1];
-            *end-- = s[i];
-        }
-        tokuL_buff_endsz(&b, l);
-    }
+    char *p = tokuL_buff_initsz(T, &B, l);
+    for (size_t i = 0; i < l; i++)
+        p[i] = s[l - i - 1];
+    tokuL_buff_endsz(&B, l);
     return 1; /* return string */
 }
 
@@ -238,9 +233,9 @@ static int s_repeat(toku_State *T) {
     else if (l + lsep < l || TOKU_MAXSIZE / cast_sizet(n) < l + lsep)
         tokuL_error(T, "resulting string too large");
     else {
-        tokuL_Buffer b;
+        tokuL_Buffer B;
         size_t totalsize = (cast_sizet(n) * (l + lsep)) - lsep;
-        char *p = tokuL_buff_initsz(T, &b, totalsize);
+        char *p = tokuL_buff_initsz(T, &B, totalsize);
         while (n-- > 1) {
             memcpy(p, s, l * sizeof(char)); p += l;
             if (lsep > 0) { /* branch costs less than empty 'memcpy' copium */
@@ -249,21 +244,21 @@ static int s_repeat(toku_State *T) {
             }
         }
         memcpy(p, s, l * sizeof(char)); /* last copy without separator */
-        tokuL_buff_endsz(&b, totalsize);
+        tokuL_buff_endsz(&B, totalsize);
     }
     return 1; /* return final string */
 }
 
 
-static void auxjoinstr(tokuL_Buffer *b, const char *s, size_t l,
+static void auxjoinstr(tokuL_Buffer *B, const char *s, size_t l,
                                       const char *sep, size_t lsep) {
-    tokuL_buff_push_lstring(b, s, l);
+    tokuL_buff_push_lstring(B, s, l);
     if (lsep > 0) /* non empty separator? */
-        tokuL_buff_push_lstring(b, sep, lsep);
+        tokuL_buff_push_lstring(B, sep, lsep);
 }
 
 
-static void joinfromtable(toku_State *T, tokuL_Buffer *b,
+static void joinfromtable(toku_State *T, tokuL_Buffer *B,
                           const char *sep, size_t lsep) {
     toku_push_nil(T);
     while (toku_nextfield(T, 1) != 0) {
@@ -272,7 +267,7 @@ static void joinfromtable(toku_State *T, tokuL_Buffer *b,
         int pop = 1; /* value */
         if (s && l > 0) {
             toku_push(T, -3); /* push buffer */
-            auxjoinstr(b, s, l, sep, lsep);
+            auxjoinstr(B, s, l, sep, lsep);
             pop++; /* buffer */
         }
         toku_pop(T, pop);
@@ -280,7 +275,7 @@ static void joinfromtable(toku_State *T, tokuL_Buffer *b,
 }
 
 
-static void joinfromlist(toku_State *T, tokuL_Buffer *b,
+static void joinfromlist(toku_State *T, tokuL_Buffer *B,
                          const char *sep, size_t lsep, int len) {
     for (int i = 0; i < len; i++) {
         size_t l;
@@ -289,27 +284,27 @@ static void joinfromlist(toku_State *T, tokuL_Buffer *b,
         s = toku_to_lstring(T, -1, &l);
         toku_pop(T, 1);
         if (s && l > 0)
-            auxjoinstr(b, s, l, sep, lsep);
+            auxjoinstr(B, s, l, sep, lsep);
     }
 }
 
 
 static int s_join(toku_State *T) {
-    tokuL_Buffer b;
+    tokuL_Buffer B;
     size_t lsep;
     const char *sep = tokuL_check_lstring(T, 0, &lsep);
     int t = toku_type(T, 1);
     tokuL_expect_arg(T, t == TOKU_T_LIST || t == TOKU_T_TABLE, 1, "list/table");
-    tokuL_buff_init(T, &b);
+    tokuL_buff_init(T, &B);
     if (t == TOKU_T_LIST) {
         int len = cast_int(t_castU2S(toku_len(T, 1)));
         if (len > 0)
-            joinfromlist(T, &b, sep, lsep, len);
+            joinfromlist(T, &B, sep, lsep, len);
     } else
-        joinfromtable(T, &b, sep, lsep);
-    if (tokuL_bufflen(&b) > 0 && lsep > 0) /* buffer has separator? */
-        tokuL_buffsub(&b, lsep); /* remove it */
-    tokuL_buff_end(&b);
+        joinfromtable(T, &B, sep, lsep);
+    if (tokuL_bufflen(&B) > 0 && lsep > 0) /* buffer has separator? */
+        tokuL_buffsub(&B, lsep); /* remove it */
+    tokuL_buff_end(&B);
     return 1; /* return final string */
 }
 
@@ -324,7 +319,7 @@ static int s_join(toku_State *T) {
 ** and '\0') + number of decimal digits to represent maxfloat (which
 ** is maximum exponent + 1). (99+3+1, adding some extra, 110)
 */
-#define MAX_ITEMF	(110 + t_floatatt(MAX_10_EXP))
+#define MAX_ITEMF       (110 + t_floatatt(MAX_10_EXP))
 
 
 /*
@@ -347,16 +342,16 @@ static int s_join(toku_State *T) {
 #define T_FMTFLAGSF     "-+#0 "
 
 /* valid flags for o, x, and X conversions */
-#define T_FMTFLAGSX	"-#0"
+#define T_FMTFLAGSX     "-#0"
 
 /* valid flags for d and i conversions */
-#define T_FMTFLAGSI	"-+0 "
+#define T_FMTFLAGSI     "-+0 "
 
 /* valid flags for u conversions */
-#define T_FMTFLAGSU	"-0"
+#define T_FMTFLAGSU     "-0"
 
 /* valid flags for c, p, and s conversions */
-#define T_FMTFLAGSC	"-"
+#define T_FMTFLAGSC     "-"
 
 #endif
 
@@ -367,15 +362,15 @@ static int s_join(toku_State *T) {
 ** length modifier (8), conversion specifier, and final '\0', plus some
 ** extra.
 */
-#define MAX_FORMAT	32
+#define MAX_FORMAT      32
 
 
-static void addquoted(tokuL_Buffer *b, const char *s, size_t len) {
-    tokuL_buff_push(b, '"');
+static void addquoted(tokuL_Buffer *B, const char *s, size_t len) {
+    tokuL_buff_push(B, '"');
     while (len--) {
         if (*s == '"' || *s == '\\' || *s == '\n') {
-            tokuL_buff_push(b, '\\');
-            tokuL_buff_push(b, *s);
+            tokuL_buff_push(B, '\\');
+            tokuL_buff_push(B, *s);
         }
         else if (iscntrl(uchar(*s))) {
             char buff[10];
@@ -383,13 +378,13 @@ static void addquoted(tokuL_Buffer *b, const char *s, size_t len) {
                 t_snprintf(buff, sizeof(buff), "\\%d", cast_int(uchar(*s)));
             else
                 t_snprintf(buff, sizeof(buff), "\\%03d", cast_int(uchar(*s)));
-            tokuL_buff_push_string(b, buff);
+            tokuL_buff_push_string(B, buff);
         }
         else
-            tokuL_buff_push(b, *s);
+            tokuL_buff_push(B, *s);
         s++;
     }
-    tokuL_buff_push(b, '"');
+    tokuL_buff_push(B, '"');
 }
 
 
@@ -422,16 +417,16 @@ static int quotefloat(toku_State *T, char *buff, toku_Number n) {
 }
 
 
-static void addliteral(toku_State *T, tokuL_Buffer *b, int arg) {
+static void addliteral(toku_State *T, tokuL_Buffer *B, int arg) {
     switch (toku_type(T, arg)) {
         case TOKU_T_STRING: {
             size_t len;
             const char *s = toku_to_lstring(T, arg, &len);
-            addquoted(b, s, len);
+            addquoted(B, s, len);
             break;
         }
         case TOKU_T_NUMBER: {
-            char *buff = tokuL_buff_ensure(b, MAX_ITEM);
+            char *buff = tokuL_buff_ensure(B, MAX_ITEM);
             int nb;
             if (!toku_is_integer(T, arg)) /* float? */
                 nb = quotefloat(T, buff, toku_to_number(T, arg));
@@ -442,12 +437,12 @@ static void addliteral(toku_State *T, tokuL_Buffer *b, int arg) {
                     : TOKU_INTEGER_FMT; /* else use default format */
                 nb = t_snprintf(buff, MAX_ITEM, format, n);
             }
-            tokuL_buffadd(b, cast_uint(nb));
+            tokuL_buffadd(B, cast_uint(nb));
             break;
         }
         case TOKU_T_NIL: case TOKU_T_BOOL: {
             tokuL_to_lstring(T, arg, NULL);
-            tokuL_buff_push_stack(b);
+            tokuL_buff_push_stack(B);
             break;
         }
         default:
@@ -523,19 +518,19 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
     int arg = 0;
     const char *efmt = fmt + lfmt;
     const char *flags;
-    tokuL_Buffer b;
-    tokuL_buff_init(T, &b);
+    tokuL_Buffer B;
+    tokuL_buff_init(T, &B);
     while (fmt < efmt) {
         if (*fmt != T_FMTC) { /* not % */
-            tokuL_buff_push(&b, *fmt++);
+            tokuL_buff_push(&B, *fmt++);
             continue;
         } else if (*++fmt == T_FMTC) { /* %% */
-            tokuL_buff_push(&b, *fmt++);
+            tokuL_buff_push(&B, *fmt++);
             continue;
         } /* else '%' */
         char form[MAX_FORMAT]; /* to store the format ('%...') */
         t_uint maxitem = MAX_ITEM; /* maximum length for the result */
-        char *buff = tokuL_buff_ensure(&b, maxitem); /* to put result */
+        char *buff = tokuL_buff_ensure(&B, maxitem); /* to put result */
         int nb = 0; /* number of bytes in result */
         if (++arg > top) /* too many format specifiers? */
             return tokuL_error_arg(T, arg, "missing format value");
@@ -570,7 +565,7 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
                 break;
             case 'f':
                      maxitem = MAX_ITEMF; /* extra space for '%f' */
-                     buff = tokuL_buff_ensure(&b, maxitem);
+                     buff = tokuL_buff_ensure(&B, maxitem);
                      /* fall through */
             case 'e': case 'E': case 'g': case 'G': {
                 toku_Number n = tokuL_check_number(T, arg);
@@ -591,7 +586,7 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
             }
             case 'q': {
                 if (form[2] == '\0') { /* no modifiers? */
-                    addliteral(T, &b, arg);
+                    addliteral(T, &B, arg);
                     break;
                 } /* otherwise have modifiers */
                 return tokuL_error(T, "specifier '%%q' cannot have modifiers");
@@ -600,13 +595,13 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
                 size_t l;
                 const char *s = tokuL_to_lstring(T, arg, &l);
                 if (form[2] == '\0') /* no modifiers? */
-                    tokuL_buff_push_stack(&b); /* keep entire string */
+                    tokuL_buff_push_stack(&B); /* keep entire string */
                 else {
                     tokuL_check_arg(T, l == strlen(s), arg, "string contains zeros");
                     checkformat(T, form, T_FMTFLAGSC, 1);
                     if (strchr(form, '.') == NULL && l >= 100) {
                         /* no precision and string is too long to be formatted */
-                        tokuL_buff_push_stack(&b); /* keep entire string */
+                        tokuL_buff_push_stack(&B); /* keep entire string */
                     }
                     else { /* format the string into 'buff' */
                         nb = t_snprintf(buff, maxitem, form, s);
@@ -620,9 +615,9 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
             }
         }
         toku_assert(cast_uint(nb) < maxitem);
-        tokuL_buffadd(&b, cast_uint(nb));
+        tokuL_buffadd(&B, cast_uint(nb));
     }
-    tokuL_buff_end(&b);
+    tokuL_buff_end(&B);
     return 1; /* return formatted string */
 }
 
@@ -655,8 +650,8 @@ static int auxtocase(toku_State *T, int (*f)(int c)) {
     if (l == 0 || posj < posi) {
         l_done: toku_push(T, 0);
     } else {
-        tokuL_Buffer b;
-        char *p = tokuL_buff_initsz(T, &b, l);
+        tokuL_Buffer B;
+        char *p = tokuL_buff_initsz(T, &B, l);
         memcpy(p, s, posi);
         while (posi < posj) {
             p[posi] = cast_char(f(s[posi])); posi++;
@@ -664,7 +659,7 @@ static int auxtocase(toku_State *T, int (*f)(int c)) {
         }
         p[posi] = cast_char(f(s[posi]));
         memcpy(p + endpos, s + endpos, l - endpos);
-        tokuL_buff_endsz(&b, l);
+        tokuL_buff_endsz(&B, l);
     }
     return 1; /* return final string */
 }
@@ -779,19 +774,19 @@ static int s_replace(toku_State *T) {
     else if (lpat == 0) /* pattern is empty string? */
         toku_push_lstring(T, v, lv); /* return replacement string */
     else {
-        tokuL_Buffer b;
+        tokuL_Buffer B;
         const char *p;
-        tokuL_buff_init(T, &b);
+        tokuL_buff_init(T, &B);
         while (0 < n && (p = findstr(s, l, pat, lpat, 0))) {
             size_t sz = cast_diff2sz(p - s);
-            tokuL_buff_push_lstring(&b, s, sz); /* push prefix */
-            tokuL_buff_push_lstring(&b, v, lv); /* push replacement text */
+            tokuL_buff_push_lstring(&B, s, sz); /* push prefix */
+            tokuL_buff_push_lstring(&B, v, lv); /* push replacement text */
             l -= sz + lpat; /* subtract prefix and pattern length */
             s = p + lpat; /* go after the pattern */
             n--; /* one less replacement to do */
         }
-        tokuL_buff_push_lstring(&b, s, l); /* push remaining string */
-        tokuL_buff_end(&b);
+        tokuL_buff_push_lstring(&B, s, l); /* push remaining string */
+        tokuL_buff_end(&B);
     }
     return 1; /* return final string */
 }
@@ -871,13 +866,13 @@ static int auxcase(toku_State *T, void (*f)(char*,const char*,size_t,size_t)) {
         if (posj < posi || l == 0) /* empty interval or empty string */
             goto l_empty;
         else { /* otherwise build the new string */
-            tokuL_Buffer b;
-            char *p = tokuL_buff_initsz(T, &b, l);
+            tokuL_Buffer B;
+            char *p = tokuL_buff_initsz(T, &B, l);
             memcpy(p, s, posi);
             f(p, s, posi, posj);
             posj++; /* go past the last index that was swapped */
             memcpy(p+posj, s+posj, l-posj);
-            tokuL_buff_endsz(&b, l);
+            tokuL_buff_endsz(&B, l);
         }
     } else { /* otherwise 'j' would be less than 0 */
         l_empty: toku_push(T, 0); /* get original string */
@@ -972,15 +967,15 @@ static int s_bytes(toku_State *T) {
 static int s_char(toku_State *T) {
     int n = toku_getntop(T); /* number of arguments */
     if (n > 0) { /* have at least 1 argument? */
-        tokuL_Buffer b;
-        char *p = tokuL_buff_initsz(T, &b, cast_uint(n));
+        tokuL_Buffer B;
+        char *p = tokuL_buff_initsz(T, &B, cast_uint(n));
         for (int i=0; i<n; i++) {
             toku_Unsigned c = t_castS2U(tokuL_check_integer(T, i));
             tokuL_check_arg(T, c <= cast_uint(UCHAR_MAX), i,
                                "value out of range");
             p[i] = cast_char(uchar(c));
         }
-        tokuL_buff_endsz(&b, cast_uint(n));
+        tokuL_buff_endsz(&B, cast_uint(n));
     } else /* otherwise no arguments were provided */
         toku_push_literal(T, ""); /* push empty string (a bit faster) */
     return 1;
@@ -1005,6 +1000,509 @@ static int s_cmp(toku_State *T) {
 }
 
 
+/*
+** Buffer to store the result of 'string.dump'. It must be initialized
+** after the call to 'toku_dump', to ensure that the function is on the
+** top of the stack when 'toku_dump' is called. ('tokuL_buff_init' might
+** push stuff.)
+*/
+struct s_Writer {
+    int init; /* true if buffer has been initialized */
+    tokuL_Buffer B;
+};
+
+
+static int writer(toku_State *T, const void *b, size_t size, void *ud) {
+    struct s_Writer *state = cast(struct s_Writer *, ud);
+    if (!state->init) {
+        state->init = 1;
+        tokuL_buff_init(T, &state->B);
+    }
+    if (b == NULL) { /* finishing dump? */
+        tokuL_buff_end(&state->B); /* push result */
+        toku_replace(T, 0); /* move it to reserved slot */
+    } else
+        tokuL_buff_push_lstring(&state->B, cast(const char *, b), size);
+    return 0;
+}
+
+
+static int s_dump(toku_State *T) {
+    struct s_Writer state;
+    int strip = toku_to_bool(T, 1);
+    tokuL_check_arg(T, toku_type(T, 0) == TOKU_T_FUNCTION &&
+                       !toku_is_cfunction(T, 0), 0,
+                       "Tokudae function expected");
+    /* ensure function is on the top of the stack and vacate slot 0 */
+    toku_push(T, 0);
+    state.init = 0;
+    toku_dump(T, writer, &state, strip);
+    toku_setntop(T, 1); /* leave final result on top */
+    return 1;
+}
+
+
+/* {=====================================================================
+** PACK/UNPACK
+** ====================================================================== */
+
+/* value used for padding */
+#if !defined(TOKUL_KPADBYTE)
+#define TOKUL_KPADBYTE      0x00
+#endif
+
+/* maximum size for the binary representation of an integer */
+#define MAXINTSIZE      16
+
+/* number of bits in a character */
+#define NB      CHAR_BIT
+
+/* mask for one character (NB 1's) */
+#define MC      ((1 << NB) - 1)
+
+/* size of a toku_Integer */
+#define SZINT   cast_int(sizeof(toku_Integer))
+
+
+/* dummy union to get native endianness */
+static const union {
+    int dummy;
+    t_byte little; /* true iff machine is little endian */
+} nativeendian = {1};
+
+
+/*
+** information to pack/unpack stuff
+*/
+typedef struct Header {
+    toku_State *T;
+    int islittle;
+    t_uint maxalign;
+} Header;
+
+
+/*
+** options for pack/unpack
+*/
+typedef enum KOption {
+    Kint,       /* signed integers */
+    Kuint,      /* unsigned integers */
+    Kfloat,     /* single-precision floating-point numbers */
+    Knumber,    /* Tokudae "native" floating-point numbers */
+    Kdouble,    /* double-precision floating-point numbers */
+    Kchar,      /* fixed-length strings */
+    Kstring,    /* strings with prefixed length */
+    Kzstr,      /* zero-terminated strings */
+    Kpadding,   /* padding */
+    Kpaddalign, /* padding for alignment */
+    Knop        /* no-op (configuration or spaces) */
+} KOption;
+
+
+/*
+** Read an integer numeral from string 'fmt' or return 'df' if
+** there is no numeral
+*/
+static size_t getnum(const char **fmt, size_t df) {
+    if (!isdigit(**fmt)) /* no number? */
+        return df; /* return default value */
+    else {
+        size_t a = 0;
+        do {
+            a = a*10 + cast_uint(*((*fmt)++) - '0');
+        } while (isdigit(**fmt) && a <= (TOKU_MAXSIZE - 9)/10);
+        return a;
+    }
+}
+
+
+/*
+** Read an integer numeral and raises an error if it is larger
+** than the maximum size of integers.
+*/
+static t_uint getnumlimit(Header *h, const char **fmt, size_t df) {
+    size_t sz = getnum(fmt, df);
+    if (t_unlikely((sz - 1u) >= MAXINTSIZE))
+        return cast_uint(tokuL_error(h->T,
+                "integral size (%d) out of limits [1,%d]", sz, MAXINTSIZE));
+    return cast_uint(sz);
+}
+
+
+/*
+** Initialize Header
+*/
+static void initheader(toku_State *T, Header *h) {
+    h->T = T;
+    h->islittle = nativeendian.little;
+    h->maxalign = 1;
+}
+
+
+/*
+** Read and classify next option. 'size' is filled with option's size.
+*/
+static KOption getoption(Header *h, const char **fmt, size_t *size) {
+    /* dummy structure to get native alignment requirements */
+    struct cD { t_byte c; union { TOKUI_MAXALIGN; } u; };
+    int opt = *((*fmt)++);
+    *size = 0; /* default */
+    switch (opt) {
+        case 'b': *size = sizeof(t_byte); return Kint;
+        case 'B': *size = sizeof(t_byte); return Kuint;
+        case 'h': *size = sizeof(short); return Kint;
+        case 'H': *size = sizeof(short); return Kuint;
+        case 'l': *size = sizeof(long); return Kint;
+        case 'L': *size = sizeof(long); return Kuint;
+        case 'j': *size = sizeof(toku_Integer); return Kint;
+        case 'J': *size = sizeof(toku_Integer); return Kuint;
+        case 'T': *size = sizeof(size_t); return Kuint;
+        case 'f': *size = sizeof(float); return Kfloat;
+        case 'n': *size = sizeof(toku_Number); return Knumber;
+        case 'd': *size = sizeof(double); return Kdouble;
+        case 'i': *size = getnumlimit(h, fmt, sizeof(int)); return Kint;
+        case 'I': *size = getnumlimit(h, fmt, sizeof(int)); return Kuint;
+        case 's': *size = getnumlimit(h, fmt, sizeof(size_t)); return Kstring;
+        case 'c':
+            *size = getnum(fmt, cast_sizet(-1));
+            if (t_unlikely(*size == cast_sizet(-1)))
+                tokuL_error(h->T, "missing size for format option 'c'");
+            return Kchar;
+        case 'z': return Kzstr;
+        case 'x': *size = 1; return Kpadding;
+        case 'X': return Kpaddalign;
+        case ' ': break;
+        case '<': h->islittle = 1; break;
+        case '>': h->islittle = 0; break;
+        case '=': h->islittle = nativeendian.little; break;
+        case '!': {
+            const size_t maxalign = offsetof(struct cD, u);
+            h->maxalign = getnumlimit(h, fmt, maxalign);
+            break;
+        }
+        default: tokuL_error(h->T, "invalid format option '%c'", opt);
+    }
+    return Knop;
+}
+
+
+/*
+** Read, classify, and fill other details about the next option.
+** 'psize' is filled with option's size, 'ntoalign' with its
+** alignment requirements.
+** Local variable 'size' gets the size to be aligned. (Kpaddalign option
+** always gets its full alignment, other options are limited by
+** the maximum alignment ('maxalign'). Kchar option needs no alignment
+** despite its size.
+*/
+static KOption getdetails(Header *h, size_t totalsize, const char **fmt,
+                          size_t *psize, t_uint *ntoalign) {
+    KOption opt = getoption(h, fmt, psize);
+    size_t align = *psize; /* usually, alignment follows size */
+    if (opt == Kpaddalign) { /* 'X' gets alignment from following option */
+        if (**fmt == '\0' || getoption(h, fmt, &align) == Kchar || align == 0)
+            tokuL_error_arg(h->T, 0, "invalid next option for option 'X'");
+    }
+    if (align <= 1 || opt == Kchar)  /* need no alignment? */
+        *ntoalign = 0;
+    else {
+        if (align > h->maxalign) /* enforce maximum alignment */
+            align = h->maxalign;
+        if (t_unlikely(!t_ispow2(align))) { /* not a power of 2? */
+            *ntoalign = 0; /* to avoid warnings */
+            tokuL_error_arg(h->T, 0,
+                    "format asks for alignment that is not a power of 2");
+        } else {
+            t_uint alignrem = cast_uint(t_fastmod(totalsize, align));
+            *ntoalign = cast_uint(t_fastmod(align - alignrem, align));
+        }
+    }
+    return opt;
+}
+
+
+/*
+** Pack integer 'n' with 'size' bytes and 'islittle' endianness.
+** The final 'if' handles the case when 'size' is larger than
+** the size of a Tokudae integer, correcting the extra sign-extension
+** bytes if necessary (by default they would be zeros for positive integer).
+*/
+static void packint(tokuL_Buffer *B, toku_Unsigned n,
+                    int islittle, t_uint size, int neg) {
+    char *buff = tokuL_buff_ensure(B, size);
+    t_uint i;
+    buff[islittle ? 0 : size - 1] = cast_byte(n & MC); /* first byte */
+    for (i = 1; i < size; i++) {
+        n >>= NB;
+        buff[islittle ? i : size - 1 - i] = cast_byte(n & MC);
+    }
+    if (neg && size > SZINT) {  /* negative number need sign extension? */
+        for (i = SZINT; i < size; i++)  /* correct extra bytes */
+            buff[islittle ? i : size - 1 - i] = cast_byte(MC);
+    }
+    tokuL_buffadd(B, size); /* add result to buffer */
+}
+
+
+/*
+** Copy 'size' bytes from 'src' to 'dest', correcting endianness if
+** given 'islittle' is different from native endianness.
+*/
+static void copywithendian(char *dest, const char *src,
+                           t_uint size, int islittle) {
+    if (islittle == nativeendian.little)
+        memcpy(dest, src, size);
+    else {
+        dest += size - 1;
+        while (size-- != 0)
+            *dest-- = *src++;
+    }
+}
+
+
+static int s_pack(toku_State *T) {
+    tokuL_Buffer B;
+    Header h;
+    const char *fmt = tokuL_check_string(T, 0); /* format string */
+    int arg = 0; /* current argument to pack */
+    size_t totalsize = 0; /* accumulate total size of result */
+    initheader(T, &h);
+    toku_push_nil(T); /* mark to separate arguments from string buffer */
+    tokuL_buff_init(T, &B);
+    while (*fmt != '\0') {
+        t_uint ntoalign;
+        size_t size;
+        KOption opt = getdetails(&h, totalsize, &fmt, &size, &ntoalign);
+        tokuL_check_arg(T, size + ntoalign <= TOKU_MAXSIZE - totalsize, arg,
+                          "result too long");
+        totalsize += ntoalign + size;
+        while (ntoalign-- > 0)
+            tokuL_buff_push(&B, TOKUL_KPADBYTE); /* fill alignment */
+        arg++;
+        switch (opt) {
+            case Kint: { /* signed integers */
+                toku_Integer n = tokuL_check_integer(T, arg);
+                if (size < SZINT) { /* need overflow check? */
+                    toku_Integer lim = cast_Integer(1) << ((size * NB) - 1);
+                    tokuL_check_arg(T, -lim <= n && n < lim, arg,
+                            "integer overflow");
+                }
+                packint(&B, t_castS2U(n), h.islittle, cast_uint(size), (n<0));
+                break;
+            }
+            case Kuint: { /* unsigned integers */
+                toku_Integer n = tokuL_check_integer(T, arg);
+                if (size < SZINT) { /* need overflow check? */
+                    tokuL_check_arg(T,
+                            t_castS2U(n) < (cast_Unsigned(1) << (size * NB)),
+                            arg, "unsigned overflow");
+                }
+                packint(&B, t_castS2U(n), h.islittle, cast_uint(size), 0);
+                break;
+            }
+            case Kfloat: { /* C float */
+                float f = cast_float(tokuL_check_number(T, arg));
+                char *buff = tokuL_buff_ensure(&B, sizeof(f));
+                /* move 'f' to final result, correcting endianness if needed */
+                copywithendian(buff, cast_charp(&f), sizeof(f), h.islittle);
+                tokuL_buffadd(&B, size);
+                break;
+            }
+            case Knumber: { /* Tokudae float */
+                toku_Number f = tokuL_check_number(T, arg);
+                char *buff = tokuL_buff_ensure(&B, sizeof(f));
+                /* move 'f' to final result, correcting endianness if needed */
+                copywithendian(buff, cast_charp(&f), sizeof(f), h.islittle);
+                tokuL_buffadd(&B, size);
+                break;
+            }
+            case Kdouble: { /* C double */
+                double f = cast_double(tokuL_check_number(T, arg));
+                char *buff = tokuL_buff_ensure(&B, sizeof(f));
+                /* move 'f' to final result, correcting endianness if needed */
+                copywithendian(buff, cast_charp(&f), sizeof(f), h.islittle);
+                tokuL_buffadd(&B, size);
+                break;
+            }
+            case Kchar: { /* fixed-size string */
+                size_t len;
+                const char *s = tokuL_check_lstring(T, arg, &len);
+                tokuL_check_arg(T, len <= size, arg,
+                                   "string longer than given size");
+                tokuL_buff_push_lstring(&B, s, len); /* add string */
+                if (len < size) { /* does it need padding? */
+                    size_t psize = size - len; /* pad size */
+                    char *buff = tokuL_buff_ensure(&B, psize);
+                    memset(buff, TOKUL_KPADBYTE, psize);
+                    tokuL_buffadd(&B, psize);
+                }
+                break;
+            }
+            case Kstring: { /* strings with length count */
+                size_t len;
+                const char *s = tokuL_check_lstring(T, arg, &len);
+                tokuL_check_arg(T, size >= sizeof(toku_Unsigned) ||
+                        len < (cast_Unsigned(1) << (size*NB)), arg,
+                        "string length does not fit in given size");
+                /* pack length */
+                packint(&B, cast_Unsigned(len), h.islittle, cast_uint(size), 0);
+                tokuL_buff_push_lstring(&B, s, len);
+                totalsize += len;
+                break;
+            }
+            case Kzstr: { /* zero-terminated string */
+                size_t len;
+                const char *s = tokuL_check_lstring(T, arg, &len);
+                tokuL_check_arg(T, strlen(s) == len, arg,
+                        "string argument to format 'z' contains zeros");
+                tokuL_buff_push_lstring(&B, s, len);
+                tokuL_buff_push(&B, '\0'); /* add zero at the end */
+                totalsize += len + 1;
+                break;
+            }
+            case Kpadding: tokuL_buff_push(&B, TOKUL_KPADBYTE);
+            /* fall through */
+            case Kpaddalign: case Knop:
+                arg--; /* undo increment */
+                break;
+        }
+    }
+    tokuL_buff_end(&B);
+    return 1;
+}
+
+
+static int s_packsize(toku_State *T) {
+    const char *fmt = tokuL_check_string(T, 0); /* format string */
+    size_t totalsize = 0; /* accumulate total size of result */
+    Header h;
+    initheader(T, &h);
+    while (*fmt != '\0') {
+        t_uint ntoalign;
+        size_t size;
+        KOption opt = getdetails(&h, totalsize, &fmt, &size, &ntoalign);
+        tokuL_check_arg(T, opt != Kstring && opt != Kzstr, 0,
+                           "variable-length format");
+        size += ntoalign; /* total space used by option */
+        tokuL_check_arg(T, totalsize <= TOKU_INTEGER_MAX - size, 0,
+                           "format result too large");
+        totalsize += size;
+    }
+    toku_push_integer(T, cast_sz2S(totalsize));
+    return 1;
+}
+
+
+/*
+** Unpack an integer with 'size' bytes and 'islittle' endianness.
+** If size is smaller than the size of a Tokudae integer and integer
+** is signed, must do sign extension (propagating the sign to the
+** higher bits); if size is larger than the size of a Tokudae integer,
+** it must check the unread bytes to see whether they do not cause an
+** overflow.
+*/
+static toku_Integer unpackint(toku_State *T, const char *str,
+                              int islittle, int size, int issigned) {
+    toku_Unsigned res = 0;
+    int limit = (size  <= SZINT) ? size : SZINT;
+    for (int i = limit - 1; i >= 0; i--) {
+        res <<= NB;
+        res |= cast_Unsigned(cast_ubyte(str[islittle ? i : size-1-i]));
+    }
+    if (size < SZINT) { /* real size smaller than toku_Integer? */
+        if (issigned) { /* needs sign extension? */
+            toku_Unsigned mask = cast_Unsigned(1) << (size*NB - 1);
+            res = ((res ^ mask) - mask); /* do sign extension */
+        }
+    }
+    else if (size > SZINT) { /* must check unread bytes */
+        int mask = (!issigned || t_castU2S(res) >= 0) ? 0 : MC;
+        for (int i = limit; i < size; i++) {
+            if (t_unlikely(cast_ubyte(str[islittle ? i : size-1-i]) != mask))
+                tokuL_error(T, "%d-byte integer does not fit into Tokudae Integer", size);
+        }
+    }
+    return t_castU2S(res);
+}
+
+
+static int s_unpack(toku_State *T) {
+    const char *fmt = tokuL_check_string(T, 0);
+    size_t ld;
+    const char *data = tokuL_check_lstring(T, 1, &ld);
+    size_t pos = posrelStart(tokuL_opt_integer(T, 2, 0), ld);
+    int n = 0; /* number of results */
+    Header h;
+    tokuL_check_arg(T, pos <= ld - 1, 2, "initial position out of string");
+    initheader(T, &h);
+    while (*fmt != '\0') {
+        t_uint ntoalign;
+        size_t size;
+        KOption opt = getdetails(&h, pos, &fmt, &size, &ntoalign);
+        tokuL_check_arg(T, ntoalign + size <= ld - pos, 1,
+                           "data string too short");
+        pos += ntoalign; /* skip alignment */
+        /* stack space for item + next position */
+        tokuL_check_stack(T, 2, "too many results");
+        n++;
+        switch (opt) {
+            case Kint: case Kuint: {
+                toku_Integer res = unpackint(T, data + pos, h.islittle,
+                                                cast_int(size), (opt == Kint));
+                toku_push_integer(T, res);
+                break;
+            }
+            case Kfloat: {
+                float f;
+                copywithendian(cast_charp(&f), data+pos, sizeof(f), h.islittle);
+                toku_push_number(T, cast_num(f));
+                break;
+            }
+            case Knumber: {
+                toku_Number f;
+                copywithendian(cast_charp(&f), data+pos, sizeof(f), h.islittle);
+                toku_push_number(T, f);
+                break;
+            }
+            case Kdouble: {
+                double f;
+                copywithendian(cast_charp(&f), data+pos, sizeof(f), h.islittle);
+                toku_push_number(T, cast_num(f));
+                break;
+            }
+            case Kchar: {
+                toku_push_lstring(T, data+pos, size);
+                break;
+            }
+            case Kstring: {
+                toku_Unsigned len = t_castS2U(unpackint(T, data+pos,
+                                              h.islittle, cast_int(size), 0));
+                tokuL_check_arg(T, len <= ld - pos - size, 1,
+                                   "data string too short");
+                toku_push_lstring(T, data + pos + size, cast_sizet(len));
+                pos += cast_sizet(len);  /* skip string */
+                break;
+            }
+            case Kzstr: {
+                size_t len = strlen(data + pos);
+                tokuL_check_arg(T, pos + len < ld, 1,
+                                   "unfinished string for format 'z'");
+                toku_push_lstring(T, data + pos, len);
+                pos += len + 1;  /* skip string plus final '\0' */
+                break;
+            }
+            case Kpaddalign: case Kpadding: case Knop:
+                n--; /* undo increment */
+                break;
+        }
+        pos += size;
+    }
+    toku_push_integer(T, cast_sz2S(pos)); /* next position */
+    return n + 1;
+}
+
+/* }===================================================================== */
+
 static const tokuL_Entry strlib[] = {
     {"split", s_split},
     {"rsplit", s_rsplit},
@@ -1028,6 +1526,10 @@ static const tokuL_Entry strlib[] = {
     {"bytes", s_bytes},
     {"char", s_char},
     {"cmp", s_cmp},
+    {"dump", s_dump},
+    {"pack", s_pack},
+    {"packsize", s_packsize},
+    {"unpack", s_unpack},
     {"ascii_uppercase", NULL},
     {"ascii_lowercase", NULL},
     {"ascii_letters", NULL},

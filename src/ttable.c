@@ -70,7 +70,7 @@
 ** Table size invariant.
 */
 #define tablesize_invariant(t,sz) \
-        ((t && isdummy(t)) || (4 <= (sz) && ispow2(sz) && (sz) < MAXHSIZE))
+        ((t && isdummy(t)) || (4 <= (sz) && t_ispow2(sz) && (sz) < MAXHSIZE))
 
 
 #define dummynode	(&dummynode_)

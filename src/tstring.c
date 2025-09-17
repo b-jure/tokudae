@@ -217,9 +217,9 @@ static OString *internshrstr(toku_State *T, const char *str, size_t l) {
 
 /* create new string with explicit length */
 OString *tokuS_newl(toku_State *T, const char *str, size_t l) {
-    if (l <= TOKUI_MAXSHORTLEN) { /* short string? */
+    if (l <= TOKUI_MAXSHORTLEN) /* short string? */
         return internshrstr(T, str, l);
-    } else { /* otherwise long string */
+    else { /* otherwise long string */
         OString *s;
         if (t_unlikely(l*sizeof(char) >= (TOKU_MAXSIZE-sizeof(OString))))
             tokuM_toobig(T);
@@ -357,7 +357,7 @@ static const char *str2int(const char *s, toku_Integer *i) {
                       10*y <= TOKU_UNSIGNED_MAX-val[c]; c=*s++)
                 y = y * 10 + val[c];
         }
-    } else if (ispow2(base)) { /* base is power of 2? (up to base 32) */
+    } else if (t_ispow2(base)) { /* base is power of 2? (up to base 32) */
         if (!empty) {
             int bs = "\0\1\2\4\7\3\6\5"[(0x17*base)>>5&7];
             for (x=0; val[c] < base && x <= UINT_MAX/32; c=*s++)

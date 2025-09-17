@@ -20,10 +20,6 @@
 ** Some hard limits to current Tokudae implementation
 ** ======================================================================= */
 
-#if SIZE_MAX < UINT_MAX
-#error SIZE_MAX must be greater or equal UINT_MAX
-#endif
-
 #if ((UINT_MAX >> 30) < 3)
 #error 'int' has to have at least 32 bits
 #endif
@@ -457,7 +453,7 @@
 ** CHANGE it if you need a different limit. This limit is arbitrary;
 ** its only purpose is to stop Tokudae from consuming unlimited stack
 ** space (and to reserve some numbers for pseudo-indices).
-** (It must fit into max(size_t)/32 and max(int)/2.)
+** (It must fit into (max(size_t)/32 - 1000) and (max(int)/2 - 1000).)
 */
 #define TOKUI_MAXSTACK      (1 << 23)
 

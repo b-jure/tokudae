@@ -1,0 +1,314 @@
+local pack = string.pack;
+local packsize = string.packsize;
+local unpack = string.unpack;
+
+/// maximum size for integers
+local NB = 16;
+
+local sizeshort = packsize("h");
+local sizeint = packsize("i");
+local sizelong = packsize("l");
+local sizesize_t = packsize("T");
+local sizeTI = packsize("j");
+local sizefloat = packsize("f");
+local sizedouble = packsize("d");
+local sizenumber = packsize("n");
+local little = (pack("i2", 1) == "\1\0");
+local align = packsize("!xXi16");
+
+assert(1 <= sizeshort and sizeshort <= sizeint and sizeint <= sizelong and
+       sizefloat <= sizedouble);
+
+print("platform:");
+print(string.fmt(
+  "\tshort %d, int %d, long %d, size_t %d, float %d, double %d,\n" ..
+  "\ttokudae Integer %d, tokudae Number %d",
+   sizeshort, sizeint, sizelong, sizesize_t, sizefloat, sizedouble,
+   sizeTI, sizenumber));
+print("\t" .. (little and "little" or "big") .. " endian");
+print("\talignment: " .. tostr(align));
+
+
+/// check errors in arguments
+local fn checkerror(msg, f, ...) {
+    local status, err = pcall(f, ...);
+    /// print(status, err, msg)
+    assert(!status and reg.find(err, msg));
+}
+
+/// minimum behavior for integer formats
+assert(unpack("B", pack("B", 0xff)) == 0xff);
+assert(unpack("b", pack("b", 0x7f)) == 0x7f);
+assert(unpack("b", pack("b", -0x80)) == -0x80);
+
+assert(unpack("H", pack("H", 0xffff)) == 0xffff);
+assert(unpack("h", pack("h", 0x7fff)) == 0x7fff);
+assert(unpack("h", pack("h", -0x8000)) == -0x8000);
+
+assert(unpack("L", pack("L", 0xffffffff)) == 0xffffffff);
+assert(unpack("l", pack("l", 0x7fffffff)) == 0x7fffffff);
+assert(unpack("l", pack("l", -0x80000000)) == -0x80000000);
+
+
+for (local i = 1; i <= NB; i++) {
+    /// small numbers with signal extension ("\xFF...")
+    local s = string.repeat("\xff", i);
+    assert(pack("i" .. tostr(i), -1) == s);
+    assert(packsize("i" .. tostr(i)) == len(s));
+    assert(unpack("i" .. tostr(i), s) == -1);
+
+    /// small unsigned number ("\0...\xAA")
+    s = "\xAA" .. string.repeat("\0", i - 1);
+    assert(pack("<I" .. tostr(i), 0xAA) == s);
+    assert(unpack("<I" .. tostr(i), s) == 0xAA);
+    assert(pack(">I" .. tostr(i), 0xAA) == string.reverse(s));
+    assert(unpack(">I" .. tostr(i), string.reverse(s)) == 0xAA);
+}
+
+{
+    local lnum = 578_437_695_752_307_201;
+    local s = pack("<j", lnum);
+    assert(unpack("<j", s) == lnum);
+    assert(unpack("<i" .. tostr(sizeTI + 1), s .. "\0") == lnum);
+    assert(unpack("<i" .. tostr(sizeTI + 1), s .. "\0") == lnum);
+
+    for (local i = sizeTI + 1; i <= NB; i++) {
+        local s = pack("<j", -lnum);
+        assert(unpack("<j", s) == -lnum);
+        /// strings with (correct) extra bytes
+        assert(unpack("<i" .. tostr(i), s .. string.repeat("\xFF", i - sizeTI)) == -lnum);
+        assert(unpack(">i" .. tostr(i), string.repeat("\xFF", i - sizeTI) .. string.reverse(s)) == -lnum);
+        assert(unpack("<I" .. tostr(i), s .. string.repeat("\0", i - sizeTI)) == -lnum);
+
+        /// overflows
+        checkerror("does not fit", unpack, "<I" .. tostr(i),
+                string.repeat("\x00", i - 1) .. "\1");
+        checkerror("does not fit", unpack, ">i" .. tostr(i),
+                "\1" .. string.repeat("\x00", i - 1));
+    }
+}
+
+for (local i = 1; i <= sizeTI; i++) {
+    local lstr = "\1\2\3\4\5\6\7\8\9\10\11\12\13";
+    local lnum = 578_437_695_752_307_201;
+    local n = lnum & (~(-1 << (i * 8)));
+    local s = string.substr(lstr, 0, i-1);
+    assert(pack("<i" .. tostr(i), n) == s);
+    assert(pack(">i" .. tostr(i), n) == string.reverse(s));
+    assert(unpack(">i" .. tostr(i), string.reverse(s)) == n);
+}
+
+
+{ /// sign extension
+    local u = 0xf0;
+    for (local i = 1; i < sizeTI; i++) {
+        assert(unpack("<i"..tostr(i), "\xf0"..string.repeat("\xff", i - 1)) == -16);
+        assert(unpack(">I"..tostr(i), "\xf0"..string.repeat("\xff", i - 1)) == u);
+        u = u * 256 + 0xff;
+    }
+}
+
+
+{ /// mixed endianness
+    assert(pack(">i2 <i2", 10, 20) == "\0\10\20\0");
+    local a, b = unpack("<i2 >i2", "\10\0\0\20");
+    assert(a == 10 and b == 20);
+    assert(pack("=i4", 2001) == pack("i4", 2001));
+}
+
+print("testing invalid formats");
+
+checkerror("out of limits", pack, "i0", 0);
+checkerror("out of limits", pack, "i" .. tostr(NB + 1), 0);
+checkerror("out of limits", pack, "!" .. tostr(NB + 1), 0);
+checkerror("%(17%) out of limits %[1,16%]", pack, "Xi" .. tostr(NB + 1));
+checkerror("invalid format option 'r'", pack, "i3r", 0);
+checkerror("16%-byte integer", unpack, "i16", string.repeat("\3", 16));
+checkerror("not a power of 2", pack, "!4i3", 0);
+checkerror("missing size", pack, "c", "");
+checkerror("variable%-length format", packsize, "s");
+checkerror("variable%-length format", packsize, "z");
+
+/// overflow in option size (error will be in digit after limit)
+checkerror("invalid format", packsize, "c1" .. string.repeat("0", 40));
+
+{
+  local maxsize = (packsize("j") <= packsize("T")) and
+                      math.maxint or (1 << (packsize("T") * 8));
+  assert (packsize(string.fmt("c%d", maxsize - 9)) == maxsize - 9);
+  checkerror("too large", packsize, string.fmt("c%dc10", maxsize - 9));
+  checkerror("too long", pack, string.fmt("xxxxxxxxxx c%d", maxsize - 9));
+}
+
+
+/// overflow in packing
+for (local i = 1; i < sizeTI; i++) {
+    local umax = (1 << (i * 8)) - 1;
+    local max = umax >> 1;
+    local min = ~max;
+    checkerror("overflow", pack, "<I" .. tostr(i), -1);
+    checkerror("overflow", pack, "<I" .. tostr(i), min);
+    checkerror("overflow", pack, ">I" .. tostr(i), umax + 1);
+
+    checkerror("overflow", pack, ">i" .. tostr(i), umax);
+    checkerror("overflow", pack, ">i" .. tostr(i), max + 1);
+    checkerror("overflow", pack, "<i" .. tostr(i), min - 1);
+
+    assert(unpack(">i" .. tostr(i), pack(">i" .. tostr(i), max)) == max);
+    assert(unpack("<i" .. tostr(i), pack("<i" .. tostr(i), min)) == min);
+    assert(unpack(">I" .. tostr(i), pack(">I" .. tostr(i), umax)) == umax);
+}
+
+/// Tokudae integer size
+assert(unpack(">j", pack(">j", math.maxint)) == math.maxint);
+assert(unpack("<j", pack("<j", math.minint)) == math.minint);
+assert(unpack("<J", pack("<j", -1)) == -1); /// maximum unsigned integer
+
+if little
+    assert(pack("f", 24) == pack("<f", 24));
+else
+    assert(pack("f", 24) == pack(">f", 24));
+
+print("testing pack/unpack of floating-point numbers");
+
+foreach _, n in indices([0, -1.1, 1.9, 1/0, -1/0, 1e20, -1e20, 0.1, 2000.7]) {
+    assert(unpack("n", pack("n", n)) == n);
+    assert(unpack("<n", pack("<n", n)) == n);
+    assert(unpack(">n", pack(">n", n)) == n);
+    assert(pack("<f", n) == string.reverse(pack(">f", n)));
+    assert(pack(">d", n) == string.reverse(pack("<d", n)));
+}
+
+/// for non-native precisions, test only with "round" numbers
+foreach _, n in indices([0, -1.5, 1/0, -1/0, 1e10, -1e9, 0.5, 2000.25]) {
+    assert(unpack("<f", pack("<f", n)) == n);
+    assert(unpack(">f", pack(">f", n)) == n);
+    assert(unpack("<d", pack("<d", n)) == n);
+    assert(unpack(">d", pack(">d", n)) == n);
+}
+
+print("testing pack/unpack of strings");
+{
+    local s = string.repeat("abc", 1000);
+    assert(pack("zB", s, 247) == s .. "\0\xF7");
+    local s1, b = unpack("zB", s .. "\0\xF9");
+    assert(b == 249 and s1 == s);
+    s1 = pack("s", s);
+    assert(unpack("s", s1) == s);
+
+    checkerror("does not fit", pack, "s1", s);
+    checkerror("contains zeros", pack, "z", "alo\0");;
+    checkerror("unfinished string", unpack, "zc10000000", "alo");
+
+    for (local i = 2; i <= NB; i++) {
+        local s1 = pack("s" .. tostr(i), s);
+        assert(unpack("s" .. tostr(i), s1) == s and len(s1) == len(s) + i);
+    }
+}
+
+{
+    local x = pack("s", "alo");;
+    checkerror("too short", unpack, "s", string.substr(x, 0, -2));
+    checkerror("too short", unpack, "c5", "abcd");
+    checkerror("out of limits", pack, "s100", "alo");
+}
+
+{
+    assert(pack("c0", "") == "");
+    assert(packsize("c0") == 0);
+    assert(unpack("c0", "") == "");
+    assert(pack("<! c3", "abc") == "abc");
+    assert(packsize("<! c3") == 3);
+    assert(pack(">!4 c6", "abcdef") == "abcdef");
+    assert(pack("c3", "123") == "123");
+    assert(pack("c0", "") == "");
+    assert(pack("c8", "123456") == "123456\0\0");
+    assert(pack("c88 c1", "", "X") == string.repeat("\0", 88) .. "X");
+    assert(pack("c188 c2", "ab", "X\1") ==
+            "ab" .. string.repeat("\0", 188 - 2) .. "X\1");
+    local a, b, c = unpack("!4 z c3", "abcdefghi\0xyz");
+    assert(a == "abcdefghi" and b == "xyz" and c == 13);
+    checkerror("longer than", pack, "c3", "1234");
+}
+
+
+{ /// testing multiple types and sequence
+  local x = pack("<b h b f d f n i", 1, 2, 3, 4, 5, 6, 7, 8);
+  assert(len(x) == packsize("<b h b f d f n i"));
+  local a, b, c, d, e, f, g, h = unpack("<b h b f d f n i", x);
+  assert(a == 1 and b == 2 and c == 3 and d == 4 and e == 5 and f == 6 and
+         g == 7 and h == 8);
+}
+
+print("testing alignment");
+{
+    assert(pack(" < i1 i2 ", 2, 3) == "\2\3\0"); /// no alignment by default
+    local x = pack(">!8 b Xh i4 i8 c1 Xi8", -12, 100, 200, "\xEC");
+    assert(len(x) == packsize(">!8 b Xh i4 i8 c1 Xi8"));
+    assert(x == "\xf4" .. "\0\0\0" ..
+            "\0\0\0\100" ..
+            "\0\0\0\0\0\0\0\xC8" .. 
+            "\xEC" .. "\0\0\0\0\0\0\0");
+    local a, b, c, d, pos = unpack(">!8 c1 Xh i4 i8 b Xi8 XI XH", x);
+    assert(a == "\xF4" and b == 100 and c == 200 and d == -20 and pos == len(x));
+
+    x = pack(">!4 c3 c4 c2 z i4 c5 c2 Xi4",
+            "abc", "abcd", "xz", "hello", 5, "world", "xy");
+    assert(x == "abcabcdxzhello\0\0\0\0\0\5worldxy\0");
+    a, b, c, d, e, f, g, pos = unpack(">!4 c3 c4 c2 z i4 c5 c2 Xh Xi4", x);
+    assert(a == "abc" and b == "abcd" and c == "xz" and d == "hello" and
+            e == 5 and f == "world" and g == "xy" and pos % 4 == 0);
+
+    x = pack(" b b Xd b Xb x", 1, 2, 3);
+    assert(packsize(" b b Xd b Xb x") == 4);
+    assert(x == "\1\2\3\0");
+    a, b, c, pos = unpack("bbXdb", x);
+    assert(a == 1 and b == 2 and c == 3 and pos == len(x) - 1);
+
+    /// only alignment
+    assert(packsize("!8 xXi8") == 8);
+    pos = unpack("!8 xXi8", "0123456701234567"); assert(pos == 8);
+    assert(packsize("!8 xXi2") == 2);
+    pos = unpack("!8 xXi2", "0123456701234567"); assert(pos == 2);
+    assert(packsize("!2 xXi2") == 2);
+    pos = unpack("!2 xXi2", "0123456701234567"); assert(pos == 2);
+    assert(packsize("!2 xXi8") == 2);
+    pos = unpack("!2 xXi8", "0123456701234567"); assert(pos == 2);
+    assert(packsize("!16 xXi16") == 16);
+    pos = unpack("!16 xXi16", "0123456701234567"); assert(pos == 16);
+
+    checkerror("invalid next option", pack, "X");
+    checkerror("invalid next option", unpack, "XXi", "");
+    checkerror("invalid next option", unpack, "X i", "");
+    checkerror("invalid next option", pack, "Xc1");
+}
+
+{ /// testing initial position
+    local pos;
+    local x = pack("i4i4i4i4", 1, 2, 3, 4);
+    for (pos = 0; pos < 16; pos += 4) {
+        local i, p = unpack("i4", x, pos);
+        assert(i == pos//4 + 1 and p == pos + 4);
+    }
+
+    /// with alignment
+    for (pos = 0; pos < 12; pos++) { /// will always round position to power of 2
+        local i, p = unpack("!4 i4", x, pos + 1);
+        assert(i == (pos + 4)//4 + 1);
+        assert(p == i*4);
+    }
+
+    /// negative indices
+    local i, p = unpack("!4 i4", x, -4);
+    assert(i == 4 and p == 16);
+    i, p = unpack("!4 i4", x, -7);
+    assert(i == 4 and p == 16);
+    i, p = unpack("!4 i4", x, -len(x));
+    assert(i == 1 and p == 4);
+
+    /// limits
+    local end = len(x);
+    for (local i = 0; i < end; i++)
+        assert(unpack("c0", x, i) == "");
+    checkerror("out of string", unpack, "c0", x, len(x));
+}

@@ -34,20 +34,20 @@ static const char strupval[] = "upvalue";
 
 
 /*
-** Gets the Number of instructions up to 'pc'. This Tokudae implementation
+** Gets the number of instructions up to 'pc'. This Tokudae implementation
 ** is using stack-based architecture and the sizes of instructions are
 ** variable length, we then also store additional pc for each emitted
 ** instruction. This is required in order to properly calculate estimate
 ** when fetching base line in O(log(n)), otherwise linear search or some
 ** other loopkup strategy is required to make this efficient.
 */
-static int Ninstuptopc(const Proto *p, int pc) {
+static int ninst(const Proto *p, int pc) {
     int l = 0;
     int h = p->sizeinstpc - 1;
     int m, instpc;
     toku_assert(h >= 0);
     while (l <= h) {
-        m = l + ((h - l) / 2); /* avoid potential overflow */
+        m = l + ((h - l) / 2); /* avoid overflow */
         instpc = p->instpc[m];
         if (pc < instpc)
             h = m - 1;
@@ -57,7 +57,7 @@ static int Ninstuptopc(const Proto *p, int pc) {
             return m;
     }
     toku_assert(0); /* 'pc' does not correspond to any instruction */
-    return -1; /* to prevent compiler warnings */
+    return -1; /* to avoid warnings */
 }
 
 
@@ -79,7 +79,7 @@ static int getbaseline(const Proto *p, int pc, int *basepc) {
         return p->defline + p->lineinfo[0]; /* first instruction line */
     } else {
         /* get an estimate */
-        int i = Ninstuptopc(p, pc) / MAXIWTHABS - 1;
+        int i = ninst(p, pc) / MAXIWTHABS - 1;
         /* estimate must be a lower bound of the correct base */
         toku_assert(i < 0 || /* linedif was too large before MAXIWTHABS? */
                    (i < p->sizeabslineinfo && p->abslineinfo[i].pc <= pc));
@@ -97,15 +97,19 @@ static int getbaseline(const Proto *p, int pc, int *basepc) {
 ** desired instruction.
 */
 int tokuD_getfuncline(const Proto *p, int pc) {
-    int basepc;
-    int baseline = getbaseline(p, pc, &basepc);
-    while (basepc < pc) { /* walk until given instruction */
-        basepc += getopSize(p->code[basepc]); /* next instruction pc */
-        toku_assert(p->lineinfo[basepc] != ABSLINEINFO);
-        baseline += p->lineinfo[basepc]; /* correct line */
+    if (p->lineinfo == NULL) /* no debug information? */
+        return -1;
+    else {
+        int basepc;
+        int baseline = getbaseline(p, pc, &basepc);
+        while (basepc < pc) { /* walk until given instruction */
+            basepc += getopSize(p->code[basepc]); /* next instruction pc */
+            toku_assert(p->lineinfo[basepc] != ABSLINEINFO);
+            baseline += p->lineinfo[basepc]; /* correct line */
+        }
+        toku_assert(pc == basepc);
+        return baseline;
     }
-    toku_assert(pc == basepc);
-    return baseline;
 }
 
 
@@ -157,7 +161,7 @@ const char *tokuD_findlocal(toku_State *T, CallFrame *cf, int n, SPtr *pos) {
         if (limit - base >= n && n > 0) /* 'n' is in stack range ? */
             name = isTokudae(cf) ? "(temporary)" : "(C temporary)";
         else
-            return NULL;
+            return NULL; /* no name */
     }
     if (pos)
         *pos = base + (n - 1);
@@ -178,7 +182,6 @@ TOKU_API const char *toku_getlocal(toku_State *T, const toku_Debug *ar, int n) {
         SPtr pos = NULL; /* to avoid warnings */
         name = tokuD_findlocal(T, ar->cf, n, &pos);
         if (name) { /* found ? */
-            /* push its value on top of the stack */
             setobjs2s(T, T->sp.p, pos);
             api_inctop(T);
         }
@@ -226,20 +229,30 @@ static void getfuncinfo(Closure *cl, toku_Debug *ar) {
 }
 
 
+/*
+** For low-level debugging of the Symbolic Execution.
+*/
+#if 0
+#define trace_se(fmt,...)     printf(fmt, __VA_ARGS__)
+#else
+#define trace_se(fmt,...)     /* empty */
+#endif
+
+
 static int symbexec(const Proto *p, int lastpc, int sp) {
     int pc = 0; /* execute from start */
     int symsp = p->arity - 1; /* initial stack pointer (-1 if no params) */
     int pcsp = -1; /* pc of instruction that sets 'sp' (-1 if none) */
     const Instruction *code = p->code;
-    //printf("Symbolic execution\ttop=%d\n", symsp);
+    trace_se("Symbolic execution\ttop=%d\n", symsp);
     if (*code == OP_VARARGPREP) /* vararg function? */
         pc += getopSize(*code); /* skip first opcode */
-    if (code[lastpc] == OP_MBIN)
-        lastpc = p->instpc[Ninstuptopc(p, lastpc) - 1];
+    if (code[lastpc] == OP_MBIN && pc + getopSize(code[pc]) == lastpc)
+        goto end; /* done; 'lastpc' is 'pc' */
     while (pc < lastpc) {
         const Instruction *i = &code[pc];
         int change; /* true if current instruction changed 'sp' */
-        //printf("%d:%d:%-20s\t", tokuD_getfuncline(p, pc), pc, getopName(*i));
+        trace_se("%d:%d:%-20s\t", tokuD_getfuncline(p, pc), pc, getopName(*i));
         toku_assert(-1 <= symsp && symsp <= p->maxstack);
         switch (*i) {
             case OP_CHECKADJ: {
@@ -331,21 +344,25 @@ static int symbexec(const Proto *p, int lastpc, int sp) {
         }
         if (change) {
             pcsp = pc;
-            //printf("(change) symsp=%d, pcsp=%d [sp=%d]\n", symsp, pcsp, sp);
+            trace_se("(change) symsp=%d, pcsp=%d [sp=%d]\n", symsp, pcsp, sp);
         } else {
-            //printf("(no change) symsp=%d [sp=%d]\n", symsp, sp);
+            trace_se("(no change) symsp=%d [sp=%d]\n", symsp, sp);
         }
         pc += getopSize(code[pc]); /* next instruction */
+        /* last instruction is MBIN and the next 'pc' is 'lastpc' */
+        if (code[lastpc] == OP_MBIN && pc + getopSize(code[pc]) == lastpc)
+            break; /* done; this 'pc' is 'lastpc' */
     }
-    //printf("\n%s RETURNS pcsp->%d\n\n", __func__, pcsp);
+end:
+    trace_se("\n%s RETURNS pcsp->%d\n\n", __func__, pcsp);
     return pcsp;
 }
 
 
 static const char *upvalname(const Proto *p, int uv) {
     OString *s = check_exp(uv < p->sizeupvals, p->upvals[uv].name);
-    toku_assert(s != NULL); /* must have debug information */
-    return getstr(s);
+    if (s == NULL) return "?"; /* no debug information */
+    else return getstr(s);
 }
 
 
@@ -367,10 +384,10 @@ static const char *kname(const Proto *p, int index, const char **name) {
 static const char *basicgetobjname(const Proto *p, int *ppc, int sp,
                                    const char **name) {
     int pc = *ppc;
-    //printf("%s pc=%d, sp=%d\n", __func__, pc, sp);
+    trace_se("%s pc=%d, sp=%d\n", __func__, pc, sp);
     *name = tokuF_getlocalname(p, sp + 1, pc);
     if (*name) {  /* is a local? */
-        //printf("Got local '%s'\n", *name);
+        trace_se("Got local '%s'\n", *name);
         return strlocal;
     }
     /* else try symbolic execution */
@@ -382,19 +399,19 @@ static const char *basicgetobjname(const Proto *p, int *ppc, int sp,
                 int stk = GET_ARG_L(i, 0);
                 toku_assert(stk < sp);
                 const char *nam = basicgetobjname(p, ppc, stk, name);
-                //printf("Local name '%s'\n", nam);
+                trace_se("Local name '%s'\n", nam);
                 return nam;
             }
             case OP_GETUVAL:
                 *name = upvalname(p, GET_ARG_L(i, 0));
-                //printf("upvalue '%s'\n", *name);
+                trace_se("upvalue '%s'\n", *name);
                 return strupval;
             case OP_CONST: return kname(p, GET_ARG_S(i, 0), name);
             case OP_CONSTL: return kname(p, GET_ARG_L(i, 0), name);
             default: break;
         }
     }
-    //printf("could not find reasonable name (%s)\n", __func__);
+    trace_se("could not find reasonable name (%s)\n", __func__);
     return NULL; /* could not find reasonable name */
 }
 
@@ -402,7 +419,7 @@ static const char *basicgetobjname(const Proto *p, int *ppc, int sp,
 /*
 ** Find a "name" for the stack slot 'c'.
 */
-static void sname(const Proto *p, int pc, int c, const char **name) {
+static void stkname(const Proto *p, int pc, int c, const char **name) {
     const char *what = basicgetobjname(p, &pc, c, name);
     if (!(what && *what == 'c')) /* did not find a constant name? */
         *name = "?";
@@ -410,17 +427,21 @@ static void sname(const Proto *p, int pc, int c, const char **name) {
 
 
 /*
-** Check whether table at stack slot 't' is the environment '__ENV'.
+** Check whether value being indexed at stack slot 't' is the
+** environment '__ENV'.
 */
 static const char *isEnv(const Proto *p, int pc, int t, int isup) {
     const char *name; /* name of indexed variable */
     if (isup) { /* is 't' an upvalue? */
-        toku_assert(0); /* unreachable */
+        toku_assert(0);
         /* TODO: make OP_GETINDEXUP, which indexes upvalue these
            opcodes would be fairly common for __ENV accesses. */
         name = upvalname(p, t);
-    } else /* 't' is a stack slot */
-        basicgetobjname(p, &pc, t, &name);
+    } else { /* 't' is a stack slot */
+        const char *what = basicgetobjname(p, &pc, t, &name);
+        if (what != strlocal && what != strupval)
+            what = NULL; /* cannot be the variable __ENV */
+    }
     return (name && strcmp(name, TOKU_ENV) == 0) ? "global" : "field";
 }
 
@@ -430,33 +451,40 @@ static const char *isEnv(const Proto *p, int pc, int t, int isup) {
 */
 static const char *getobjname(const Proto *p, int lastpc, int sp,
                               const char **name) {
-    //printf("%s lastpc=%d sp=%d\n", __func__, lastpc, sp);
+    trace_se("%s lastpc=%d sp=%d\n", __func__, lastpc, sp);
     const char *kind = basicgetobjname(p, &lastpc, sp, name);
     if (kind != NULL)
         return kind;
     else if (lastpc != -1) { /* could find instruction? */
         Instruction *i = &p->code[lastpc];
-        //printf(">>> %s at pc %d modified stack slot %d <<<\n", getopName(*i), lastpc, sp);
+        trace_se("! %s at pc %d modified stack slot %d !\n",
+                  getopName(*i), lastpc, sp);
         switch (*i) {
-            case OP_GETPROPERTY: case OP_GETINDEXSTR:
+            case OP_GETPROPERTY: case OP_GETINDEXSTR: {
                 kname(p, GET_ARG_L(i, 0), name);
                 return isEnv(p, lastpc, sp, 0);
-            case OP_GETINDEX:
-                sname(p, lastpc, sp, name); /* key */
+            }
+            case OP_GETINDEX: {
+                stkname(p, lastpc, sp, name); /* key */
                 return isEnv(p, lastpc, sp-1, 0);
-            case OP_GETINDEXINT: case OP_GETINDEXINTL:
+            }
+            case OP_GETINDEXINT: case OP_GETINDEXINTL: {
                 *name = "integer index"; /* key */
                 return "field";
-            case OP_GETSUP:
+            }
+            case OP_GETSUP: {
                 kname(p, GET_ARG_L(i, 0), name); /* key */
                 return "superclass field";
-            case OP_GETSUPIDX:
-                sname(p, lastpc, sp-1, name); /* key */
+            }
+            case OP_GETSUPIDX: {
+                stkname(p, lastpc, sp-1, name); /* key */
                 return "superclass field";
+            }
             default: break; /* go through to return NULL */
         }
     }
-    //printf("Could not find reasonable name (lastpc=%d, sp=%d)\n", lastpc, sp);
+    trace_se("Could not find a reasonable name (lastpc=%d, sp=%d)\n",
+              lastpc, sp);
     return NULL; /* could not find reasonable name */
 }
 
@@ -519,7 +547,7 @@ static const char *funcnamefromcall(toku_State *T, CallFrame *cf,
 
 
 static const char *getfuncname(toku_State *T, CallFrame *cf, const char **name) {
-    if (cf != NULL)
+    if (cf != NULL) /* function is active (running)? */
         return funcnamefromcall(T, cf->prev, name);
     else
         return NULL;
@@ -550,11 +578,11 @@ static int auxgetinfo(toku_State *T, const char *options, Closure *cl,
                 ar->currline = (cf && isTokudae(cf)) ? getcurrentline(cf) : -1;
                 break;
             case 'u':
-                ar->nupvals = (cl ? cl->c.nupvals : 0);
+                ar->nupvals = (cl == NULL) ? 0 : cl->c.nupvals;
                 if (TokudaeClosure(cl)) {
                     ar->nparams = cl->t.p->arity;
                     ar->isvararg = cl->t.p->isvararg;
-                } else {
+                } else { /* otherwise C function/closure */
                     ar->nparams = 0;
                     ar->isvararg = 1;
                 }
@@ -597,19 +625,20 @@ static void collectvalidlines(toku_State *T, Closure *f) {
         Table *t = tokuH_new(T); /* new table to store active lines */
         settval2s(T, T->sp.p, t); /* push it on stack */
         api_inctop(T);
-        toku_assert(p->lineinfo != NULL); /* must have debug information */
-        setbtval(&v); /* bool 'true' to be the value of all indices */
-        if (!p->isvararg) /* regular function? */
-            i = 0; /* consider all instructions */
-        else { /* vararg function */
-            toku_assert(p->code[0] == OP_VARARGPREP);
-            currline = nextline(p, currline, 0);
-            i = getopSize(OP_VARARGPREP); /* skip first instruction */
-        }
-        while (i < p->sizelineinfo) { /* for each instruction */
-            currline = nextline(p, currline, i); /* get its line */
-            tokuH_setint(T, t, currline, &v); /* table[line] = true */
-            i += getopSize(p->code[i]); /* get next instruction */
+        if (p->lineinfo != NULL) { /* have debug information? */
+            setbtval(&v); /* bool 'true' to be the value of all indices */
+            if (!p->isvararg) /* regular function? */
+                i = 0; /* consider all instructions */
+            else { /* vararg function */
+                toku_assert(p->code[0] == OP_VARARGPREP);
+                currline = nextline(p, currline, 0);
+                i = getopSize(OP_VARARGPREP); /* skip first instruction */
+            }
+            while (i < p->sizelineinfo) { /* for each instruction */
+                currline = nextline(p, currline, i); /* get its line */
+                tokuH_setint(T, t, currline, &v); /* table[line] = true */
+                i += getopSize(p->code[i]); /* get next instruction */
+            }
         }
     }
 }
@@ -705,15 +734,14 @@ TOKU_API int toku_gethookcount(toku_State *T) {
 
 /* add usual debug information to 'msg' (source id and line) */
 const char *tokuD_addinfo(toku_State *T, const char *msg, OString *src,
-                        int line) {
-    char buffer[TOKU_IDSIZE];
-    if (src)
-        tokuS_chunkid(buffer, getstr(src), getstrlen(src));
+                                         int line) {
+    if (src == NULL) /* no debug information? */
+        return tokuS_pushfstring(T, "?:?: %s", msg);
     else {
-        buffer[0] = '?';
-        buffer[1] = '\0';
+        char buff[TOKU_IDSIZE];
+        tokuS_chunkid(buff, getstr(src), getstrlen(src));
+        return tokuS_pushfstring(T, "%s:%d: %s", buff, line, msg);
     }
-    return tokuS_pushfstring(T, "%s:%d: %s", buffer, line, msg);
 }
 
 
@@ -802,7 +830,7 @@ static const char *varinfo(toku_State *T, const TValue *o) {
     const char *name = NULL;  /* to avoid warnings */
     const char *kind = NULL;
     if (isTokudae(cf)) {
-        kind = getupvalname(cf, o, &name); /* check whether 'o' is an upvalue */
+        kind = getupvalname(cf, o, &name);
         if (!kind) { /* not an upvalue? */
             int sp = instack(cf, o); /* try a stack slot */
             if (sp >= 0) /* found? */
@@ -960,10 +988,10 @@ t_noret tokuD_unknownlf(toku_State *T, const TValue *field) {
 ** so it goes directly to 'tokuD_getfuncline'.
 */
 static int changedline(const Proto *p, int oldpc, int newpc) {
-    toku_assert(p->lineinfo != NULL);
-    toku_assert(oldpc < newpc);
+    if (p->lineinfo == NULL) /* no debug information? */
+        return 0;
     /* instructions are not too far apart? */
-    if (Ninstuptopc(p, newpc) - Ninstuptopc(p, oldpc) < MAXIWTHABS / 2) {
+    if (ninst(p, newpc) - ninst(p, oldpc) < MAXIWTHABS / 2) {
         int delta = 0; /* line difference */
         int pc = oldpc;
         for (;;) {

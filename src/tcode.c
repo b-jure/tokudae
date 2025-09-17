@@ -40,23 +40,16 @@
 
 /*
 ** Max(Min)imum possible values for immediate operand.
-** Maximum limit is a value smaller by one "bit" than 'MAX_ARG_*',
+** Maximum limit is a value smaller by one power of two than 'MAX_ARG_*',
 ** in order to ensure that the most significant bit is never set.
 ** This is because immediate operands can be negative values
-** and we must be able to code them into the array and later decode them.
-** For example, 8-bit (char) pattern '1111_1111' encodes value -1, first we
-** take absolute value '0000_0001', then we set the most significant
-** bit '1000_0001', finally we code that result into the array.
-** When decoding, presence of most significant bit is checked, if present,
-** first do '1000_0001 & 0111_1111', then convert to signed
-** '(char)(~0000_0001 + 1)'.
-** Note: all of this is done on integers, so the exact bit operations
-** differ from the ones shown here.
+** and we must be able to code them into the bytecode array and
+** later decode them.
 */
-#define MIN_IMM         (MIN_ARG_S>>1)
-#define MAX_IMM         (MAX_ARG_S>>1)
-#define MIN_IMML        (MIN_ARG_L>>1)
-#define MAX_IMML        (MAX_ARG_L>>1)
+#define MAX_IMM         (MAX_ARG_S >> 1)
+#define MIN_IMM         (-MAX_IMM)
+#define MAX_IMML        (MAX_ARG_L >> 1)
+#define MIN_IMML        (-MAX_IMML)
 
 /*
 ** Check if value is in range of short/long immediate operand.
@@ -216,8 +209,8 @@ TOKUI_DEF const char *tokuC_opname[NUM_OPCODES] = { /* "ORDER OP" */
 ** (assuming two's complement).
 */
 static t_uint t_abs(int v) {
-    int const mask = v >> (sizeof(int)*CHAR_BIT - 1);
-    return cast_uint((v+mask)^mask);
+    int const mask = v >> (t_nbits(int) - 1);
+    return cast_uint((v + mask) ^ mask);
 }
 
 
@@ -456,9 +449,9 @@ static int addK(FunctionState *fs, Proto *p, TValue *v) {
 ** keys), the caller must provide a useful 'key' for indexing the cache.
 */
 static int k2proto(FunctionState *fs, TValue *key, TValue *value) {
-    Proto *p = fs->p;
     TValue val;
     t_ubyte tag = tokuH_get(fs->kcache, key, &val); /* query scanner table */
+    Proto *p = fs->p;
     int k;
     if (!tagisempty(tag)) { /* is there an index? */
         k = cast_int(ival(&val));
@@ -775,7 +768,7 @@ static int codeK(FunctionState *fs, int idx) {
 ** from 32nd bit to the 8th bit.
 */
 static int imms(int imm) {
-    t_uint x = check_exp(imm < 0 && MIN_ARG_S <= imm, t_abs(imm));
+    t_uint x = check_exp(imm < 0, t_abs(imm));
     toku_assert(!(x & 0x80)); /* 8th bit must be free */
     return cast_int(x|0x80); /* set 8th bit */
 }
@@ -786,7 +779,7 @@ static int imms(int imm) {
 ** from 32nd bit to the 24th bit.
 */
 static int imml(int imm) {
-    t_uint x = check_exp(imm < 0 && MIN_ARG_L <= imm, t_abs(imm));
+    t_uint x = check_exp(imm < 0, t_abs(imm));
     toku_assert(!(x & 0x800000)); /* 24th bit must be free */
     return cast_int(x|0x800000); /* set 24th bit */
 }

@@ -25,14 +25,14 @@
 
 #define currIsNewline(lx)       ((lx)->c == '\r' || (lx)->c == '\n')
 
-#define currIsEnd(lx)           ((lx)->c == TOKUEOF)
+#define currIsEnd(lx)           ((lx)->c == TEOF)
 
 
 /* fetch the next character and store it as current char */
-#define advance(lx)     ((lx)->c = brgetc((lx)->br))
+#define advance(lx)     ((lx)->c = zgetc((lx)->Z))
 
 /* save current character into lexer buffer */
-#define save(lx)    savec(lx, (lx)->c)
+#define save(lx)        savec(lx, (lx)->c)
 
 /* save the current character into lexer buffer and advance */
 #define save_and_advance(lx)    (save(lx), advance(lx))
@@ -58,18 +58,19 @@ typedef enum DigType {
 } DigType;
 
 
-void tokuY_setinput(toku_State *T, Lexer *lx, BuffReader *br, OString *source) {
-    toku_assert(lx->ps != NULL);
-    lx->c = brgetc(br); /* fetch first char */
+void tokuY_setinput(toku_State *T, Lexer *lx, BuffReader *Z, OString *source,
+                    int firstchar) {
+    toku_assert(lx->dyd && lx->buff);
+    lx->c = firstchar;
     lx->line = 1;
     lx->lastline = 1;
     lx->T = T;
-    lx->fs = NULL;
     lx->tahead.tk = TK_EOS; /* no lookahead token */
-    lx->br = br;
+    lx->Z = Z;
     lx->src = source;
     lx->envn = tokuS_newlit(T, TOKU_ENV);
     tokuR_buffresize(T, lx->buff, TOKUI_MINBUFFER);
+    /* all the other fields should be zeroed out by this point */
 }
 
 
@@ -218,7 +219,7 @@ static void read_comment(Lexer *lx) {
 static void read_longcomment(Lexer *lx) {
     for (;;) {
         switch (lx->c) {
-            case TOKUEOF: return;
+            case TEOF: return;
             case '\r': case '\n':
                 inclinenr(lx); break;
             case '*':
@@ -239,7 +240,7 @@ static void read_longcomment(Lexer *lx) {
 
 static void checkcond(Lexer *lx, int cond, const char *msg) {
     if (t_unlikely(!cond)) { /* condition fails? */
-        if (lx->c != TOKUEOF) /* not end-of-file? */
+        if (lx->c != TEOF) /* not end-of-file? */
             save_and_advance(lx); /* add current char to buffer for err msg */
         lexerror(lx, msg, TK_STRING); /* invoke syntax error */
     }
@@ -395,7 +396,7 @@ static void read_long_string(Lexer *lx, Literal *k, size_t sep) {
         inclinenr(lx); /* skip it */
     for (;;) {
         switch (lx->c) {
-            case TOKUEOF: { /* error */
+            case TEOF: { /* error */
                 const char *msg = tokuS_pushfstring(lx->T,
                     "unterminated long string (starting at line %d)", line);
                 lexerror(lx, msg, TK_EOS);
@@ -425,7 +426,7 @@ static void read_string(Lexer *lx, Literal *k) {
     save_and_advance(lx); /* skip '"' */
     while (lx->c != '"') {
         switch (lx->c) {
-            case TOKUEOF: /* end of file */
+            case TEOF: /* end of file */
                 lexerror(lx, "unterminated string", TK_EOS);
                 break; /* to avoid warnings */
             case '\r': case '\n': /* newline */
@@ -453,7 +454,7 @@ static void read_string(Lexer *lx, Literal *k) {
                         c = lx->c;
                         goto read_save;
                     }
-                    case TOKUEOF: goto no_save; /* raise err on next iteration */
+                    case TEOF: goto no_save; /* raise err on next iteration */
                     default: {
                         checkcond(lx, tisdigit(lx->c), "invalid escape sequence");
                         c = read_decesc(lx); /* '\ddd' */
@@ -489,7 +490,7 @@ static int read_char(Lexer *lx, Literal *k) {
     save_and_advance(lx); /* skip ' */
 repeat:
     switch (lx->c) {
-        case TOKUEOF:
+        case TEOF:
             lexerror(lx, "unterminated character constant", TK_EOS);
             break; /* to avoid warnings */
         case '\r': case '\n':
@@ -508,7 +509,7 @@ repeat:
                 case 'x': c = read_hexesc(lx); break;
                 case '\"': case '\'': case '\\':
                     c = lx->c; break;
-                case TOKUEOF: goto repeat;
+                case TEOF: goto repeat;
                 default: { /* error */
                     checkcond(lx, tisdigit(lx->c), "invalid escape sequence");
                     c = read_decesc(lx); /* '\ddd' */
@@ -798,7 +799,7 @@ static int scan(Lexer *lx, Literal *k) {
                     return '.';
                 else
                     return read_decnum(lx, k, '.');
-            case TOKUEOF:
+            case TEOF:
                 return TK_EOS;
             default: {
                 if (!tisalpha(lx->c) && lx->c != '_') {

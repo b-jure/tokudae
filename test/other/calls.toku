@@ -286,7 +286,7 @@ local fn equallst(l1, l2) {
       assert(l1[i] == l2[i]);
 }
 
-local pack = fn(...) { return ([...]); };
+local pack = |...| :: { return [...] };
 
 f = fn() { return 1,2,30,4; };
 local fn ret2(a,b) { return a,b; }
@@ -322,7 +322,7 @@ local fn read1(x) {
     local i = -1;
     return fn() {
         gc();
-        i=i+1;
+        i++;
         return string.substr(x, i, i);
     };
 }
@@ -331,7 +331,7 @@ local fn cannotload(msg, a,b) {
     assert(!a and string.find(b, msg));
 }
 
-a = assert(load(read1(x), "modname", __G));
+a = assert(load(read1(x), "modname", "t", __G));
 assert(a() == "\0" and __G.x == 33);
 
 a = assert(load(fn() { return nil; }));
@@ -341,19 +341,16 @@ assert(!load(fn() { return true; }));
 
 
 {
-    local a = [nil, "return ", "3;"];
-    f, msg = load(fn() {
-            local res = a[0];
-            foreach i in range(0, len(a))
-            a[i] = a[i+1];
-            return res;
-            });
+    local l = [nil, "return ", "3;"];
+    local f, msg = load(|| :: return list.remove(l, 0));
     assert(f() == nil); /// should read the empty chunk
 }
 
 
-{
-    local f = "return \"01234567890123456789012345678901234567890123456789\";";
+{ /// loading a binary long string interrupted by GC cycles
+    local f = string.dump(|| {
+        return "01234567890123456789012345678901234567890123456789"
+    });
     f = load(read1(f));
     assert(f() == "01234567890123456789012345678901234567890123456789");
 }
@@ -363,25 +360,25 @@ cannotload("unexpected symbol", load(read1("*a = 123")));
 cannotload("unexpected symbol", load("*a = 123"));
 cannotload("hhi", load(fn() { error("hhi"); }));
 
+
 { /// any value is valid for __ENV
-    assert(load("return __ENV;", nil, 123)() == 123);
+    assert(load("return __ENV;", nil, nil, 123)() == 123);
 }
 
 
 { /// load when __ENV is not first upvalue
-    local h = [=[
-        local x; XX = 123;
-        return fn() {
-            local y=x; /// use 'x', so that it becomes 1st upvalue
-            return XX; /// global name
-        };
-    ]=];
-    x = load(h, "")();
+    local x;
+    XX = 123;
+    local fn h() {
+        local y=x; /// use 'x', so that it becomes 1st upvalue
+        return XX; /// global name
+    };
+    local d = string.dump(h);
+    x = load(d, "", "b");
     assert(debug.getupvalue(x, 1) == "__ENV");
     debug.setupvalue(x, 1, __G);
     assert(x() == 123);
-
-    assert(assert(load("return XX + ...;", nil, {XX = 13}))(4) == 17);
+    assert(assert(load("return XX + ...;", nil, nil, {XX = 13}))(4) == 17);
     XX = nil;
 }
 
@@ -420,13 +417,134 @@ cannotload("hhi", load(fn() { error("hhi"); }));
 }
 
 
-/// test for bug in parameter adjustment
+{ /// test for dump/undump with upvalues
+    local a, b = 20, 30;
+    x = load(string.dump(|x| {
+        if x == "set" {
+            a = 10+b;
+            b++;
+        } else
+            return a;
+    }), "", "b", nil);
+    assert(x() == nil);
+    assert(debug.setupvalue(x, 0, "hi") == "a");
+    assert(x() == "hi");
+    assert(debug.setupvalue(x, 1, 13) == "b");
+    assert(!debug.setupvalue(x, 2, 10)); /// only 2 upvalues
+    x("set");
+    assert(x() == 23);
+    x("set");
+    assert(x() == 24);
+}
+
+
+{ /// test for dump/undump with many upvalues
+    local nup = 5000;
+    local prog = ["local a0"];
+    local i;
+    for (i = 1; i < nup; i++) prog[prog.len] = ", a" .. tostr(i);
+    prog[prog.len] = " = 0";
+    for (i = 1; i < nup; i++) prog[prog.len] = ", " .. tostr(i);
+    local sum = 0;
+    prog[prog.len] = "; return fn() { return a0";
+    for (i = 1; i < nup; i++) { prog[prog.len] = " + a" .. tostr(i); sum+=i; }
+    prog[prog.len] = " };";
+    prog = list.concat(prog);
+    local f = assert(load(prog))();
+    assert(f() == sum);
+
+    f = load(string.dump(f)); /// main chunk now has many upvalues
+    local a = 10;
+    local h = || { return a };
+    for (i = 0; i < nup; i++)
+        debug.upvaluejoin(f, i, h, 0);
+    assert(f() == 10 * nup);
+}
+
+
+{ /// test binary chunks
+    print("testing binary chunks");
+    local headformat = "c8BBc6BiBI1BjBn";
+    local header = [ /// header components
+        "\eTokudae",            # signature
+        0x10,                   # version 1.0 (0x10)
+        0,                      # format
+        "\x19\x93\r\n\x1a\n",   # a binary string
+        string.packsize("i"),   # size of an int
+        -69,                    # an int
+        1,                      # size of an instruction
+        0xf1,                   # an instruction (1 byte)
+        string.packsize("j"),   # size of a Tokudae integer
+        -69,                    # a Tokudae integer
+        string.packsize("n"),   # size of a Tokudae float
+        -69.5,                  # a Tokudae float
+    ];
+
+    local c = string.dump(fn() {
+        local a = 1; local b = 3;
+        local f = || { return a + b + __ENV.c }; /// upvalues
+        local s1 = "a constant";
+        local s2 = "another constant";
+        return a + b * 3;
+    });
+
+    assert(assert(load(c))() == 10);
+
+    /// check header
+    local l = [string.unpack(headformat, c)];
+    foreach i in range(header.len)
+        assert(l[i] == header[i]);
+
+    /// Testing corrupted header.
+    /// A single wrong byte in the head invalidates the chunk,
+    /// except for the Tokudae float check. (If numbers are long double,
+    /// the representation may need padding, and changing that padding
+    /// will not invalidate the chunk.)
+    local headlen = string.packsize(headformat);
+    headlen = headlen - string.packsize("n"); /// remove float check
+    for (local i = 0; i < headlen; i++) {
+        local s = (i > 0 and string.substr(c, 0, i - 1) or "") ..
+            string.char((string.byte(string.substr(c, i, i)) + 1) & 0xFF) ..
+            string.substr(c, i + 1, -1);
+        assert(len(s) == len(c) and s != c);
+        assert(!load(s));
+    }
+
+    /// loading truncated binary chunks
+    foreach i in range(len(c) - 1) {
+        local st, msg = load(string.substr(c, 0, i));
+        assert(!st and string.find(msg, "truncated"));
+    }
+}
+
+
+{ /// check reuse of strings in dumps
+    print("testing reuse of strings in dumps");
+    local str = "|" .. string.repeat("X", 50) .. "|";
+    local foo = load(string.fmt([=[
+        local str <final> = "%s";
+        return [
+            || :: return str,
+            || :: return str,
+            || :: return str
+        ];
+    ]=], str));
+    /// count occurrences of 'str' inside the dump
+    local dump = string.dump(foo);
+    local _, count = reg.gsub(dump, str, {});
+    /// there should be only two occurrences:
+    /// one inside the source, other the string itself.
+    assert(count == 2);
+}
+
+/// test parameter adjustment
 assert((fn() { return nil; })(4) == nil);
 assert((fn() { local a; return a; })(4) == nil);
 assert((fn(a) { return a; })() == nil);
 
 
 if __heavy { /// test stack/bytecode limit
+    print("testing stack/bytecode limit");
     local blim <final> = 16_777_215;
     local inuse = debug.stackinuse();
     if (debug.maxstack - inuse - 10 > blim) { /// test bytecode limit 

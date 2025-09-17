@@ -451,9 +451,9 @@ local fn showmem() {
 
 
 /* log functions */
-local fn loginfo(msg)  :: printf("[%]: %", YELLOW("INFO"), msg);
-local fn loginput(msg) :: printf("[%]: %", MAGENTA("INPUT"), msg);
-local fn logcmd(msg)   :: printf("[%]: %", RED("CMD"), msg);
+local fn loginfo(msg)  :: if isatty() stdout.write(fmt("[%s]: %s\n", YELLOW("INFO"), msg));
+local fn loginput(msg) :: if isatty() stdout.write(fmt("[%s]: %s\n", MAGENTA("INPUT"), msg));
+local fn logcmd(msg)   :: if isatty() stdout.write(fmt("[%s]: %s\n", RED("CMD"), msg));
 
 
 /* temporary output file */

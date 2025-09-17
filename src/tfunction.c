@@ -9,6 +9,8 @@
 
 #include "tokudaeprefix.h"
 
+#include <string.h>
+
 #include "tfunction.h"
 #include "tdebug.h"
 #include "tgc.h"
@@ -26,21 +28,7 @@
 Proto *tokuF_newproto(toku_State *T) {
     GCObject *o = tokuG_new(T, sizeof(Proto), TOKU_VPROTO); 
     Proto *p = gco2proto(o);
-    p->isvararg = 0;
-    p->gclist = NULL;
-    p->source = NULL;
-    { p->p = NULL; p->sizep = 0; } /* function prototypes */
-    { p->k = NULL; p->sizek = 0; } /* constants */
-    { p->code = NULL; p->sizecode = 0; } /* code */
-    { p->lineinfo = NULL; p->sizelineinfo = 0; } /* rel. line info */
-    { p->abslineinfo = NULL; p->sizeabslineinfo = 0; } /* abs. line info */
-    { p->instpc = NULL; p->sizeinstpc = 0; } /* instruction pc's */
-    { p->locals = NULL; p->sizelocals = 0; } /* locals */
-    { p->upvals = NULL; p->sizeupvals = 0; } /* upvalues */
-    p->maxstack = 0;
-    p->arity = 0;
-    p->defline = 0;
-    p->deflastline = 0;
+    objzero(p, sizeof(*p));
     return p;
 }
 

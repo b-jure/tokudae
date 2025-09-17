@@ -356,12 +356,16 @@ static int b_gc(toku_State *T) {
 }
 
 
+/* default mode for 'load' and 'loadfile' is "bt" (binary/text) */
+#define getmode(T,idx)      tokuL_opt_string(T, idx, "bt")
+
+
 /*
 ** Reserved slot, above all arguments, to hold a copy of the returned
-** string to avoid it being collected while parsed. 'load' has 3
-** optional arguments (chunk, chunkname and environment).
+** string to avoid it being collected while parsed. 'load' has 4
+** optional arguments (chunk, chunkname, mode and environment).
 */
-#define RESERVEDSLOT    3
+#define RESERVEDSLOT    4
 
 
 static const char *genericreader(toku_State *T, void *ud, size_t *sz) {
@@ -387,7 +391,7 @@ static int auxload(toku_State *T, int status, int envidx) {
             if (!toku_setupvalue(T, -2, 0)) /* set it as 1st upvalue */
                 toku_pop(T, 1); /* remove 'env' if not used by previous call */
         }
-        return 1; /* compiled function */
+        return 1; /* return function */
     } else { /* error (message is on top of the stack) */
         tokuL_push_fail(T); /* push fail */
         toku_insert(T, -2); /* and put it before error message */
@@ -400,15 +404,16 @@ static int b_load(toku_State *T) {
     int status;
     size_t l;
     const char *s = toku_to_lstring(T, 0, &l);
-    int env = (!toku_is_none(T, 2) ? 2 : 0);
+    const char *mode = getmode(T, 2);
+    int env = (!toku_is_none(T, 3) ? 3 : 0);
     if (s != NULL) { /* loading a string? */
         const char *chunkname = tokuL_opt_string(T, 1, s);
-        status = tokuL_loadbuffer(T, s, l, chunkname);
+        status = tokuL_loadbufferx(T, s, l, chunkname, mode);
     } else { /* loading from a reader function */
         const char *chunkname = tokuL_opt_string(T, 1, "=(load)");
         tokuL_check_type(T, 0, TOKU_T_FUNCTION); /* 'chunk' must be a function */
         toku_setntop(T, RESERVEDSLOT+1); /* create reserved slot */
-        status = toku_load(T, genericreader, NULL, chunkname);
+        status = toku_load(T, genericreader, NULL, chunkname, mode);
     }
     return auxload(T, status, env);
 }
@@ -416,8 +421,9 @@ static int b_load(toku_State *T) {
 
 static int b_loadfile(toku_State *T) {
     const char *filename = tokuL_opt_string(T, 0, NULL);
-    int env = (!toku_is_none(T, 1) ? 1 : 0);
-    int status = tokuL_loadfile(T, filename);
+    const char *mode = getmode(T, 1);
+    int env = (!toku_is_none(T, 2) ? 2 : 0);
+    int status = tokuL_loadfilex(T, filename, mode);
     return auxload(T, status, env);
 }
 

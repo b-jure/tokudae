@@ -318,22 +318,22 @@ TOKULIB_API const char *tokuL_opt_lstring(toku_State *T, int idx,
 
 typedef struct LoadFile {
     int n; /* number of pre-read characters */
-    FILE *fp; /* file being read */
-    char buffer[BUFSIZ];
+    FILE *f; /* file being read */
+    char buff[BUFSIZ];
 } LoadFile;
 
 
 static const char *filereader(toku_State *T, void *data, size_t *szread) {
-    LoadFile *fr = (LoadFile *)data;
+    LoadFile *lf = cast(LoadFile *, data);
     UNUSED(T); /* unused */
-    if (fr->n > 0) { /* have pre-read characters ? */
-        *szread = cast_uint(fr->n);
-        fr->n = 0;
+    if (lf->n > 0) { /* have pre-read characters ? */
+        *szread = cast_uint(lf->n);
+        lf->n = 0;
     } else { /* read from a file */
-        if (feof(fr->fp)) return NULL;
-        *szread = fread(fr->buffer, 1, sizeof(fr->buffer), fr->fp);
+        if (feof(lf->f)) return NULL;
+        *szread = fread(lf->buff, 1, sizeof(lf->buff), lf->f);
     }
-    return fr->buffer;
+    return lf->buff;
 }
 
 
@@ -349,13 +349,14 @@ static int errorfile(toku_State *T, const char *what, int fidx) {
 }
 
 
-TOKULIB_API int tokuL_loadfile(toku_State *T, const char *fname) {
+TOKULIB_API int tokuL_loadfilex(toku_State *T, const char *fname,
+                                               const char *mode) {
     LoadFile lf = {0};
-    int status, readstatus;
     int filename_index = toku_getntop(T);
+    int status, readstatus, c;
     if (fname == NULL) { /* stdin? */
         toku_push_string(T, "=stdin");
-        lf.fp = stdin;
+        lf.f = stdin;
     } else { /* otherwise real file */
         int stat;
         const char *msg = NULL;
@@ -368,15 +369,26 @@ TOKULIB_API int tokuL_loadfile(toku_State *T, const char *fname) {
             return TOKU_STATUS_EFILE;
         } else {
             errno = 0;
-            lf.fp = fopen(fname, "r");
-            if (lf.fp == NULL)
+            lf.f = fopen(fname, "r");
+            if (lf.f == NULL)
                 return errorfile(T, "open", filename_index);
         }
     }
-    status = toku_load(T, filereader, &lf, toku_to_string(T, -1));
-    readstatus = ferror(lf.fp);
+    c = getc(lf.f); /* read first char */
+    if (c == TOKU_SIGNATURE[0] && fname) { /* binary file? */
+        errno = 0;
+        lf.f = freopen(fname, "rb", lf.f); /* reopen in binary mode */
+        if (lf.f == NULL)
+            return errorfile(T, "reopen", filename_index);
+        getc(lf.f); /* read again TOKU_SIGNATURE[0] byte */
+    }
+    if (c != EOF)
+        lf.buff[lf.n++] = cast_char(c); /* 'c' is the first character */
+    status = toku_load(T, filereader, &lf, toku_to_string(T, -1), mode);
+    readstatus = ferror(lf.f);
+    errno = 0;
     if (fname) /* real file ? */
-        fclose(lf.fp); /* close it */
+        fclose(lf.f); /* close it */
     if (readstatus) { /* error while reading */
         toku_setntop(T, filename_index); /* remove any results */
         return errorfile(T, "read", filename_index);
@@ -393,7 +405,7 @@ typedef struct LoadString {
 
 
 static const char *stringreader(toku_State *T, void *data, size_t *szread) {
-    LoadString *ls = (LoadString *)data;
+    LoadString *ls = cast(LoadString *, data);
     UNUSED(T); /* unused */
     if (ls->sz == 0) return NULL;
     *szread = ls->sz;
@@ -407,12 +419,12 @@ TOKULIB_API int tokuL_loadstring(toku_State *T, const char *s) {
 }
 
 
-TOKULIB_API int tokuL_loadbuffer(toku_State *T, const char *buff, size_t sz,
-                                 const char *name) {
+TOKULIB_API int tokuL_loadbufferx(toku_State *T, const char *buff, size_t sz,
+                                  const char *name, const char *mode) {
     LoadString ls;
     ls.sz = sz;
     ls.str = buff;
-    return toku_load(T, stringreader, &ls, name);
+    return toku_load(T, stringreader, &ls, name, mode);
 }
 
 /* }======================================================================= */
@@ -549,8 +561,7 @@ TOKULIB_API int tokuL_execresult(toku_State *T, int stat) {
 ** Miscellaneous functions
 ** ======================================================================== */
 
-TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int idx,
-                                                        size_t *plen) {
+TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int idx, size_t *pl) {
     idx = toku_absindex(T, idx);
     if (tokuL_callmeta(T, idx, "__tostring")) {
         if (!toku_is_string(T, -1))
@@ -589,7 +600,7 @@ TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int idx,
             }
         }
     }
-    return toku_to_lstring(T, -1, plen);
+    return toku_to_lstring(T, -1, pl);
 }
 
 

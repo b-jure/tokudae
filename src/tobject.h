@@ -168,6 +168,12 @@ typedef struct GCObject {
 } GCObject;
 
 
+#define HEADEROFFSET    (offsetof(GCObject, mark) + sizeof(t_ubyte))
+
+#define objzero(o,sz) \
+        memset(cast_charp(o) + HEADEROFFSET, 0, sz - HEADEROFFSET)
+
+
 /* bit for collectable types */
 #define BIT_COLLECTABLE     (1 << 7)
 
@@ -449,9 +455,9 @@ typedef struct OString {
 ** Get string bytes from 'OString'. (Both generic version and specialized
 ** versions for long and short strings.)
 */
-#define getstr(os)       ((os)->bytes)
-#define getlngstr(os)    check_exp((os)->shrlen == 0xFF, (os)->bytes)
-#define getshrstr(os)    check_exp((os)->shrlen != 0xFF, (os)->bytes)
+#define getstr(os)      ((os)->bytes)
+#define getlngstr(os)   check_exp((os)->shrlen == 0xFF, (os)->bytes)
+#define getshrstr(os)   check_exp((os)->shrlen != 0xFF, (os)->bytes)
 
 /* get string length from 'OString *s' */
 #define getstrlen(s)    ((s)->shrlen != 0xFF ? (s)->shrlen : (s)->u.lnglen)
@@ -498,7 +504,7 @@ typedef struct OClass {
 ** Information of the upvalues for function prototypes
 */
 typedef struct UpValInfo {
-    OString *name; /* upvalue name */
+    OString *name; /* upvalue name (debug) */
     int idx; /* index in stack or outer function local var list */
     t_ubyte onstack; /* is it on stack */
     t_ubyte kind;
@@ -538,27 +544,29 @@ typedef struct AbsLineInfo {
 typedef struct Proto {
     ObjectHeader;
     t_ubyte isvararg;       /* true if this function accepts extra params */
+    int defline;            /* function definition line (debug) */
+    int deflastline;        /* function definition last line (debug) */
     int arity;              /* number of fixed (named) function parameters */
     int maxstack;           /* max stack size for this function */
-    int sizep;              /* size of 'p' */
-    int sizek;              /* size of 'k' */
     int sizecode;           /* size of 'code' */
+    int sizek;              /* size of 'k' */
     int sizeupvals;         /* size of 'upvals' */
+    int sizep;              /* size of 'p' */
     int sizelineinfo;       /* size of 'lineinfo' */
     int sizeabslineinfo;    /* size of 'abslineinfo' */
     int sizeinstpc;         /* size of 'instpc' */
     int sizelocals;         /* size of 'locals' */
-    int defline;            /* function definition line (debug) */
-    int deflastline;        /* function definition last line (debug) */
-    struct Proto **p;       /* list of funcs defined inside of this function */
-    TValue *k;              /* constant values */
     Instruction *code;      /* bytecode */
+    TValue *k;              /* constant values */
     UpValInfo *upvals;      /* debug information for upvalues */
-    t_byte *lineinfo;       /* information about source lines (debug) */
-    AbsLineInfo *abslineinfo; /* idem */
-    int *instpc;            /* list of pc's for each instruction (debug) */
-    LVarInfo *locals;       /* information about local variables (debug) */
-    OString *source;        /* source name (debug information) */
+    struct Proto **p;       /* list of funcs defined inside of this function */
+    /* debug information (can be stripped away when dumping) */
+    OString *source;            /* source name */
+    t_byte *lineinfo;           /* information about source lines */
+    AbsLineInfo *abslineinfo;   /* idem */
+    int *instpc;                /* list of pc's for each instruction */
+    LVarInfo *locals;           /* information about local variables */
+    /* (for garbage collector) */
     GCObject *gclist;
 } Proto;
 
@@ -837,7 +845,7 @@ typedef enum N2IMode {
 
 /* fast 'module' operation for hashing (sz is always power of 2) */
 #define tmod(h,sz) \
-        (check_exp(ispow2(sz), (cast_int((h) & ((sz)-1)))))
+        (check_exp(t_ispow2(sz), (cast_int((h) & ((sz)-1)))))
 
 
 TOKUI_FUNC int tokuO_ceillog2(t_uint x);

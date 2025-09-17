@@ -166,7 +166,7 @@ typedef struct GotoList {
 /*
 ** Dynamic data used by parser.
 */
-typedef struct ParserState {
+typedef struct DynData {
     struct { /* list of all active local variables */
         int len; /* number of locals in use */
         int size; /* size of 'arr' */
@@ -178,7 +178,7 @@ typedef struct ParserState {
         struct LiteralInfo *arr; /* array of switch constants */
     } literals;
     GotoList gt; /* idem */
-} ParserState;
+} DynData;
 
 
 struct LoopState; /* defined in tparser.c */
@@ -223,8 +223,8 @@ typedef struct FunctionState {
 TOKUI_FUNC t_noret tokuP_semerror(Lexer *lx, const char *err);
 TOKUI_FUNC void tokuP_checklimit(FunctionState *fs, int n,
                                  int limit, const char *what);
-TOKUI_FUNC TClosure *tokuP_parse(toku_State *T, BuffReader *br, Buffer *buff,
-                                 ParserState *ps, const char *source);
+TOKUI_FUNC TClosure *tokuP_parse(toku_State *T, BuffReader *Z, Buffer *buff,
+                                 DynData *dyd, const char *name, int firstchar);
 
 
 #endif

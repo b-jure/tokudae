@@ -59,6 +59,7 @@ TOKUI_FUNC int tokuPR_rawcall(toku_State *T, ProtectedFn fn, void *ud);
 TOKUI_FUNC int tokuPR_call(toku_State *T, ProtectedFn fn, void *ud, ptrdiff_t top,
                            ptrdiff_t errfunc);
 TOKUI_FUNC int tokuPR_close(toku_State *T, ptrdiff_t level, int status);
-TOKUI_FUNC int tokuPR_parse(toku_State *T, BuffReader *br, const char *name); 
+TOKUI_FUNC int tokuPR_parse(toku_State *T, BuffReader *Z, const char *name,
+                                                          const char *mode); 
 
 #endif

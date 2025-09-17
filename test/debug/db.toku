@@ -29,7 +29,6 @@ local Cprint = (__c and __c.print) or print;
     assert(!debug.getinfo(1000));  /// out of range level
     assert(!debug.getinfo(-1));    /// out of range level
     local a = debug.getinfo(Cprint);
-    print(a.what, a.shortsrc);
     assert(a.what == "C" and a.shortsrc == "[C]");
     a = debug.getinfo(Cprint, "L");
     assert(a.activelines == nil);
@@ -46,12 +45,17 @@ local Cprint = (__c and __c.print) or print;
 }
 
 
+{
+    local func = load(string.dump(load("print(10);"), true));
+    local actl = debug.getinfo(func, "L").activelines;
+    assert(len(actl) == 0); /// no line info
+}
+
 
 { /// test file and string names truncation
     local a = "fn f() {}";
     local fn dostring(s, x) { return load(s, x)(); }
     dostring(a);
-    print("----");
     assert(debug.getinfo(f).shortsrc == string.fmt("[string \"%s\"]", a));
     dostring(a..string.fmt("; %s\n=1;", string.repeat("p", 400)));
     assert(reg.find(debug.getinfo(f).shortsrc, "^%[string [^\n]*%.%.%.\"%]$"));
@@ -782,3 +786,92 @@ if !__opts or (__opts and __opts.run_isolated) {
             checkdeep(d, l);
 } else
     (Message or print)("skipped traceback size tests");
+
+
+{ /// tests for binary chunks
+    local prog = [=[/// program to be loaded without debug information (strip)
+        local debug = import("debug");
+        local a = 12; /// a local variable
+
+        local n, v = debug.getlocal(1, 1);
+        assert(n == "(temporary)" and v == debug); /// unknown name but known value
+        n, v = debug.getlocal(1, 2);
+        assert(n == "(temporary)" and v == 12); /// unknown name but known value
+
+        /// a function with an upvalue
+        local f = || { local x; return a; };
+        n, v = debug.getupvalue(f, 0);
+        assert(n == "(no name)" and v == 12);
+        assert(debug.setupvalue(f, 0, 13) == "(no name)");
+        assert(a == 13);
+
+        local t = debug.getinfo(f);
+        assert(t.name == nil and t.defline > 0 and
+               t.lastdefline == t.defline and
+               t.shortsrc == "?");
+        assert(debug.getinfo(1).currline == -1);
+
+        t = debug.getinfo(f, "L").activelines;
+        assert(nextfield(t) == nil); /// active lines are empty
+
+        /// dump/load a function without debug info
+        f = load(string.dump(f));
+
+        t = debug.getinfo(f);
+        assert(t.name == nil and t.defline > 0 and
+               t.lastdefline == t.defline and
+               t.shortsrc == "?");
+        assert(debug.getinfo(1).currline == -1);
+
+        return a;
+    ]=];
+
+
+    local f = load(prog); /// precompile 'prog'
+    f = string.dump(f, true); /// dump and strip debug info
+    f = assert(load(f)); /// load binary string
+    assert(f() == 13); /// call it
+
+    {
+        local fn foo() {
+            local a = 1;
+            local b = 2;
+            return b;
+        }
+
+        local s = load(string.dump(foo, true));
+        local line = true;
+        debug.sethook(fn (e, l) {
+            assert(e == "line");
+            line = l;
+        }, "l");
+        assert(s() == 2); debug.sethook(nil);
+        assert(line == nil); /// hook called without debug info for 1st instruction
+    }
+
+    {  /// tests for 'source' in binary dumps
+        local prog = [=[ return fn(x) { return fn(y) :: return x + y }; ]=];
+        local name = string.repeat("x", 1000);
+        local p = assert(load(prog, name));
+        /// load 'p' as a binary chunk with debug information
+        local c = string.dump(p);
+        assert(len(c) > 1000 and len(c) < 2000); /// no repetition of 'source' in dump
+        local f = assert(load(c));
+        local g = f();
+        local h = g(3);
+        assert(h(5) == 8);
+        assert(debug.getinfo(f).source == name and /// all functions have 'source'
+               debug.getinfo(g).source == name and 
+               debug.getinfo(h).source == name);
+        /// again, without debug info
+        c = string.dump(p, true);
+        assert(len(c) < 500); /// no 'source' in dump
+        f = assert(load(c));
+        g = f();
+        h = g(30);
+        assert(h(50) == 80);
+        assert(debug.getinfo(f).source == "=?" and /// no function has 'source'
+               debug.getinfo(g).source == "=?" and 
+               debug.getinfo(h).source == "=?");
+    }
+}

@@ -28,36 +28,34 @@
 #define SIZE_ARG_L          (sizeof(Instruction[3]))
 
 /* bit widths */
-#define WIDTH_INSTR         (SIZE_INSTR*CHAR_BIT)
-#define WIDTH_ARG_S         (SIZE_ARG_S*CHAR_BIT)
-#define WIDTH_ARG_L         (SIZE_ARG_L*CHAR_BIT)
+#define WIDTH_INSTR         t_nbits(Instruction)
+#define WIDTH_ARG_S         WIDTH_INSTR
+#define WIDTH_ARG_L         t_nbits(Instruction[3])
 
 /* limits */
-#define MAX_INSTR           ((1<<WIDTH_INSTR)-1)
-#define MIN_ARG_S           (-(1<<(WIDTH_ARG_S)))
-#define MAX_ARG_S           ((1<<WIDTH_ARG_S)-1)
-#define MIN_ARG_L           (-(1<<(WIDTH_ARG_L)))
-#define MAX_ARG_L           ((1<<WIDTH_ARG_L)-1)
+#define MAX_INSTR           ((1 << WIDTH_INSTR) - 1)
+#define MAX_ARG_S           ((1 << WIDTH_ARG_S) - 1)
+#define MAX_ARG_L           ((1 << WIDTH_ARG_L) - 1)
 #define MAX_CODE            MAX_ARG_L
 
 
 /* gets first arg pc */
-#define GET_ARG(ip)             ((ip)+SIZE_INSTR)
+#define GET_ARG(ip)             ((ip) + SIZE_INSTR)
 
 /* get short/long argument pc */
-#define GETPC_S(ip,o)           (GET_ARG(ip)+(cast_uint(o)*SIZE_ARG_S))
-#define GETPC_L(ip,o)           (GET_ARG(ip)+(cast_uint(o)*SIZE_ARG_L))
+#define GETPC_S(ip,o)           (GET_ARG(ip)+(cast_uint(o) * SIZE_ARG_S))
+#define GETPC_L(ip,o)           (GET_ARG(ip)+(cast_uint(o) * SIZE_ARG_L))
 
 
 /* get/set short parameter */
 #define GET_ARG_S(ip,o)         cast_ubyte(*GETPC_S(ip,o))
 #define SET_ARG_S(ip,o,v)       setbyte(GETPC_S(ip,0), o, v);
-#define SET_ARG_LLS(ip,v)       setbyte(GET_ARG(ip), 2u*SIZE_ARG_L, v)
+#define SET_ARG_LLS(ip,v)       setbyte(GET_ARG(ip), 2u * SIZE_ARG_L, v)
 
 
 /* get/set long arg */
-#define GET_ARG_L(ip,o)         get3bytes(GET_ARG(ip)+(cast_uint(o)*SIZE_ARG_L))
-#define SET_ARG_L(ip,o,v)       set3bytes(GETPC_L(ip,o), v)
+#define GET_ARG_L(ip,o)     get3bytes(GET_ARG(ip)+(cast_uint(o) * SIZE_ARG_L))
+#define SET_ARG_L(ip,o,v)   set3bytes(GETPC_L(ip,o), v)
 
 
 /*
@@ -156,7 +154,7 @@ OP_NEWCLASS,/*     S          'create and load new class of size 1<<(S-1)'  */
 OP_NEWTABLE,/*     S          'create and load new table of size 1<<(S-1)'  */
 OP_METHOD,/*       L V1 V2    'define method V2 for class V1 under key K{L}'*/
 OP_SETTM,/*        S V1 V2    'V1->metatable[g->tmnames[S]] = V2'           */
-OP_SETMT,/*     L V1 V2    'V1->metatable[K{L}] = V2'                    */
+OP_SETMT,/*        L V1 V2    'V1->metatable[K{L}] = V2'                    */
 
 OP_MBIN,/*         V1 V2 S    'V1 S V2'  (S is binop)                       */
 
