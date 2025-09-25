@@ -255,6 +255,7 @@ print("testing alignment");
     x = pack(">!4 c3 c4 c2 z i4 c5 c2 Xi4",
             "abc", "abcd", "xz", "hello", 5, "world", "xy");
     assert(x == "abcabcdxzhello\0\0\0\0\0\5worldxy\0");
+    local g;
     a, b, c, d, e, f, g, pos = unpack(">!4 c3 c4 c2 z i4 c5 c2 Xh Xi4", x);
     assert(a == "abc" and b == "abcd" and c == "xz" and d == "hello" and
             e == 5 and f == "world" and g == "xy" and pos % 4 == 0);

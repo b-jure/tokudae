@@ -1,15 +1,10 @@
 # Configuration file for building and installing Tokudae on mingw
-
-
 # {=========================================================================
 # 			    Version and release
 # ==========================================================================
 V = 1.0
 R = $(V).0
-# }=========================================================================
-
-
-# {=========================================================================
+# }{========================================================================
 # 				Paths & Installing
 # ==========================================================================
 # Your platform (see PLATFORMS for possible values).
@@ -29,63 +24,62 @@ INSTALL_CMOD = $(INSTALL_ROOT)/lib/tokudae/$(V)
 INSTALL = install -p
 INSTALL_EXEC = $(INSTALL) -m 0755
 INSTALL_DATA = $(INSTALL) -m 0644
-# }=========================================================================
-
-
-# {=========================================================================
+# }{========================================================================
 # 			Compiler and Linker Flags
 # ==========================================================================
-# Internal defines used for testing (all of these slow down operations a lot):
-# -DTOKUI_ASSERT => Enables all internal asserts inside Tokudae.
-# -DTOKUI_TRACE_EXEC => Traces bytecode execution (including stack state).
-# -DTOKUI_DISASSEMBLE_BYTECODE => Disassembles precompiled chunks.
-# -DTOKUI_EMERGENCYGCTESTS => Forces an emergency collection at every single
-# 			      allocation.
-# -DTOKUI_HARDMEMTESTS => Forces a full collection at all points where the
-# 			  collector can run.
-# -DTOKUI_HARDSTACKTESTS => forces a reallocation of the stack at every point
-# 			    where the stack can be reallocated.
-#
-# Recommended macro to define for debug builds
-# -TOKU_USE_APICHECK => enables asserts in the API (consistency checks)
-
-# handy when compiling with g++
+# Use gcc by default
 ifeq ($(strip $(CC)),)
 CC = gcc
-else ifeq ($(strip $(CC)),g++)
-CFLAGS = -Wno-missing-field-initializers -Wno-literal-suffix
 endif
 
-CFLAGS = -Wfatal-errors -Wall -Wextra -Werror -Wconversion $(SYSCFLAGS) $(MYCFLAGS)
-LDFLAGS = $(SYSLDFLAGS) $(MYLDFLAGS)
-LIBS = -lm $(SYSLIBS) $(MYLIBS)
+# Internal defines used for testing (all of these slow down operations a lot):
+# TOKUI_ASSERT => Enables all internal asserts inside Tokudae.
+# TOKUI_TRACE_EXEC => Traces bytecode execution (including stack state).
+# TOKUI_DISASSEMBLE_BYTECODE => Disassembles precompiled chunks.
+# TOKUI_EMERGENCYGCTESTS => Forces an emergency collection at every single
+#     		            allocation.
+# TOKUI_HARDMEMTESTS => Forces a full collection at all points where the
+#     		        collector can run.
+# TOKUI_HARDSTACKTESTS => forces a reallocation of the stack at every point
+# 			  where the stack can be reallocated.
+# Recommended macro to define for debug builds
+# TOKU_USE_APICHECK => enables asserts in the API (consistency checks)
 
-# system flags
+# Warning flags
+WARN = -Wfatal-errors -Wall -Wextra -Wconversion
+NOWARN = -Wno-char-subscripts
+ifeq ($(strip $(CC)),g++)
+NOWARN += -Wno-missing-field-initializers -Wno-literal-suffix
+endif
+WARNINGS = $(WARN) $(NOWARN)
+
+# System flags
 SYSCFLAGS = -DTOKU_BUILD_AS_DLL
 SYSLDFLAGS = -s
 SYSLIBS =
 
 # Release flags
-MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
-MYLDFLAGS =
-MYLIBS =
-MYOBJS =
-
-# Testing flags
-#ASANFLAGS = -fsanitize=address -fsanitize=undefined \
-# 	    -fsanitize=pointer-subtract -fsanitize=pointer-compare
-#MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
-#	   #-DTOKUI_DISASSEMBLE_BYTECODE -DTOKUI_TRACE_EXEC
-#MYLDFLAGS = $(ASANFLAGS)
+#MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
+#MYLDFLAGS =
 #MYLIBS =
 #MYOBJS =
 
+# Testing flags
+ASANFLAGS = -fsanitize=address -fsanitize=undefined \
+ 	    -fsanitize=pointer-subtract -fsanitize=pointer-compare
+MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
+MYLDFLAGS = $(ASANFLAGS)
+MYLIBS =
+MYOBJS =
+
 # Special flags for compiler modules; -Os reduces code size.
-CMCFLAGS= 
-# }=========================================================================
+CMCFLAGS = 
 
-
-# {=========================================================================
+# Final flags
+CFLAGS = $(WARNINGS) $(SYSCFLAGS) $(MYCFLAGS)
+LDFLAGS = $(SYSLDFLAGS) $(MYLDFLAGS)
+LIBS = -lm $(SYSLIBS) $(MYLIBS)
+# }{========================================================================
 # 			Archiver and Other Utilities
 # ==========================================================================
 ifeq ($(CC),g++)
@@ -98,10 +92,7 @@ RANLIB = strip --strip-unneeded
 RM = rm -f
 MKDIR = mkdir -p
 UNAME = uname
-# }=========================================================================
-
-
-# {=========================================================================
+# }{========================================================================
 # 			       Targets
 # ==========================================================================
 TOKUDAE_T = tokudae.exe

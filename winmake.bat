@@ -55,7 +55,7 @@ set CMCFLAGS=
 set CORE_O=src\tapi.obj src\tlist.obj src\tcode.obj src\tdebug.obj src\tfunction.obj
 set CORE_O=!CORE_O! src\tgc.obj src\ttable.obj src\tlexer.obj src\tmem.obj src\tmeta.obj
 set CORE_O=!CORE_O! src\tobject.obj src\tparser.obj src\tvm.obj src\tprotected.obj
-set CORE_O=!CORE_O! src\treader.obj src\tstate.obj src\tstring.obj src\ttrace.obj
+set CORE_O=!CORE_O! src\treader.obj src\tstate.obj src\tstring.obj src\ttrace.obj src\tmarshal.obj
 set LIB_O=src\tokudaeaux.obj src\tbaselib.obj src\tloadlib.obj src\tokudaelib.obj src\tstrlib.obj
 :: Standard library object files
 set LIB_O=!LIB_O! src\tmathlib.obj src\tiolib.obj src\toslib.obj src\treglib.obj src\tdblib.obj

@@ -1,5 +1,7 @@
 # Makefile for installing Tokudae
 
+PLATFORMS = guess posix linux linux-readline mingw generic 
+
 # Use one of these configurations (or add yours)
 include config_linux.mk
 #include config_mingw.mk
