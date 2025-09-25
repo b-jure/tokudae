@@ -301,7 +301,7 @@ int tokuZ_dump(toku_State *T, const Proto *f, toku_Writer writer, void *data,
                               int strip) {
     MarshalState M = {
         .T = T,
-        .u.d = { .writer = writer, .data = data, .strip = strip }
+        .u = {.d = { .writer = writer, .data = data, .strip = strip }}
     };
     M.h = tokuH_new(T); /* aux. table  to keep strings already dumped */
     settval2s(T, T->sp.p, M.h); /* anchor it */
@@ -615,7 +615,7 @@ static void load_function(MarshalState *M, Proto *f) {
 TClosure *tokuZ_undump(toku_State *T, BuffReader *Z, const char *name) {
     MarshalState M = {
         .T = T,
-        .u.l = { .Z = Z },
+        .u = {.l = { .Z = Z }},
         .offset = 1, /* first byte is already read */
     };
     TClosure *cl;

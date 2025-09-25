@@ -2,11 +2,7 @@
 # of the version being tested
 TOKU_DIR = ../../src
 
-ifeq ($(strip $(CC)),)
-CC = gcc
-else ifeq ($(strip $(CC)),cc)
-CC = gcc
-else ifeq ($(strip $(CC)),g++)
+ifeq ($(strip $(CC)),g++)
 CFLAGS = -Wno-missing-field-initializers -Wno-literal-suffix
 endif
 

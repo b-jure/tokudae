@@ -26,7 +26,8 @@ TO_BIN = $(TOKUDAE_T)
 TO_INC = src/tokudae.h src/tokudaeconf.h src/tokudaelib.h src/tokudaeaux.h src/tokudaelimits.h src/tokudae.hpp
 TO_LIB = $(TOKUDAE_A)
 TO_MAN = doc/tokudae.1
-TO_DOC = doc/manual.html doc/manual.css doc/contents.html doc/EBNF.txt
+TO_DOC = doc/manual.html doc/manual.css doc/contents.html doc/contents.css \
+	 doc/tokudae.css doc/EBNF.txt
 
 default: $(PLATFORM)
 

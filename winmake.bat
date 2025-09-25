@@ -75,7 +75,8 @@ set TO_BIN=!TOKUDAE_T!
 set TO_INC=src\tokudae.h src\tokudaeconf.h src\tokudaelib.h src\tokudaeaux.h
 set TO_INC=!TO_INC! src\tokudaelimits.h src\tokudae.hpp
 set TO_LIB=!TOKUDAE_A! !TOKUDAE_L! !TOKUDAE_E!
-set TO_DOC=doc\tokudae.1 doc\manual.html doc\manual.css doc\contents.html doc\EBNF.txt
+set TO_DOC=doc\tokudae.1 doc\manual.html doc\manual.css doc\contents.html
+set TO_DOC=!TO_DOC! doc\contents.css doc\tokudae.css doc\EBNF.txt
 
 :: }=== END OF CONFIGURATION ==={
 

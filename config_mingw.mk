@@ -19,6 +19,7 @@ INSTALL_LIB = $(INSTALL_ROOT)/lib
 INSTALL_MAN = $(INSTALL_ROOT)/man/man1
 INSTALL_TMOD = $(INSTALL_ROOT)/share/tokudae/$(V)
 INSTALL_CMOD = $(INSTALL_ROOT)/lib/tokudae/$(V)
+INSTALL_DOC = $(INSTALL_TMOD)/doc
 
 # Install tool
 INSTALL = install -p
@@ -64,11 +65,9 @@ SYSLIBS =
 #MYLIBS =
 #MYOBJS =
 
-# Testing flags
-ASANFLAGS = -fsanitize=address -fsanitize=undefined \
- 	    -fsanitize=pointer-subtract -fsanitize=pointer-compare
-MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
-MYLDFLAGS = $(ASANFLAGS)
+# Testing flags (mingw gcc does not support address sanitizer)
+MYCFLAGS = -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
+MYLDFLAGS =
 MYLIBS =
 MYOBJS =
 
@@ -82,12 +81,7 @@ LIBS = -lm $(SYSLIBS) $(MYLIBS)
 # }{========================================================================
 # 			Archiver and Other Utilities
 # ==========================================================================
-ifeq ($(CC),g++)
-AR = g++ -shared -o
-else
-AR = gcc -shared -o
-endif
-
+AR = $(CC) -shared -o
 RANLIB = strip --strip-unneeded
 RM = rm -f
 MKDIR = mkdir -p
