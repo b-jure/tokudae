@@ -60,16 +60,16 @@ SYSLDFLAGS = -s
 SYSLIBS =
 
 # Release flags
-#MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
-#MYLDFLAGS =
-#MYLIBS =
-#MYOBJS =
-
-# Testing flags (mingw gcc does not support address sanitizer)
-MYCFLAGS = -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
+MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
 MYLDFLAGS =
 MYLIBS =
 MYOBJS =
+
+# Testing flags (mingw gcc does not support address sanitizer)
+#MYCFLAGS = -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
+#MYLDFLAGS =
+#MYLIBS =
+#MYOBJS =
 
 # Special flags for compiler modules; -Os reduces code size.
 CMCFLAGS = 
