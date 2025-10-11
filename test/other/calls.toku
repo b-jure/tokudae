@@ -543,6 +543,13 @@ assert((fn() { local a; return a; })(4) == nil);
 assert((fn(a) { return a; })() == nil);
 
 
+{ /// function as function argument with 'return' as body
+    local fn a(x,y) :: assert(y == 5);
+    a(|| :: return, 5);
+    a = |x,y| { assert(x == 5); };
+    a(5, || return);
+}
+
 if __heavy { /// test stack/bytecode limit
     print("testing stack/bytecode limit");
     local blim <final> = 16_777_215;

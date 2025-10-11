@@ -1,4 +1,3 @@
-
 local class X {
     __init = |x| {
         self.x = x;
