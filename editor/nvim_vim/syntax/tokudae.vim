@@ -85,15 +85,15 @@ syn match tokudaeOctal /\<0\o[0-7_]*\>/ contains=tokudaeOctalZero
 syn match tokudaeOctalZero contained /\<0/
 
 " decimal floating point number, with dot, optional exponent
-syn match tokudaeFloat /\<\d[[:digit:]_]*\.\d*\%([eE][-+]\=\d[[:digit:]_]*\)\=\>/
+syn match tokudaeFloat /\<\d[[:digit:]_]*\.\d*\%([eE][-+]\?\d[[:digit:]_]*\)\?\>/
 " decimal floating point number, starting with a dot, optional exponent
-syn match tokudaeFloat /\.\d\+\%([eE][-+]\=\d[[:digit:]_]*\)\=\>/
+syn match tokudaeFloat /\.\d\+\%([eE][-+]\?\d[[:digit:]_]*\)\?\>/
 " decimal floating point number, without dot, with exponent
-syn match tokudaeFloat /\<\d[_0-9]*[eE][-+]\=\d[[:digit:]_]*\>/
+syn match tokudaeFloat /\<\d[[:digit:]_]*[eE][-+]\?\d[[:digit:]_]*\>/
 " hexadecimal foating point number, optional leading digits, with dot, with exponent
-syn match tokudaeFloat /\<0[xX]\x[[:xdigit:]_]*\.\x\+[pP][-+]\=\d[[:digit:]_]*\>/
+syn match tokudaeFloat /\<0[xX]\%(\x[[:xdigit:]_]*\)\?\.\x\+[pP][-+]\?\d[[:digit:]_]*\>/
 " hexadecimal floating point number, with leading digits, optional dot, with exponent
-syn match tokudaeFloat /\<0x\x[[:digit:]_]*\.\=[pP][-+]\=\d[[:digit:]_]*\>/
+syn match tokudaeFloat /\<0[xX]\x[[:xdigit:]_]*\.\?[pP][-+]\?\d[[:digit:]_]*\>/
 "-----------------}
 
 "-Keywords--------{

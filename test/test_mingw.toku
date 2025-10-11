@@ -1186,7 +1186,7 @@ local fn set_output_options() {
     }
     if !__opts.warnings { /* no warnings? */
         __c.warn = __G.warn;
-        __G.warn = fn(...) { return; };
+        __G.warn = |...| :: { return };
     }
 }
 

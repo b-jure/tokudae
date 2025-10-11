@@ -1,7 +1,7 @@
 assert(2**2 == 4);          # (folded)
 assert(2**3 == 8);          # (folded)
 assert(2**-3 == 0.125);     # (folded)
-local a = 2**2;                   # (folded)
+local a = 2**2;             # (folded)
 assert(a == 4);
 assert(a**2 == 16);         # (not folded)
 assert(2**a == 16);         # (not folded)

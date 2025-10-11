@@ -202,7 +202,6 @@ assert(x);
 __G.x = nil;
 
 
-
 { /// reuse of long strings
 
     /// get the address of a string

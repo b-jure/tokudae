@@ -216,7 +216,7 @@ static void read_comment(Lexer *lx) {
 
 
 /* read comment potentially spanning multiple lines */
-static void read_longcomment(Lexer *lx) {
+static void read_long_comment(Lexer *lx) {
     for (;;) {
         switch (lx->c) {
             case TEOF: return;
@@ -417,7 +417,7 @@ static void read_long_string(Lexer *lx, Literal *k, size_t sep) {
     }
 endloop:
     k->str = tokuY_newstring(lx, tokuR_buff(lx->buff) + sep,
-                               tokuR_bufflen(lx->buff) - 2 * sep);
+                                 tokuR_bufflen(lx->buff) - 2 * sep);
 }
 
 
@@ -726,7 +726,7 @@ static int scan(Lexer *lx, Literal *k) {
                     else
                         return TK_IDIV;
                 } else if (lxmatch(lx, '*'))
-                    read_longcomment(lx);
+                    read_long_comment(lx);
                 else 
                     return '/';
                 break;

@@ -66,7 +66,7 @@ MYLDFLAGS =
 MYLIBS =
 MYOBJS =
 
-# Testing flags
+## Testing flags
 #ASANFLAGS = -fsanitize=address -fsanitize=undefined \
 # 	    -fsanitize=pointer-subtract -fsanitize=pointer-compare
 #MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT

@@ -1018,7 +1018,10 @@ static const tokuL_Entry basic_funcs[] = {
     {"__POSIX", NULL},
     {"__WINDOWS", NULL},
     /* internal test flags table */
+#if (defined(TOKUI_EMERGENCYGCTESTS) || defined(TOKUI_HARDMEMTESTS) || \
+        defined(TOKUI_HARDSTACKTESTS))
     {"__TESTS", NULL},
+#endif
     {NULL, NULL},
 };
 

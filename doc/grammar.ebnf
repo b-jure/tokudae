@@ -59,31 +59,29 @@ switchbody ::= '{' {'case' exp ':' {stm}} ['default' ':' {stm}] '}'
 
 switchstm ::= 'switch' exp switchbody
 
-switchblock ::= {decl} [breakstm] | block
+blockstm ::= '{' loopblock '}'
 
 loopblock ::= {decl} [continuestm] | switchblock
 
-blockstm ::= '{' loopblock '}'
+switchblock ::= {decl} [breakstm] | block
 
 returnstm ::= 'return' [explist] [';']
 
 functiondef ::= 'fn' parenparams funcbody | pipeparams funcbody
 
-sep ::= ',' | ';'
+listdef ::= '[' [elementlist] ']'
 
 elementlist ::= exp {sep exp} [sep]
 
-listdef ::= '[' [elementlist] ']'
-
-field ::= '[' exp ']' '=' exp | Name '=' exp
+tabledef ::= '{' [fieldlist] '}'
 
 fieldlist ::= field {sep field} [sep]
 
-tabledef ::= '{' [fieldlist] '}'
+field ::= '[' exp ']' '=' exp | Name '=' exp
+
+sep ::= ',' | ';'
 
 pipeparams ::= '|' [parameters] '|'
-
-classbody ::= '{' {classvalue} '}'
 
 method ::= 'fn' Name parenparams funcbody
 
@@ -105,9 +103,9 @@ decl ::= localstm ';' | localfn | localclass | stm
 
 localstm ::= 'local' attnamelist ['=' explist]
 
-attnamelist ::= Name attrib {',' Name attrib}
+attnamelist ::= Name [attrib] {',' Name attrib}
 
-attrib ::= ['<' Name '>']
+attrib ::= '<' Name '>'
 
 localclass ::= 'local' 'class' Name [inherit] [classbodystm]
 

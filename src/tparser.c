@@ -1303,7 +1303,7 @@ static void decl_list(Lexer *lx, int blocktk) {
     while (!check(lx, TK_EOS) && !(blocktk && check(lx, blocktk))) {
         if (check(lx, TK_RETURN) || /* if return or... */
                 check(lx, TK_CONTINUE) || /* continue or... */
-                check(lx, TK_BREAK)) {  /* ...break? */
+                check(lx, TK_BREAK)) { /* ...break? */
             stm(lx); /* then it must be the last statement */
             return; /* done */
         } else /* otherwise it is a declaration */
@@ -2412,13 +2412,29 @@ static void breakstm(Lexer *lx) {
 }
 
 
+/*
+** Returns true if the current token is the beggining of a statement,
+** declaration or ending of a block ('}') or a file/stream (TK_EOS).
+*/
+static int decl_or_stm(Lexer *lx) {
+    switch (lx->t.tk) {
+        case TK_BREAK: case TK_CONTINUE: case TK_CASE: case TK_DEFAULT:
+        case TK_FOR: case TK_FOREACH: case TK_IF: case TK_ELSE:
+        case TK_SWITCH: case TK_WHILE: case TK_LOOP: case TK_LOCAL:
+        case TK_DO: case '}': case TK_EOS:
+            return 1;
+        default: return 0;
+    }
+}
+
+
 static void returnstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     int first = fs->sp;
     int nret = 0;
     ExpInfo e = INIT_EXP;
     tokuY_scan(lx); /* skip 'return' */
-    if (!check(lx, ';')) { /* have return values ? */
+    if (!decl_or_stm(lx) && !check(lx, ';')) { /* have return values ? */
         nret = explist(lx, &e); /* get return values */
         if (eismulret(&e)) { /* last expressions is a call or vararg? */
             tokuC_setmulret(fs, &e); /* returns all results (finalize it) */
