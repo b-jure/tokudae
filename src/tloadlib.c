@@ -16,6 +16,7 @@
 
 #include "tokudaeaux.h"
 #include "tokudaelib.h"
+#include "tokudaelimits.h"
 
 
 /* prefix for open functions in C libraries */

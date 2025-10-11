@@ -20,6 +20,7 @@
 
 #include "tokudaeaux.h"
 #include "tokudaelib.h"
+#include "tokudaelimits.h"
 
 
 
