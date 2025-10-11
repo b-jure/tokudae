@@ -13,21 +13,21 @@
 
 
 /* bit manipulation */
-#define resetbits(x,m)	        ((x) &= cast_ubyte(~(m)))
-#define setbits(x,m)		((x) |= (m))
-#define testbits(x,m)		((x) & (m))
-#define togglebits(x,m,t)	((x) ^ (((x) ^ -((t) != 0)) & (m)))
-#define bitmask(b)		(1 << (b))
-#define bit2mask(b1,b2)		(bitmask(b1) | bitmask(b2)) 
-#define resetbit(x,b)		resetbits(x, bitmask(b))
-#define setbit(x,b)		setbits(x, bitmask(b))
-#define clearbit(x,b)		resetbits(x, bitmask(b))
-#define testbit(x,b)		testbits(x, bitmask(b))
-#define togglebit(x,b,t)	togglebits(x, bitmask(b), t)
+#define resetbits(x,m)          ((x) &= cast_ubyte(~(m)))
+#define setbits(x,m)            ((x) |= (m))
+#define testbits(x,m)           ((x) & (m))
+#define togglebits(x,m,t)       ((x) ^ (((x) ^ -((t) != 0)) & (m)))
+#define bitmask(b)              (1 << (b))
+#define bit2mask(b1,b2)         (bitmask(b1) | bitmask(b2)) 
+#define resetbit(x,b)           resetbits(x, bitmask(b))
+#define setbit(x,b)             setbits(x, bitmask(b))
+#define clearbit(x,b)           resetbits(x, bitmask(b))
+#define testbit(x,b)            testbits(x, bitmask(b))
+#define togglebit(x,b,t)        togglebits(x, bitmask(b), t)
 
 
 /* get byte at offset 'o' from 'v' */
-#define getbyte(v,o)	    (((v) >> ((o) * 8)) & 0xFF)
+#define getbyte(v,o)        (((v) >> ((o) * 8)) & 0xFF)
 
 
 /* set 'src' byte at offset 'o' to 'v' */
