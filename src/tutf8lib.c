@@ -22,13 +22,13 @@
 #include "tokudaelimits.h"
 
 
-#define MAXUNICODE	0x10FFFFu
+#define MAXUNICODE      0x10FFFFu
 
-#define MAXUTF		0x7FFFFFFFu
+#define MAXUTF          0x7FFFFFFFu
 
 
-#define iscont(c)	(((c) & 0xC0) == 0x80)
-#define iscontp(p)	iscont(*(p))
+#define iscont(c)       (((c) & 0xC0) == 0x80)
+#define iscontp(p)      iscont(*(p))
 
 
 #define uchar(c)        ((t_ubyte)(c))
@@ -274,7 +274,7 @@ static int utf8_itercodes(toku_State *T) {
 
 
 /* pattern to match a single UTF-8 character */
-#define UTF8PATT	"[\0-\x7F\xC2-\xFD][\x80-\xBF]*"
+#define UTF8PATT        "[\0-\x7F\xC2-\xFD][\x80-\xBF]*"
 
 
 static const tokuL_Entry funcs[] = {

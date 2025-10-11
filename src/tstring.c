@@ -31,7 +31,7 @@
 /*
 ** Maximum size for string table.
 */
-#define MAXSTRTABLE	cast_int(tokuM_limitN(INT_MAX, OString*))
+#define MAXSTRTABLE     cast_int(tokuM_limitN(INT_MAX, OString*))
 
 
 /*
@@ -393,7 +393,7 @@ static const char *str2int(const char *s, toku_Integer *i) {
 
 /* maximum length of a numeral to be converted to a number */
 #if !defined (T_MAXNUMERAL)
-#define T_MAXNUMERAL	200
+#define T_MAXNUMERAL    200
 #endif
 
 
@@ -512,7 +512,7 @@ int tokuS_utf8esc(char *buff, t_uint n) {
 ** gets called by 'tokuD_getinfo'; the size should be
 ** at least 'TOKU_IDSIZE' + 'MAXNUM2STR' + size for message.
 */
-#define BUFFVFSSIZ	(TOKU_IDSIZE + TOKU_N2SBUFFSZ + 100)
+#define BUFFVFSSIZ      (TOKU_IDSIZE + TOKU_N2SBUFFSZ + 100)
 
 /* buffer for 'tokuS_newvstringf' */
 typedef struct BuffVFS {
@@ -662,11 +662,11 @@ const char *tokuS_pushfstring(toku_State *T, const char *fmt, ...) {
 /* }===================================================================== */
 
 
-#define DOTS	"..."
-#define PRE	"[string \""
-#define POS	"\"]"
+#define DOTS    "..."
+#define PRE     "[string \""
+#define POS     "\"]"
 
-#define addstr(a,b,l)	(memcpy(a,b,(l) * sizeof(char)), a += (l))
+#define addstr(a,b,l)   (memcpy(a,b,(l) * sizeof(char)), a += (l))
 
 
 void tokuS_trimstr(char *out, size_t lout, const char *s, size_t l) {

@@ -36,7 +36,7 @@ typedef unsigned long   t_ulong;
 
 
 /* maximum value for 'size_t' */
-#define TOKU_MAXSIZET	cast_sizet(~cast_sizet(0))
+#define TOKU_MAXSIZET   cast_sizet(~cast_sizet(0))
 
 
 /*
@@ -366,7 +366,7 @@ typedef void (*voidf)(void);
 
 
 #if !defined(TOKUI_HARDMEMTESTS)
-#define condchangemem(T,pre,pos,emg)	UNUSED(0)
+#define condchangemem(T,pre,pos,emg)    UNUSED(0)
 #else
 #define condchangemem(T,pre,pos,emg)  \
     { if (gcrunning(G(T))) { pre; tokuG_fullinc(T, emg); pos; } }

@@ -308,20 +308,20 @@ static int m_type(toku_State *T) {
 #if ((ULONG_MAX >> 31) >> 31) >= 3
 
 /* 'long' has at least 64 bits */
-#define Rand64	        unsigned long
-#define SRand64		long
+#define Rand64          unsigned long
+#define SRand64         long
 
 #elif defined(LLONG_MAX)
 
 /* there is a 'long long' type (which must have at least 64 bits) */
-#define Rand64		unsigned long long
-#define SRand64		long long
+#define Rand64          unsigned long long
+#define SRand64         long long
 
 #elif ((TOKU_UNSIGNED_MAX >> 31) >> 31) >= 3
 
 /* 'toku_Unsigned' has at least 64 bits */
-#define Rand64		toku_Unsigned
-#define SRand64		toku_Integer
+#define Rand64          toku_Unsigned
+#define SRand64         toku_Integer
 
 #endif
 
@@ -335,7 +335,7 @@ static int m_type(toku_State *T) {
 #define R2U(x)      cast(toku_Unsigned, (x) & 0xffffffffffffffffu)
 
 /* convert a 'toku_Unsigned' to a 'Rand64' */
-#define U2R(x)	    cast(Rand64, (x))
+#define U2R(x)      cast(Rand64, (x))
 
 /* convert unsigned constant to a 'Rand64' */
 #define UK2R(k)     U2R(t_intatt(k))

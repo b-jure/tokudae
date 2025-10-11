@@ -13,7 +13,7 @@
 
 
 /* end of file */
-#define TEOF	    (-1)
+#define TEOF        (-1)
 
 
 /* Return next char and progress the buffer or try fill the buffer. */

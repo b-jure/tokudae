@@ -17,7 +17,7 @@
 */
 #define adjustresults(T,nres) \
     { if ((nres) <= TOKU_MULTRET && (T)->cf->top.p < (T)->sp.p) \
-	(T)->cf->top.p = (T)->sp.p; }
+        (T)->cf->top.p = (T)->sp.p; }
 
 
 /* ensure the stack has at least 'n' elements */
@@ -34,7 +34,7 @@
 
 #define hastocloseCfunc(n)      ((n) < TOKU_MULTRET)
 
-#define codeNresults(n)		(-(n) - 3)
-#define decodeNresults(n)	(-(n) - 3)
+#define codeNresults(n)         (-(n) - 3)
+#define decodeNresults(n)       (-(n) - 3)
 
 #endif

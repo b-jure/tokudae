@@ -17,8 +17,8 @@ typedef void (*ProtectedFn)(toku_State *T, void *userdata);
 
 
 /* save/restore stack position */
-#define savestack(T,ptr)	(cast_charp(ptr) - cast_charp((T)->stack.p))
-#define restorestack(T,n)	cast(SPtr, cast_charp((T)->stack.p) + (n))
+#define savestack(T,ptr)        (cast_charp(ptr) - cast_charp((T)->stack.p))
+#define restorestack(T,n)       cast(SPtr, cast_charp((T)->stack.p) + (n))
 
 
 /* 

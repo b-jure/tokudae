@@ -26,12 +26,12 @@
 ** an unsigned char.
 */
 #if !defined(TOKU_MAXCAPTURES)
-#define TOKU_MAXCAPTURES		32
+#define TOKU_MAXCAPTURES                32
 #endif
 
 
-#define CAP_UNFINISHED	(-1)
-#define CAP_POSITION	(-2)
+#define CAP_UNFINISHED  (-1)
+#define CAP_POSITION    (-2)
 
 
 typedef struct MatchState {
@@ -54,12 +54,12 @@ static const char *match(MatchState *ms, const char *s, const char *p);
 
 /* maximum recursion depth for 'match' */
 #if !defined(MAXCCALLS)
-#define MAXCCALLS	200
+#define MAXCCALLS       200
 #endif
 
 
-#define T_ESC		'%'
-#define SPECIALS	"^$*+?.([%-"
+#define T_ESC           '%'
+#define SPECIALS        "^$*+?.([%-"
 
 
 static int check_capture(MatchState *ms, int l) {

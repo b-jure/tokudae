@@ -27,10 +27,10 @@
 ** avoiding this warning but also this optimization.)
 */
 #define tokuM_testsize(n,e) \
-	(sizeof(n) >= sizeof(size_t) && cast_sizet(n)+1 > TOKU_MAXSIZET/(e))
+        (sizeof(n) >= sizeof(size_t) && cast_sizet(n)+1 > TOKU_MAXSIZET/(e))
 
 #define tokuM_checksize(L,n,e) \
-	(tokuM_testsize(n,e) ? tokuM_toobig(L) : cast_void(0))
+        (tokuM_testsize(n,e) ? tokuM_toobig(L) : cast_void(0))
 
 
 /*

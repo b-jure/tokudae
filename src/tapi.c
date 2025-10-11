@@ -37,10 +37,10 @@
 
 
 /* test for pseudo index */
-#define ispseudo(i)	    ((i) <= TOKU_CLIST_INDEX)
+#define ispseudo(i)         ((i) <= TOKU_CLIST_INDEX)
 
 /* test for upvalue */
-#define isupvalue(i)	    ((i) <= UPVALINDEX)
+#define isupvalue(i)        ((i) <= UPVALINDEX)
 
 /* test for valid index */
 #define isvalid(T,o)        (!isempty(o) || (o) != &G(T)->nil)
@@ -1287,7 +1287,7 @@ TOKU_API int toku_error(toku_State *T) {
 #define checkresults(T,nargs,nres) \
      api_check(T, (nres) == TOKU_MULTRET \
                || (T->cf->top.p - T->sp.p >= (nres) - (nargs)), \
-	"results from function overflow current stack size")
+        "results from function overflow current stack size")
 
 
 TOKU_API void toku_call(toku_State *T, int nargs, int nresults) {
@@ -1397,10 +1397,10 @@ TOKU_API int toku_gc(toku_State *T, int option, ...) {
     toku_lock(T);
     va_start(argp, option);
     switch (option) {
-	case TOKU_GC_STOP: /* stop garbage collector */
+        case TOKU_GC_STOP: /* stop garbage collector */
             gs->gcstop = GCSTPUSR; /* stopped by user */
             break;
-	case TOKU_GC_RESTART: /* restart GC */
+        case TOKU_GC_RESTART: /* restart GC */
             tokuG_setgcdebt(gs, 0);
             gs->gcstop = 0; /* clear stop */
             break;
@@ -1408,16 +1408,16 @@ TOKU_API int toku_gc(toku_State *T, int option, ...) {
             res = gs->gccheck; /* get check flag */
             gs->gccheck = 0; /* clear check flag */
             break;
-	case TOKU_GC_COLLECT: /* start GC cycle */
+        case TOKU_GC_COLLECT: /* start GC cycle */
             tokuG_fullinc(T, 0);
             break;
-	case TOKU_GC_COUNT: /* total GC memory count (in Kbytes) */
+        case TOKU_GC_COUNT: /* total GC memory count (in Kbytes) */
             res = cast_int(gettotalbytes(gs) >> 10);
             break;
-	case TOKU_GC_COUNTBYTES: /* remainder bytes of totalbytes/1024 */
+        case TOKU_GC_COUNTBYTES: /* remainder bytes of totalbytes/1024 */
             res = cast_int(gettotalbytes(gs) & 0x3FF); /* all before bit 10 */
             break;
-	case TOKU_GC_STEP: { /* perform GC step */
+        case TOKU_GC_STEP: { /* perform GC step */
             int data = va_arg(argp, int); /* Kbytes */
             t_mem gcdebt = 1; /* true if GC did work */
             t_ubyte old_gcstop = gs->gcstop;
@@ -1450,7 +1450,7 @@ TOKU_API int toku_gc(toku_State *T, int option, ...) {
             }
             break;
         }
-	case TOKU_GC_ISRUNNING: /* check if GC is running */
+        case TOKU_GC_ISRUNNING: /* check if GC is running */
             res = gcrunning(gs);
             break;
         default: res = -1; /* invalid option */

@@ -45,14 +45,14 @@
 #if defined(TOKU_USE_LINUX)
 #define TOKU_USE_POSIX
 #define TOKU_USE_DLOPEN
-#define TOKU_READLINELIB	    "libreadline.so"
+#define TOKU_READLINELIB            "libreadline.so"
 #endif
 
 
 #if defined(TOKU_USE_MACOSX)
 #define TOKU_USE_POSIX
 #define TOKU_USE_DLOPEN
-#define TOKU_READLINELIB	    "libedit.dylib"
+#define TOKU_READLINELIB            "libedit.dylib"
 #endif
 
 

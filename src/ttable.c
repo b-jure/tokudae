@@ -73,7 +73,7 @@
         ((t && isdummy(t)) || (4 <= (sz) && t_ispow2(sz) && (sz) < MAXHSIZE))
 
 
-#define dummynode	(&dummynode_)
+#define dummynode       (&dummynode_)
 
 /*
 ** Common hash part for tables with empty hashes. That allows all

@@ -47,12 +47,12 @@ typedef struct toku_longjmp {
 ** C++ code, with _longjmp/_setjmp when available (POSIX), and with
 ** longjmp/setjmp otherwise.
 */
-#if !defined(TOKUI_THROW)				/* { */
+#if !defined(TOKUI_THROW)                               /* { */
 
-#if defined(__cplusplus) && !defined(TOKU_USE_LONGJMP)	/* { */
+#if defined(__cplusplus) && !defined(TOKU_USE_LONGJMP)  /* { */
 
 /* C++ exceptions */
-#define TOKUI_THROW(T,c)	throw(c)
+#define TOKUI_THROW(T,c)        throw(c)
 
 static void TOKUI_TRY(toku_State *T, toku_longjmp *c, ProtectedFn f, void *ud) {
     try {
@@ -68,25 +68,25 @@ static void TOKUI_TRY(toku_State *T, toku_longjmp *c, ProtectedFn f, void *ud) {
 }
 
 
-#elif defined(TOKU_USE_POSIX)				/* }{ */
+#elif defined(TOKU_USE_POSIX)                           /* }{ */
 
 /*
 ** In POSIX, use _longjmp/_setjmp
 ** (more efficient, does not manipulate signal mask).
 */
-#define TOKUI_THROW(T,c)	_longjmp((c)->buf, 1)
-#define TOKUI_TRY(T,c,f,ud)	if (_setjmp((c)->buf) == 0) ((f)(T,ud))
+#define TOKUI_THROW(T,c)        _longjmp((c)->buf, 1)
+#define TOKUI_TRY(T,c,f,ud)     if (_setjmp((c)->buf) == 0) ((f)(T,ud))
 
 
-#else						        /* }{ */
+#else                                                   /* }{ */
 
 /* ISO C handling with long jumps */
-#define TOKUI_THROW(T,c)	longjmp((c)->buf, 1)
-#define TOKUI_TRY(T,c,f,ud)	if (setjmp((c)->buf) == 0) ((f)(T,ud))
+#define TOKUI_THROW(T,c)        longjmp((c)->buf, 1)
+#define TOKUI_TRY(T,c,f,ud)     if (setjmp((c)->buf) == 0) ((f)(T,ud))
 
-#endif							/* } */
+#endif                                                  /* } */
 
-#endif							/* } */
+#endif                                                  /* } */
 
 
 void tokuPR_seterrorobj(toku_State *T, int errcode, SPtr oldtop) {

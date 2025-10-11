@@ -518,7 +518,7 @@ TOKULIB_API int tokuL_fileresult(toku_State *T, int stat, const char *fname) {
 }
 
 
-#if !defined(t_inspectstat)	/* { */
+#if !defined(t_inspectstat)     /* { */
 
 #if defined(TOKU_USE_POSIX)
 
@@ -535,7 +535,7 @@ TOKULIB_API int tokuL_fileresult(toku_State *T, int stat, const char *fname) {
 
 #endif
 
-#endif				/* } */
+#endif                          /* } */
 
 
 TOKULIB_API int tokuL_execresult(toku_State *T, int stat) {
@@ -691,16 +691,16 @@ static void fwarnoff(void *ud, const char *msg, int tocont) {
 
 
 /* Size for the buffer, in bytes */
-#define BUFSEEDB	(sizeof(void*) + sizeof(time_t))
+#define BUFSEEDB        (sizeof(void*) + sizeof(time_t))
 
 /* Size for the buffer in int's, rounded up */
-#define BUFSEED		((BUFSEEDB + sizeof(int) - 1) / sizeof(int))
+#define BUFSEED         ((BUFSEEDB + sizeof(int) - 1) / sizeof(int))
 
 /*
 ** Copy the contents of variable 'v' into the buffer pointed by 'b'.
 ** (The '&b[0]' disguises 'b' to fix an absurd warning from clang.)
 */
-#define addbuff(b,v)	(memcpy(&b[0], &(v), sizeof(v)), b += sizeof(v))
+#define addbuff(b,v)    (memcpy(&b[0], &(v), sizeof(v)), b += sizeof(v))
 
 
 static t_uint tokui_makeseed(void) {

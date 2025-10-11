@@ -13,7 +13,7 @@
 
 
 /* multi-char tokens start at this numeric value */
-#define FIRSTTK		(UCHAR_MAX + 1)
+#define FIRSTTK         (UCHAR_MAX + 1)
 
 
 #if !defined(TOKU_ENV)
@@ -40,7 +40,7 @@ enum TK {
 };
 
 /* number of reserved keywords */
-#define NUM_KEYWORDS	((TK_INFINITY - (FIRSTTK)) + 1)
+#define NUM_KEYWORDS    ((TK_INFINITY - (FIRSTTK)) + 1)
 
 
 

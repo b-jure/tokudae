@@ -85,7 +85,7 @@ typedef struct TValue {
 /* Macros for internal tests */
 
 /* collectable object hat the same tag as the original value */
-#define righttt(obj)	    (ttypetag(obj) == gcoval(obj)->tt_)
+#define righttt(obj)        (ttypetag(obj) == gcoval(obj)->tt_)
 
 /*
 ** Any value being manipulated by the program either it non
@@ -291,7 +291,7 @@ typedef struct List {
 ** As currently nil is equivalent to LUA_VEMPTY, it is simpler to
 ** just test whether the value is nil.
 */
-#define tagisempty(tag)		(novariant(tag) == TOKU_T_NIL)
+#define tagisempty(tag)         (novariant(tag) == TOKU_T_NIL)
 
 /*
 ** By default, entries with any kind of nil are considered empty.
@@ -399,14 +399,14 @@ typedef struct Table {
 #define keystrval(n)            (gco2str(keyval(n).gc))
 
 #define keyiscollectable(n)     (keytt(n) & BIT_COLLECTABLE)
-#define keyisnil(n)	        (keytt(n) == TOKU_T_NIL)
+#define keyisnil(n)             (keytt(n) == TOKU_T_NIL)
 #define keyisshrstr(n)          (keytt(n) == ctb(TOKU_VSHRSTR))
 #define keyisint(n)             (keytt(n) == TOKU_VNUMINT)
 
 #define setnilkey(n)            (keytt(n) = TOKU_T_NIL)
 
 #define setdeadkey(node)        (keytt(node) = TOKU_TDEADKEY)
-#define keyisdead(n)	        (keytt(n) == TOKU_TDEADKEY)
+#define keyisdead(n)            (keytt(n) == TOKU_TDEADKEY)
 
 /* }===================================================================== */
 
@@ -448,7 +448,7 @@ typedef struct OString {
 } OString;
 
 
-#define strisshr(ts)	((ts)->shrlen < 0xFF)
+#define strisshr(ts)    ((ts)->shrlen < 0xFF)
 
 
 /*

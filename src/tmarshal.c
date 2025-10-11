@@ -26,7 +26,7 @@
 #define TOKUC_FORMAT    0
 
 /* data to catch conversion errors */
-#define TOKUC_DATA	"\x19\x93\r\n\x1a\n"
+#define TOKUC_DATA      "\x19\x93\r\n\x1a\n"
 
 /* this value is for both 'int' and 'toku_Integer' */
 #define TOKUC_INT       -69
@@ -335,7 +335,7 @@ static t_ubyte load_byte(MarshalState *M) {
 
 #define load_vector(M,b,n)  load_block(M, b, cast_sizet(n)*sizeof((b)[0]))
 
-#define load_var(M,x)	    load_vector(M, &x, 1)
+#define load_var(M,x)       load_vector(M, &x, 1)
 
 
 static void load_block(MarshalState *M, void *b, size_t size) {

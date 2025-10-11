@@ -34,7 +34,7 @@
 #define uvisopen(uv)    ((uv)->v.p != &(uv)->u.value)
 
 
-#define uvlevel(uv)	check_exp(uvisopen(uv), cast(SPtr, (uv)->v.p))
+#define uvlevel(uv)     check_exp(uvisopen(uv), cast(SPtr, (uv)->v.p))
 
 
 /* special status to close upvalues preserving the top of the stack */

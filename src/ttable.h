@@ -22,10 +22,10 @@
 
 #define nodeval(n)          (&(n)->i_val)
 #define nodenext(n)         ((n)->s.next)
-#define htnode(t,i)	    (&(t)->node[(i)])
+#define htnode(t,i)         (&(t)->node[(i)])
 #define htnodelast(t)       htnode(t, htsize(t))
 
-#define htsize(t)	    (twoto((t)->size))
+#define htsize(t)           (twoto((t)->size))
 
 
 /*
@@ -33,12 +33,12 @@
 ** for its hash.
 */
 
-#define BITDUMMY	    (1 << 7)
-#define NOTBITDUMMY	    cast_ubyte(~BITDUMMY)
-#define isdummy(t)	    ((t)->flags & BITDUMMY)
+#define BITDUMMY            (1 << 7)
+#define NOTBITDUMMY         cast_ubyte(~BITDUMMY)
+#define isdummy(t)          ((t)->flags & BITDUMMY)
 
-#define setnodummy(t)	    ((t)->flags &= NOTBITDUMMY)
-#define setdummy(t)	    ((t)->flags |= BITDUMMY)
+#define setnodummy(t)       ((t)->flags &= NOTBITDUMMY)
+#define setdummy(t)         ((t)->flags |= BITDUMMY)
 
 
 /* allocated size for hash nodes */
@@ -46,9 +46,9 @@
 
 
 /* results from pset */
-#define HOK		0
-#define HNOTFOUND	1
-#define HFIRSTNODE	2
+#define HOK             0
+#define HNOTFOUND       1
+#define HFIRSTNODE      2
 
 
 /*

@@ -24,12 +24,12 @@
 #define notm(tm)    ttisnil(tm)
 
 
-#define checknoTM(mt,e)	    ((mt) == NULL || (mt)->flags & (1u<<(e)))
+#define checknoTM(mt,e)     ((mt) == NULL || (mt)->flags & (1u<<(e)))
 
 #define gfasttm(g,mt,e) \
         (checknoTM(mt, e) ? NULL : tokuTM_get(mt, e, (g)->tmnames[e]))
 
-#define fasttm(T,mt,e)	    gfasttm(G(T), mt, e)
+#define fasttm(T,mt,e)      gfasttm(G(T), mt, e)
 
 
 #define typename(t)     tokuO_typenames[(t) + 1]
@@ -86,7 +86,7 @@ TOKUI_FUNC OClass *tokuTM_newclass(toku_State *T);
 TOKUI_FUNC Instance *tokuTM_newinstance(toku_State *T, OClass *cls);
 TOKUI_FUNC UserData *tokuTM_newuserdata(toku_State *T, size_t size, t_ushort nuv);
 TOKUI_FUNC IMethod *tokuTM_newinsmethod(toku_State *T, Instance *receiver,
-				        const TValue *method);
+                                        const TValue *method);
 TOKUI_FUNC int tokuTM_eqim(const IMethod *v1, const IMethod *v2);
 TOKUI_FUNC UMethod *tokuTM_newudmethod(toku_State *T, UserData *ud,
                                        const TValue *method);
@@ -104,7 +104,7 @@ TOKUI_FUNC void tokuTM_callbinres(toku_State *T, const TValue *fn,
 TOKUI_FUNC void tokuTM_callunaryres(toku_State *T, const TValue *fn,
                                     const TValue *o, SPtr res);
 TOKUI_FUNC int tokuTM_order(toku_State *T, const TValue *v1, const TValue *v2,
-		  	    TM event);
+                            TM event);
 TOKUI_FUNC void tokuTM_trybin(toku_State *T, const TValue *v1,
                               const TValue *v2, SPtr res, TM event);
 TOKUI_FUNC void tokuTM_tryunary(toku_State *T, const TValue *o,

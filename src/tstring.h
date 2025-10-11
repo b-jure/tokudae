@@ -44,7 +44,7 @@
 
 
 /* equality for short strings, which are always internalized */
-#define eqshrstr(a,b)	check_exp((a)->tt_ == TOKU_VSHRSTR, (a) == (b))
+#define eqshrstr(a,b)   check_exp((a)->tt_ == TOKU_VSHRSTR, (a) == (b))
 
 
 TOKUI_FUNC int tokuS_eqlngstr(const OString *s1, const OString *s2);

@@ -28,7 +28,7 @@
 ** options are grouped by length; group of length 2 start with '||'.
 ** ======================================================================
 */
-#if !defined(TOKU_STRFTIMEOPTIONS)	/* { */
+#if !defined(TOKU_STRFTIMEOPTIONS)      /* { */
 
 #if defined(TOKU_USE_WINDOWS)
 #define TOKU_STRFTIMEOPTIONS  "aAbBcdHIjmMpSUwWxXyYzZ%" \
@@ -38,7 +38,7 @@
     "||" "EcECExEXEyEY" "OdOeOHOIOmOMOSOuOUOVOwOWOy" /* two-char options */
 #endif
 
-#endif					/* } */
+#endif                                  /* } */
 /* }===================================================================== */
 
 
@@ -49,44 +49,44 @@
 */
 
 /* type to represent time_t in Tokudae */
-#if !defined(TOKU_NUMTIME)	/* { */
+#if !defined(TOKU_NUMTIME)      /* { */
 
-#define t_timet			toku_Integer
-#define t_push_time(T,t)	toku_push_integer(T, cast_Integer(t))
+#define t_timet                 toku_Integer
+#define t_push_time(T,t)        toku_push_integer(T, cast_Integer(t))
 #define t_totime(T,index)       tokuL_check_integer(T, index)
 
-#else				/* }{ */
+#else                           /* }{ */
 
-#define t_timet			toku_Number
-#define t_push_time(T,t)	toku_push_number(T, cast_num(t))
-#define t_totime(T,index)	tokuL_check_number(T, index)
+#define t_timet                 toku_Number
+#define t_push_time(T,t)        toku_push_number(T, cast_num(t))
+#define t_totime(T,index)       tokuL_check_number(T, index)
 
-#endif				/* } */
+#endif                          /* } */
 
 
-#if !defined(t_gmtime)		/* { */
+#if !defined(t_gmtime)          /* { */
 
 /*
 ** By default, Tokudae uses gmtime/localtime, except when POSIX is available,
 ** where it uses gmtime_r/localtime_r
 */
 
-#if defined(TOKU_USE_POSIX)	/* { */
+#if defined(TOKU_USE_POSIX)     /* { */
 
 #include <unistd.h>
 
-#define t_gmtime(t,r)		gmtime_r(t,r)
-#define t_localtime(t,r)	localtime_r(t,r)
+#define t_gmtime(t,r)           gmtime_r(t,r)
+#define t_localtime(t,r)        localtime_r(t,r)
 
-#else				/* }{ */
+#else                           /* }{ */
 
 /* ISO C definitions */
-#define t_gmtime(t,r)		(UNUSED((r)->tm_sec), gmtime(t))
-#define t_localtime(t,r)	(UNUSED((r)->tm_sec), localtime(t))
+#define t_gmtime(t,r)           (UNUSED((r)->tm_sec), gmtime(t))
+#define t_localtime(t,r)        (UNUSED((r)->tm_sec), localtime(t))
 
-#endif				/* } */
+#endif                          /* } */
 
-#endif				/* } */
+#endif                          /* } */
 
 /* }===================================================================== */
 
@@ -275,12 +275,12 @@ static int os_clock(toku_State *T) {
 **   int tm_sec;    Seconds         [0-60] (1 leap second)
 **   int tm_min;    Minutes         [0-59]
 **   int tm_hour;   Hours           [0-23]
-**   int tm_mday;   Day	            [1-31]
+**   int tm_mday;   Day             [1-31]
 **   int tm_mon;    Month           [0-11]
 **   int tm_year;   Year            -1900
-**   int tm_wday;   Day of week	    [0-6]
+**   int tm_wday;   Day of week     [0-6]
 **   int tm_yday;   Days in year    [0-365]
-**   int tm_isdst;  DST		    [-1/0/1]
+**   int tm_isdst;  DST             [-1/0/1]
 ** }
 ** =======================================================
 */

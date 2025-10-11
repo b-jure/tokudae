@@ -37,9 +37,9 @@
 */
 #if !defined(TOKU_USE_JUMPTABLE)
 #if defined(__GNUC__)
-#define TOKU_USE_JUMPTABLE	1
+#define TOKU_USE_JUMPTABLE      1
 #else
-#define TOKU_USE_JUMPTABLE	0
+#define TOKU_USE_JUMPTABLE      0
 #endif
 #endif
 
@@ -54,7 +54,7 @@
 */
 
 /* number of bits in the mantissa of a float */
-#define NBM		(t_floatatt(MANT_DIG))
+#define NBM             (t_floatatt(MANT_DIG))
 
 /*
 ** Check whether some integers may not fit in a float, testing whether
@@ -64,17 +64,17 @@
 ** sizeof(long) == 32.)
 */
 #if ((((TOKU_INTEGER_MAX >> (NBM / 4)) >> (NBM / 4)) >> (NBM / 4)) \
-	>> (NBM - (3 * (NBM / 4))))  >  0
+        >> (NBM - (3 * (NBM / 4))))  >  0
 
 /* limit for integers that fit in a float */
-#define MAXINTFITSF	((toku_Unsigned)1 << NBM)
+#define MAXINTFITSF     ((toku_Unsigned)1 << NBM)
 
 /* check whether 'i' is in the interval [-MAXINTFITSF, MAXINTFITSF] */
-#define t_intfitsf(i)	((MAXINTFITSF + t_castS2U(i)) <= (2 * MAXINTFITSF))
+#define t_intfitsf(i)   ((MAXINTFITSF + t_castS2U(i)) <= (2 * MAXINTFITSF))
 
 #else /* all integers fit in a float precisely */
 
-#define t_intfitsf(i)	1
+#define t_intfitsf(i)   1
 
 #endif
 

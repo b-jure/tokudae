@@ -27,10 +27,10 @@
 
 
 #if !defined(TOKU_INIT_VAR)
-#define TOKU_INIT_VAR		"TOKU_INIT"
+#define TOKU_INIT_VAR           "TOKU_INIT"
 #endif
 
-#define TOKU_INITVARVERSION	TOKU_INIT_VAR TOKU_VERSUFFIX
+#define TOKU_INITVARVERSION     TOKU_INIT_VAR TOKU_VERSUFFIX
 
 
 #define ewritefmt(fmt,...)      toku_writefmt(stderr, fmt, __VA_ARGS__)
@@ -136,10 +136,10 @@ static int report(toku_State *T, int status) {
 
 
 /* command line args */
-#define arg_error	(1<<0) /* bad option */
-#define arg_e		(1<<1) /* -e (execute stat) */
-#define arg_v		(1<<2) /* -v (show version) */
-#define arg_h		(1<<3) /* -h (show help) */
+#define arg_error       (1<<0) /* bad option */
+#define arg_e           (1<<1) /* -e (execute stat) */
+#define arg_v           (1<<2) /* -v (show version) */
+#define arg_h           (1<<3) /* -h (show help) */
 #define arg_i           (1<<4) /* -i (interactive mode after script) */
 #define arg_E           (1<<5) /* -E (ignore env. vars) */
 
@@ -452,7 +452,7 @@ static void toku_freeline (char *line) {
 }
 
 
-#if defined(TOKU_USE_READLINE)	/* { */
+#if defined(TOKU_USE_READLINE)  /* { */
 
 /* assume Tokudae will be linked with '-lreadline' */
 #include <readline/readline.h>
@@ -483,14 +483,14 @@ static void toku_initreadline(toku_State *T) {
     }
 }
 
-#else				/* }{ */
+#else                           /* }{ */
 
 /* no readline; leave function pointers as NULL */
-#define toku_initreadline(L)	cast(void, L)
+#define toku_initreadline(L)    cast(void, L)
 
-#endif				/* } */
+#endif                          /* } */
 
-#endif			    /* } */
+#endif                      /* } */
 
 
 static const char *getprompt(toku_State *T, int firstline) {

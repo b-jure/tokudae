@@ -8,11 +8,11 @@
 #ifndef ttype_h
 #define ttype_h
 
-#define	ttoascii(c)	((c) & 0x7F)
+#define ttoascii(c)     ((c) & 0x7F)
 #define ttolower(c)     ((c) | 0x20)
 #define ttoupper(c)     ((c) & 0x5F)
 
-#define	tisascii(c)	(((c) & ~0x7F) == 0)
+#define tisascii(c)     (((c) & ~0x7F) == 0)
 #define tisdigit(c)     ((unsigned)(c)-'0' < 10u)
 #define tisalpha(c)     ((unsigned)ttolower(c)-'a' < 26u)
 #define tisupper(c)     ((c)-'A' < 26)

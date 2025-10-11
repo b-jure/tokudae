@@ -177,7 +177,7 @@ TOKULIB_API void tokuL_unref(toku_State *T, int l, int ref);
 ** semantics, as the Tokudae core does.
 */
 #define tokuL_intop(op,x,y) \
-	((toku_Integer)((toku_Unsigned)(x) op (toku_Unsigned)(y)))
+        ((toku_Integer)((toku_Unsigned)(x) op (toku_Unsigned)(y)))
 
 
 /* internal assertions */
@@ -185,9 +185,9 @@ TOKULIB_API void tokuL_unref(toku_State *T, int l, int ref);
 
 #if defined(TOKUI_ASSERT)
 #include <assert.h>
-#define toku_assert(e)	    assert(e)
+#define toku_assert(e)      assert(e)
 #else
-#define toku_assert(e)	    ((void)0)
+#define toku_assert(e)      ((void)0)
 #endif
 
 #endif

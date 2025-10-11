@@ -81,19 +81,19 @@ static int checkmode(const char *mode) {
 /* }=============================================================== */
 
 
-#if !defined(t_getc)		/* { */
+#if !defined(t_getc)            /* { */
 
 #if defined(TOKU_USE_POSIX)
-#define t_getc(f)	        getc_unlocked(f)
-#define t_lockfile(f)		flockfile(f)
-#define t_unlockfile(f)		funlockfile(f)
+#define t_getc(f)               getc_unlocked(f)
+#define t_lockfile(f)           flockfile(f)
+#define t_unlockfile(f)         funlockfile(f)
 #else
-#define t_getc(f)		getc(f)
-#define t_lockfile(f)		((void)0)
-#define t_unlockfile(f)		((void)0)
+#define t_getc(f)               getc(f)
+#define t_lockfile(f)           ((void)0)
+#define t_unlockfile(f)         ((void)0)
 #endif
 
-#endif				/* } */
+#endif                          /* } */
 
 
 /*
@@ -102,43 +102,43 @@ static int checkmode(const char *mode) {
 ** =======================================================
 */
 
-#if !defined(t_fseek)		/* { */
+#if !defined(t_fseek)           /* { */
 
-#if defined(TOKU_USE_POSIX)	/* { */
+#if defined(TOKU_USE_POSIX)     /* { */
 
 #include <sys/types.h>
 
-#define t_fseek(f,o,w)		fseeko(f,o,w)
-#define t_ftell(f)		ftello(f)
-#define t_seeknumt		off_t
+#define t_fseek(f,o,w)          fseeko(f,o,w)
+#define t_ftell(f)              ftello(f)
+#define t_seeknumt              off_t
 
 #elif defined(TOKU_USE_WINDOWS) && !defined(_CRTIMP_TYPEINFO) \
-   && defined(_MST_VER) && (_MST_VER >= 1400)	/* }{ */
+   && defined(_MST_VER) && (_MST_VER >= 1400)   /* }{ */
 
 /* Windows (but not DDK) and Visual C++ 2005 or higher */
-#define t_fseek(f,o,w)		_fseeki64(f,o,w)
-#define t_ftell(f)		_ftelli64(f)
-#define t_seeknumt		__int64
+#define t_fseek(f,o,w)          _fseeki64(f,o,w)
+#define t_ftell(f)              _ftelli64(f)
+#define t_seeknumt              __int64
 
-#else				/* }{ */
+#else                           /* }{ */
 
 /* ISO C definitions */
-#define t_fseek(f,o,w)		fseek(f,o,w)
-#define t_ftell(f)		ftell(f)
-#define t_seeknumt		long
+#define t_fseek(f,o,w)          fseek(f,o,w)
+#define t_ftell(f)              ftell(f)
+#define t_seeknumt              long
 
-#endif				/* } */
+#endif                          /* } */
 
-#endif				/* } */
+#endif                          /* } */
 
 /* }====================================================== */
 
 
 
-#define IO_PREFIX	"__IO_"
-#define IOPREF_LEN	(sizeof(IO_PREFIX)/sizeof(char) - 1)
-#define IO_INPUT	(IO_PREFIX "stdin")
-#define IO_OUTPUT	(IO_PREFIX "stdout")
+#define IO_PREFIX       "__IO_"
+#define IOPREF_LEN      (sizeof(IO_PREFIX)/sizeof(char) - 1)
+#define IO_INPUT        (IO_PREFIX "stdin")
+#define IO_OUTPUT       (IO_PREFIX "stdout")
 
 
 typedef tokuL_Stream TStream;

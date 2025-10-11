@@ -33,15 +33,15 @@
     ((o)->mark = cast_ubyte(((o)->mark & ~maskwhitebits) | bitmask(BLACKBIT)))
 
 /* mark object as gray */
-#define markgray(o)	resetbits((o)->mark, maskcolorbits)
+#define markgray(o)     resetbits((o)->mark, maskcolorbits)
 
 
 
 /* check if 'TValue' is object and white */
-#define valiswhite(v)	    (iscollectable(v) && iswhite(gcoval(v)))
+#define valiswhite(v)       (iscollectable(v) && iswhite(gcoval(v)))
 
 /* check if 'Table' key is object and white */
-#define keyiswhite(n)	    (keyiscollectable(n) && iswhite(keygcoval(n)))
+#define keyiswhite(n)       (keyiscollectable(n) && iswhite(keygcoval(n)))
 
 
 /* 'markobject_' but only if object is white */
@@ -62,26 +62,26 @@
 
 
 /* maximum amount of objects to sweep in a single 'sweepstep' */
-#define GCSWEEPMAX	100
+#define GCSWEEPMAX      100
 
 
 /* maximum number of finalizers to call in each 'singlestep' */
-#define GCFINMAX	10
+#define GCFINMAX        10
 
 
 /* cost of calling one finalizer */
-#define GCFINCOST	50
+#define GCFINCOST       50
 
 
 /*
 ** Action of visiting a slot or sweeping an object converted
 ** into bytes.
 */
-#define WORK2MEM	cast_int(sizeof(TValue))
+#define WORK2MEM        cast_int(sizeof(TValue))
 
 
 /* adjust 'pause' (same as in Lua, percentage of the 'pause') */
-#define PAUSEADJ	100
+#define PAUSEADJ        100
 
 
 
@@ -140,7 +140,7 @@ void tokuG_setgcdebt(GState *gs, t_mem debt) {
 
 
 /* link objects 'gclist' into the list 'l' */
-#define linkgclist(o,l)		linkgclist_(obj2gco(o), &(o)->gclist, &(l))
+#define linkgclist(o,l)         linkgclist_(obj2gco(o), &(o)->gclist, &(l))
 
 static void linkgclist_(GCObject *o, GCObject **gclist, GCObject **list) {
     toku_assert(!isgray(o));
@@ -150,7 +150,7 @@ static void linkgclist_(GCObject *o, GCObject **gclist, GCObject **list) {
 }
 
 /* simmilar to 'linkgclist' but generic */
-#define linkobjgclist(o,l)	linkgclist_(obj2gco(o), getgclist(o), &(l))
+#define linkobjgclist(o,l)      linkgclist_(obj2gco(o), getgclist(o), &(l))
 
 
 static GCObject **getgclist(GCObject *o) {

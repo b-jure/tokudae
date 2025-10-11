@@ -19,7 +19,7 @@
 
 
 /* prefix for open functions in C libraries */
-#define TOKU_POF	    "tokuopen_"
+#define TOKU_POF            "tokuopen_"
 
 /* separator for open functions in C libraries */
 #define TOKU_OFSEP    "_"
@@ -43,7 +43,7 @@ static const char *const CLIBS = "__CLIBS";
 
 
 /* cast void* to a Tokudae function */
-#define cast_Tfunc(p)	    cast(toku_CFunction, cast_func(p))
+#define cast_Tfunc(p)       cast(toku_CFunction, cast_func(p))
 
 
 /*
@@ -110,7 +110,7 @@ static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym) {
 ** optional flags for LoadLibraryEx
 */
 #if !defined(TOKU_LLE_FLAGS)
-#define TOKU_LLE_FLAGS	0
+#define TOKU_LLE_FLAGS  0
 #endif
 
 
@@ -242,8 +242,8 @@ static void add_libhandle_to_clibs(toku_State *T, const char *path, void *plib) 
 
 
 /* error codes for 'look_for_func' */
-#define ERRLIB		1 /* unable to load library */
-#define ERRFUNC		2 /* unable to find function */
+#define ERRLIB          1 /* unable to load library */
+#define ERRFUNC         2 /* unable to find function */
 
 /*
 ** Look for a C function named 'sym' in a dynamically loaded library 'path'.
