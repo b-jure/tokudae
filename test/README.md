@@ -4,8 +4,8 @@ Every directory in this directory represents a testsuite, and any Tokudae
 script file (filenames ending with `.toku` that do not start with `.`) in
 the testsuite directory is considered as a test belonging to that testsuite.
 
-This also holds special directories which are used by tests and so they
-are to be ignored, these directories start with `_`, such as `_libs`
+This directory also contains special directories which are used by tests and
+so they are to be ignored, these directories start with `_`, such as `_libs`
 (they are not considered to be a testsuite).
 
 For more information do `./test_{platform}.toku -h` or see `test_{platform}.toku`.

@@ -27,7 +27,7 @@ TO_INC = src/tokudae.h src/tokudaeconf.h src/tokudaelib.h src/tokudaeaux.h src/t
 TO_LIB = $(TOKUDAE_A)
 TO_MAN = doc/tokudae.1
 TO_DOC = doc/manual.html doc/manual.css doc/contents.html doc/contents.css \
-	 doc/tokudae.css doc/EBNF.txt
+	 doc/tokudae.css doc/grammar.ebnf
 
 default: $(PLATFORM)
 
@@ -152,3 +152,131 @@ tcode.o:
 	$(CC) $(CFLAGS) $(CMCFLAGS) -c tcode.c
 
 # DO NOT DELETE
+tapi.o: src/tapi.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tapi.h \
+ src/tstate.h src/tlist.h src/tmeta.h src/tdebug.h src/tfunction.h \
+ src/tcode.h src/tbits.h src/tparser.h src/tlexer.h src/treader.h \
+ src/tmem.h src/tgc.h src/tmarshal.h src/tprotected.h src/tstring.h \
+ src/ttable.h src/tvm.h
+tbaselib.o: src/tbaselib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
+ src/tokudaelib.h
+tcode.o: src/tcode.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tcode.h \
+ src/tbits.h src/tparser.h src/tlexer.h src/treader.h src/tmem.h \
+ src/ttable.h src/tdebug.h src/tstate.h src/tlist.h src/tmeta.h src/tvm.h \
+ src/tgc.h
+tdblib.o: src/tdblib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
+ src/tokudaelib.h
+tdebug.o: src/tdebug.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tdebug.h \
+ src/tstate.h src/tlist.h src/tmeta.h src/tapi.h src/tcode.h src/tbits.h \
+ src/tparser.h src/tlexer.h src/treader.h src/tmem.h src/tfunction.h \
+ src/tstring.h src/tprotected.h src/tvm.h src/tgc.h src/ttable.h
+tfunction.o: src/tfunction.c src/tokudaeprefix.h src/ttrace.h \
+ src/tobject.h src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h \
+ src/tfunction.h src/tcode.h src/tbits.h src/tparser.h src/tlexer.h \
+ src/treader.h src/tmem.h src/tstate.h src/tlist.h src/tmeta.h \
+ src/tdebug.h src/tgc.h src/tvm.h src/tprotected.h
+tgc.o: src/tgc.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tgc.h \
+ src/tbits.h src/tstate.h src/tlist.h src/tmeta.h src/tfunction.h \
+ src/tcode.h src/tparser.h src/tlexer.h src/treader.h src/tmem.h \
+ src/ttable.h src/tstring.h src/tvm.h src/tprotected.h
+tiolib.o: src/tiolib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
+ src/tokudaelib.h
+tlexer.o: src/tlexer.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/ttypes.h \
+ src/tgc.h src/tbits.h src/tstate.h src/tlist.h src/tmeta.h src/tlexer.h \
+ src/treader.h src/tmem.h src/tdebug.h src/tprotected.h src/ttable.h \
+ src/tstring.h
+tlist.o: src/tlist.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tlist.h \
+ src/tstring.h src/tstate.h src/tmeta.h src/tlexer.h src/treader.h \
+ src/tmem.h src/tgc.h src/tbits.h src/tdebug.h
+tloadlib.o: src/tloadlib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
+ src/tokudaelib.h
+tlstlib.o: src/tlstlib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
+ src/tokudaelib.h
+tmarshal.o: src/tmarshal.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tcode.h \
+ src/tbits.h src/tparser.h src/tlexer.h src/treader.h src/tmem.h \
+ src/tfunction.h src/tstate.h src/tlist.h src/tmeta.h src/tgc.h \
+ src/tmarshal.h src/tprotected.h src/tstring.h src/ttable.h
+tmathlib.o: src/tmathlib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
+ src/tokudaelib.h
+tmem.o: src/tmem.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tgc.h \
+ src/tbits.h src/tstate.h src/tlist.h src/tmeta.h src/tdebug.h src/tmem.h \
+ src/tprotected.h src/treader.h
+tmeta.o: src/tmeta.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tmeta.h \
+ src/tlist.h src/tlexer.h src/treader.h src/tmem.h src/tstring.h \
+ src/tstate.h src/tdebug.h src/ttable.h src/tbits.h src/tgc.h src/tvm.h \
+ src/tprotected.h
+tobject.o: src/tobject.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tvm.h \
+ src/tstate.h src/tlist.h src/tmeta.h
+tokudaeaux.o: src/tokudaeaux.c src/tokudaeprefix.h src/ttrace.h \
+ src/tobject.h src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h \
+ src/tokudaeaux.h
+tokudae.o: src/tokudae.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
+ src/tokudaelib.h
+tokudaelib.o: src/tokudaelib.c src/tokudaeprefix.h src/ttrace.h \
+ src/tobject.h src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h \
+ src/tokudaelib.h src/tokudaeaux.h
+toslib.o: src/toslib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
+ src/tokudaelib.h
+tparser.o: src/tparser.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tcode.h \
+ src/tbits.h src/tparser.h src/tlexer.h src/treader.h src/tmem.h \
+ src/tfunction.h src/tstate.h src/tlist.h src/tmeta.h src/tgc.h \
+ src/tstring.h src/ttable.h src/tvm.h
+tprotected.o: src/tprotected.c src/tokudaeprefix.h src/ttrace.h \
+ src/tobject.h src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h \
+ src/tfunction.h src/tcode.h src/tbits.h src/tparser.h src/tlexer.h \
+ src/treader.h src/tmem.h src/tstate.h src/tlist.h src/tmeta.h src/tgc.h \
+ src/tmarshal.h src/tprotected.h src/tstring.h
+treader.o: src/treader.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/treader.h \
+ src/tmem.h
+treglib.o: src/treglib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tstrlib.h \
+ src/tokudaeaux.h src/tokudaelib.h
+tstate.o: src/tstate.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/ttable.h \
+ src/tbits.h src/tlist.h src/tstate.h src/tmeta.h src/tapi.h src/tdebug.h \
+ src/tfunction.h src/tcode.h src/tparser.h src/tlexer.h src/treader.h \
+ src/tmem.h src/tgc.h src/tprotected.h src/tstring.h
+tstring.o: src/tstring.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tstate.h \
+ src/tlist.h src/tmeta.h src/tstring.h src/tlexer.h src/treader.h \
+ src/tmem.h src/tgc.h src/tbits.h src/ttypes.h src/tdebug.h src/tvm.h \
+ src/tprotected.h
+tstrlib.o: src/tstrlib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tstrlib.h \
+ src/tokudaeaux.h src/tokudaelib.h
+ttable.o: src/ttable.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tstring.h \
+ src/tstate.h src/tlist.h src/tmeta.h src/tlexer.h src/treader.h \
+ src/tmem.h src/ttable.h src/tbits.h src/tgc.h src/tdebug.h
+ttrace.o: src/ttrace.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tmeta.h \
+ src/tcode.h src/tbits.h src/tparser.h src/tlexer.h src/treader.h \
+ src/tmem.h src/tdebug.h src/tstate.h src/tlist.h src/tstring.h
+tutf8lib.o: src/tutf8lib.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tokudaeaux.h \
+ src/tokudaelib.h
+tvm.o: src/tvm.c src/tokudaeprefix.h src/ttrace.h src/tobject.h \
+ src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tapi.h \
+ src/tstate.h src/tlist.h src/tmeta.h src/tfunction.h src/tcode.h \
+ src/tbits.h src/tparser.h src/tlexer.h src/treader.h src/tmem.h \
+ src/tgc.h src/ttable.h src/tdebug.h src/tvm.h src/tstring.h \
+ src/tprotected.h src/tjmptable.h
