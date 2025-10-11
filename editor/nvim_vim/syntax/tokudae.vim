@@ -359,7 +359,7 @@ syn match tokudaeFunc /\<utf8\.charpattern\>/
 
 syn match tokudaeOptionalSeparator /::/
 
-hi def link tokudaeOptionalSeparator    NONE
+hi def link tokudaeOptionalSeparator    PreProc
 hi def link tokudaeClosurePipe          tokudaeStatement 
 hi def link tokudaeAttribute            StorageClass
 hi def link tokudaeSemicolon            tokudaeStatement
