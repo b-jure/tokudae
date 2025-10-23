@@ -291,7 +291,7 @@ static const tokuL_Entry funcs[] = {
 
 int tokuopen_utf8(toku_State *T) {
     tokuL_push_lib(T, funcs);
-    toku_push_lstring(T, UTF8PATT, sizeof(UTF8PATT)/sizeof(char) - 1);
+    toku_push_lstring(T, UTF8PATT, LL(UTF8PATT));
     toku_set_field_str(T, -2, "charpattern");
     return 1;
 }

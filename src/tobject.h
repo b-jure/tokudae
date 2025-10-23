@@ -94,7 +94,7 @@ typedef struct TValue {
 ** macros using this one to be used where T is not available.
 */
 #define checkliveness(T,obj) \
-        ((void)T, toku_assert(!iscollectable(obj) || \
+        (UNUSED(T), toku_assert(!iscollectable(obj) || \
         (righttt(obj) && (T == NULL || !isdead(G(T), gcoval(obj))))))
 
 
@@ -506,7 +506,7 @@ typedef struct OClass {
 typedef struct UpValInfo {
     OString *name; /* upvalue name (debug) */
     int idx; /* index in stack or outer function local var list */
-    t_ubyte onstack; /* is it on stack */
+    t_ubyte instack; /* is it on stack */
     t_ubyte kind;
 } UpValInfo;
 

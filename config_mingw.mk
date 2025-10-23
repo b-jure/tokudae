@@ -7,10 +7,6 @@ R = $(V).0
 # }{========================================================================
 # 				Paths & Installing
 # ==========================================================================
-# Your platform (see PLATFORMS for possible values).
-PLATFORM = mingw
-PLATFORMS = guess posix linux linux-readline mingw generic 
-
 # Install paths
 INSTALL_ROOT = /usr/local
 INSTALL_BIN = $(INSTALL_ROOT)/bin
@@ -35,8 +31,6 @@ endif
 
 # Internal defines used for testing (all of these slow down operations a lot):
 # TOKUI_ASSERT => Enables all internal asserts inside Tokudae.
-# TOKUI_TRACE_EXEC => Traces bytecode execution (including stack state).
-# TOKUI_DISASSEMBLE_BYTECODE => Disassembles precompiled chunks.
 # TOKUI_EMERGENCYGCTESTS => Forces an emergency collection at every single
 #     		            allocation.
 # TOKUI_HARDMEMTESTS => Forces a full collection at all points where the
@@ -90,5 +84,6 @@ UNAME = uname
 # 			       Targets
 # ==========================================================================
 TOKUDAE_T = tokudae.exe
+TOKUDAEC_C = tokuc.exe
 TOKUDAE_A = tokudae1.dll
 # }=========================================================================

@@ -433,6 +433,65 @@ static int db_stackinuse(toku_State *T) {
 }
 
 
+static void setdesc(toku_State *T, toku_Opcode *opc) {
+    toku_Opdesc opd;
+    toku_getopdesc(T, &opd, opc);
+    toku_push_string(T, opd.desc);
+    toku_set_field_str(T, -2, "description");
+    switch (opd.extra.type) {
+        case TOKU_T_BOOL: toku_push_bool(T, opd.extra.value.b); break;
+        case TOKU_T_NUMBER: toku_push_number(T, opd.extra.value.n); break;
+        case TOKU_T_STRING: toku_push_string(T, opd.extra.value.s); break;
+        case TOKU_T_NIL: case TOKU_T_NONE: return; /* no extra */
+        default: toku_assert(0); /* unreachable */
+    }
+    toku_set_field_str(T, -2, "extra");
+}
+
+
+static int db_getcode(toku_State *T) {
+    toku_Opcode opc;
+    toku_Cinfo ci;
+    int t = toku_type(T, 0);
+    if (t != TOKU_T_FUNCTION) { /* not a function? */
+        toku_Debug ar;
+        toku_Integer level = tokuL_check_integer(T, 0); /* must be level */
+        if (!toku_getstack(T, cast_int(level), &ar))
+            return tokuL_error_arg(T, 0, "level out of range");
+        toku_getinfo(T, "f", &ar);
+        toku_replace(T, 0);
+    }
+    tokuL_check_arg(T, !toku_is_cfunction(T, 0), 0,
+                       "C functions do not have bytecode");
+    toku_setntop(T, 1);
+    toku_getcompinfo(T, 0, &ci);
+    toku_push_list(T, 0);
+    for (int i = 0; toku_getopcode(T, &ci, i, &opc) != 0; i++) {
+        toku_push_table(T, 5);
+        if (opc.args[0] != -1) { /* opcode has at least one argument? */
+            t_uint j = 0;
+            toku_push_list(T, 1);
+            do {
+                toku_push_integer(T, opc.args[j]);
+                toku_set_index(T, -2, j);
+            } while (j+1 < t_arraysize(opc.args) && opc.args[++j] != -1);
+            toku_set_field_str(T, -2, "args");
+        }
+        toku_push_integer(T, opc.line);
+        toku_set_field_str(T, -2, "line");
+        toku_push_integer(T, opc.offset);
+        toku_set_field_str(T, -2, "offset");
+        toku_push_integer(T, opc.op);
+        toku_set_field_str(T, -2, "op");
+        toku_push_string(T, opc.name);
+        toku_set_field_str(T, -2, "name");
+        setdesc(T, &opc);
+        toku_set_index(T, -2, i);
+    }
+    return 1; /* return the bytecode list */
+}
+
+
 static const tokuL_Entry dblib[] = {
     {"debug", db_debug},
     {"getuservalue", db_getuservalue},
@@ -450,6 +509,7 @@ static const tokuL_Entry dblib[] = {
     {"setupvalue", db_setupvalue},
     {"traceback", db_traceback},
     {"stackinuse", db_stackinuse},
+    {"getcode", db_getcode},
     {"cstacklimit", NULL},
     {"maxstack", NULL},
     {NULL, NULL}

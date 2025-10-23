@@ -58,7 +58,7 @@ CClosure *tokuF_newCclosure(toku_State *T, int nupvals) {
 ** 'cf' and invalidates old named parameters (after they get moved).
 */
 void tokuF_adjustvarargs(toku_State *T, int arity, CallFrame *cf,
-                       SPtr *sp, const Proto *fn) {
+                         SPtr *sp, const Proto *fn) {
     int actual = cast_int(T->sp.p - cf->func.p) - 1;
     int extra = actual - arity; /* number of varargs */
     cf->t.nvarargs = extra;
@@ -147,11 +147,11 @@ UpVal *tokuF_findupval(toku_State *T, SPtr level) {
 ** Find local variable name that must be alive for the given 'pc',
 ** and at the position 'lnum', meaning there are 'lnum' locals before it.
 */
-const char *tokuF_getlocalname(const Proto *fn, int lnum, int pc) {
-    for (int i = 0; i < fn->sizelocals && fn->locals[i].startpc <= pc; i++) {
-        if (pc < fn->locals[i].endpc) { /* variable is active? */
+const char *tokuF_getlocalname(const Proto *f, int lnum, int pc) {
+    for (int i = 0; i < f->sizelocals && f->locals[i].startpc <= pc; i++) {
+        if (pc < f->locals[i].endpc) { /* variable is active? */
             if (--lnum == 0)
-                return getstr(fn->locals[i].name);
+                return getstr(f->locals[i].name);
         }
     }
     return NULL; /* not found */

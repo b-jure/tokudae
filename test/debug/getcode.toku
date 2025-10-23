@@ -1,0 +1,57 @@
+/// >>>>>>>>>>>> DO NOT MODIFY THIS SECTION
+local fn test() {
+    local x = 5;
+    x++;
+    local y = x - 5;
+    local z, u = true, false;
+    return y == 0;
+}
+/// <<<<<<<<<<<
+
+local debug = import("debug");
+
+local t = debug.getcode(test);
+assert(typeof(t) == "list");
+
+foreach _,bc in indices(t) {
+    local s = string.fmt("[%3d][%3d]: %12s ", bc.line, bc.offset, bc.name);
+    if bc.args {
+        foreach i,arg in indices(bc.args)
+            s ..= string.fmt("(%d)", arg);
+    }
+    print(s);
+}
+
+local fn checkc(c, line, offset, name, args) {
+    assert(c.line == line);
+    assert(c.offset == offset);
+    assert(c.name == name);
+    if (args) {
+        assert(c.args);
+        assert(args.len == c.args.len);
+        foreach i,v in indices(c.args)
+            assert(args[i] == v);
+    } else
+        assert(!c.args);
+}
+
+local c = t[0];
+checkc(t[0], 3, 0, "CONSTI", [5]);
+checkc(t[1], 4, 2, "GETLOCAL", [0]);
+checkc(t[2], 4, 6, "ADDI", [1]);
+checkc(t[3], 4, 10, "SETLOCAL", [0]);
+checkc(t[4], 5, 14, "GETLOCAL", [0]);
+checkc(t[5], 5, 18, "ADDI", [5 | (1<<23)]);
+checkc(t[6], 6, 22, "TRUE");
+checkc(t[7], 6, 23, "FALSE");
+checkc(t[8], 7, 24, "GETLOCAL", [1]);
+checkc(t[9], 7, 28, "EQI", [0, 1]);
+checkc(t[10], 7, 33, "RETURN", [4, 2, 0]);
+assert(!t[11]);
+
+/// level as argument ('debug.getcode' is C function)
+local st, err = pcall(debug.getcode, 0);
+assert(!st and string.find(err, "do not have bytecode"));
+
+/// current function
+assert(debug.getcode(1));

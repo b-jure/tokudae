@@ -12,24 +12,13 @@
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <float.h>
 #include <math.h>
 
 
 /* {====================================================================== 
-** Some hard limits to current Tokudae implementation
-** ======================================================================= */
-
-#if ((UINT_MAX >> 30) < 3)
-#error 'int' has to have at least 32 bits
-#endif
-
-/* }===================================================================== */
-
-
-/* {====================================================================== 
 **                      Configuration file for Tokudae.
-**                (Tries its best to mimic Lua configuration)
 ** ======================================================================= */
 
 #if defined(_WIN32) && !defined(_WIN32_WCE)
@@ -72,9 +61,9 @@
 */
 
 /* predefined options for TOKU_INT_TYPE */
-#define TOKU_INT_INT                1
-#define TOKU_INT_LONG               2
-#define TOKU_INT_LONGLONG           3
+#define TOKU_INT_16                 1
+#define TOKU_INT_32                 2
+#define TOKU_INT_64                 3
 
 /* predefined options for TOKU_FLOAT_TYPE */
 #define TOKU_FLOAT_FLOAT            1
@@ -83,7 +72,7 @@
 
 
 /* default configuration ('long long' and 'double', for 64-bit) */
-#define TOKU_INT_DEFAULT        TOKU_INT_LONGLONG
+#define TOKU_INT_DEFAULT        TOKU_INT_64
 #define TOKU_FLOAT_DEFAULT      TOKU_FLOAT_DOUBLE
 
 
@@ -254,22 +243,13 @@
 ** ======================================================================= */
 
 /*
-** @TOKU_NUMBER - is the Tokudae floating point type.
-** @TOKU_NUMBER_FMT - is the format for writing floats.
-** @TOKU_NUMBER_FMTLEN - is the additional length modifier when writing floats.
-** @t_mathop - allows the addition of an 'l' or 'f' to all math operations.
-** @t_floor - floor division.
-** @toku_number2str - convert float into string.
-** @toku_str2number - convert numeral into float
-** @toku_number2integer - converts float to integer or returns 0 if float is
-** not withing the range of integer.
+** }{========== FLOATS ============
 */
-
 
 #define t_floor(n)      (t_mathop(floor)(n))
 
 #define toku_number2str(s,sz,n) \
-        t_snprintf((s), (sz), TOKU_NUMBER_FMT, (TOKU_NUMBER)(n))
+        snprintf((s), (sz), TOKU_NUMBER_FMT, (TOKU_NUMBER)(n))
 
 #define toku_number2integer(n,p) \
     ((n) >= (TOKU_NUMBER)(TOKU_INTEGER_MIN) && \
@@ -310,66 +290,68 @@
 #endif                                          /* } */
 
 
-#if !defined(toku_str2number)
-#endif
-
-
 /*
-** @TOKU_INTEGER - integer type.
-** @TOKU_UNSIGNED - unsigned integer.
-** @TOKU_INTEGER_MAX - maximum integer size.
-** @TOKU_INTEGER_MIN - minimum integer size.
-** @TOKU_UNSIGNED_MAX - maximum unsigned integer size.
-** @TOKU_INTEGER_FMTLEN - additional length of modifier when writing integers.
-** @toku_integer2str - converts an integer to string.
+** }{========== INTEGERS ============
 */
 
+#if TOKU_INT_TYPE == TOKU_INT_16                /* { 16 bits */
 
-#define TOKU_UNSIGNED       unsigned TOKU_INTEGER
+#error 16 bit integer as 'TOKU_INTEGER' is not supported.
 
-#define TOKU_INTEGER_FMT    "%" TOKU_INTEGER_FMTLEN "d"
+#elif TOKU_INT_TYPE == TOKU_INT_32              /* }{ 32 bits */
 
-#define toku_integer2str(s,sz,n) \
-        t_snprintf((s),(sz),TOKU_INTEGER_FMT,(TOKU_INTEGER)(n))
+#error 32 bit integer as 'TOKU_INTEGER' is not supported.
 
+#elif TOKU_INT_TYPE == TOKU_INT_64              /* }{ 64 bits */
 
-#if TOKU_INT_TYPE == TOKU_INT_INT               /* { int */
+#if defined(INT64_MAX)              /* { */
 
-#error 'int' as 'TOKU_INTEGER' is not supported.
+#define TOKU_INTEGER            int64_t
+#define TOKU_INTEGER_MAX        INT64_MAX
+#define TOKU_INTEGER_MIN        INT64_MIN
 
-#elif TOKU_INT_TYPE == TOKU_INT_LONG            /* }{ long */
+#define TOKU_UNSIGNED           uint64_t
+#define TOKU_UNSIGNED_MAX       UINT64_MAX
 
-#error 'long' as 'TOKU_INTEGER' is not supported.
+#define t_intatt(i)             INT64_C(i)
+#define t_uintatt(i)            UINT64_C(i)
 
-#elif TOKU_INT_TYPE == TOKU_INT_LONGLONG        /* }{ long long */
+#define TOKU_INTEGER_FMTLEN     PRId64
+#define TOKU_INTEGER_FMT        "%" TOKU_INTEGER_FMTLEN
+#define TOKU_UINTEGER_FMTLEN    PRIu64
+#define TOKU_UINTEGER_FMT       "%" TOKU_INTEGER_FMTLEN
+#define TOKU_XINTEGER_FMTLEN    PRIX64
+#define TOKU_XINTEGER_FMT       "%" TOKU_XINTEGER_FMTLEN
+#define TOKU_xINTEGER_FMTLEN    PRIx64
+#define TOKU_xINTEGER_FMT       "%" TOKU_xINTEGER_FMTLEN
+#define TOKU_OINTEGER_FMTLEN    PRIo64
+#define TOKU_OINTEGER_FMT       "%" TOKU_OINTEGER_FMTLEN
 
-#if defined(LLONG_MAX)          /* { */
-
-#define TOKU_INTEGER            long long
-#define TOKU_INTEGER_MAX        LLONG_MAX
-#define TOKU_INTEGER_MIN        LLONG_MIN
-
-#define TOKU_UNSIGNED_MAX       ULLONG_MAX
-
-#define t_intatt(i)             (i##LL)
-
-#define TOKU_INTEGER_FMTLEN     "ll"
-
-#elif defined(TOKU_USE_WINDOWS)   /* }{ */
+#elif defined(TOKU_USE_WINDOWS)     /* }{ */
 
 #define TOKU_INTEGER            __int64
 #define TOKU_INTEGER_MAX        _I64_MAX
 #define TOKU_INTEGER_MIN        _I64_MIN
 
+#define TOKU_UNSIGNED           unsgined TOKU_INTEGER
 #define TOKU_UNSIGNED_MAX       _UI64_MAX
 
 #define TOKU_INTEGER_FMTLEN     "I64"
+#define TOKU_INTEGER_FMT        "%" TOKU_INTEGER_FMTLEN "d"
+#define TOKU_UINTEGER_FMTLEN    TOKU_INTEGER_FMTLEN
+#define TOKU_UINTEGER_FMT       "%" TOKU_XINTEGER_FMTLEN "u"
+#define TOKU_XINTEGER_FMTLEN    TOKU_INTEGER_FMTLEN
+#define TOKU_XINTEGER_FMT       "%" TOKU_XINTEGER_FMTLEN "X"
+#define TOKU_xINTEGER_FMTLEN    TOKU_INTEGER_FMTLEN
+#define TOKU_xINTEGER_FMT       "%" TOKU_xINTEGER_FMTLEN "x"
+#define TOKU_OINTEGER_FMTLEN    TOKU_INTEGER_FMTLEN
+#define TOKU_OINTEGER_FMT       "%" TOKU_OINTEGER_FMTLEN "o"
 
-#else                           /* }{ */
+#else                               /* }{ */
 
-#error Implementation does not support 'long long'.
+#error Implementation does not support 64 bit integers.
 
-#endif                          /* } */
+#endif                              /* } */
 
 #else
 
@@ -377,7 +359,11 @@
 
 #endif                                      /* } */
 
-/* }===================================================================== */
+
+#define toku_integer2str(s,sz,n) \
+        snprintf((s),(sz),TOKU_INTEGER_FMT,(TOKU_INTEGER)(n))
+
+/* }}==================================================================== */
 
 
 
@@ -385,23 +371,18 @@
 ** Dependencies with C99
 ** ======================================================================= */
 
-/*
-** @t_sprintf - is equivalent to 'snprintf'.
-*/
-#define t_snprintf(s,sz,fmt,...)        snprintf(s, sz, fmt, __VA_ARGS__)
-
 
 /* 
 ** @toku_pointer2str - converts a pointer to a string.
 */
-#define toku_pointer2str(buff,sz,p)     t_snprintf(buff,sz,"%p",p)
+#define toku_pointer2str(buff,sz,p)     snprintf(buff,sz,"%p",p)
 
 
 /*
 ** @toku_number2strx - converts float to a hexadecimal numeral.
 */
-#define toku_number2strx(C,b,sz,f,n)  \
-        ((void)C, t_snprintf(b,sz,f,(TOKU_NUMBER)(n)))
+#define toku_number2strx(T,b,sz,f,n)  \
+        ((void)T, snprintf(b,sz,f,(TOKU_NUMBER)(n)))
 
 
 /*
@@ -431,13 +412,6 @@
 
 #endif
 
-
-#if defined(TOKU_CORE) || defined(TOKU_LIB)
-/* shorter names for internal use */
-#define t_likely(cond)      tokui_likely(cond)
-#define t_unlikely(cond)    tokui_unlikely(cond)
-#endif
-
 /* }===================================================================== */
 
 
@@ -461,7 +435,6 @@
 /*
 ** @TOKU_EXTRASPACE - defines the size of a raw memory associated with
 ** the Tokudae state with very fast access (memory chunk before state).
-** CHANGE if you need a different size.
 */
 #define TOKU_EXTRASPACE     sizeof(void *)
 
@@ -469,9 +442,31 @@
 /*
 ** @TOKU_IDSIZE - the maximum size for the description of the source
 ** of a function in debug information.
-** CHANGE it if you want a different size.
 */
-#define TOKU_IDSIZE         60
+#define TOKU_IDSIZE         64
+
+
+/*
+** @TOKU_OPCNAMESIZE - the maximum size for the opcode name.
+** Refer to the 'topnames.h' for complete listing to get the idea
+** for the correct size.
+** To disable opcode names, set this to 1.
+*/
+#define TOKU_OPCNAMESIZE    16
+
+
+/*
+** @TOKU_OPCDESCSIZE - the maximum size of the opcode description.
+*/
+#define TOKU_OPCDESCSIZE    512
+
+
+/*
+** @TOKU_OPARGS - the maximum number of instruction arguments.
+** Refer to the 'tcode.h' for complete listing of the opcodes and
+** formats.
+*/
+#define TOKU_OPARGS         3
 
 
 /*
@@ -482,8 +477,8 @@
 
 
 /*
-** @TOKUI_MAXALIGN - defines fields that, when used in a union, ensure maximum
-** alignment for the other items in that union.
+** @TOKUI_MAXALIGN - defines fields that, when used in a union,
+** ensure maximum alignment for the other items in that union.
 */
 #define TOKUI_MAXALIGN \
         long l; toku_Integer i; double d; toku_Number n; void *p
@@ -495,7 +490,7 @@
 */
 #if defined(TOKU_USE_APICHECK)
 #include <assert.h>
-#define tokui_checkapi(C,e)       assert(e)
+#define tokui_checkapi(T,e)       assert(e)
 #endif
 
 /* }====================================================================== */

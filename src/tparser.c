@@ -27,18 +27,6 @@
 #include "tvm.h"
 
 
-/*
-** If enabled, it disassembles pre-compiled Tokudae chunk.
-** (Used for internal debugging.)
-*/
-#if defined(TOKUI_DISASSEMBLE_BYTECODE)
-#include "ttrace.h"
-#define unasmfunc(T,p)      tokuTR_disassemble(T, p)
-#else
-#define unasmfunc(T,p)      /* no-op */
-#endif
-
-
 /* check if 'tok' matches current token */
 #define check(lx,tok)       ((lx)->t.tk == (tok))
 
@@ -594,7 +582,6 @@ static void close_func(Lexer *lx) {
     lx->fs = fs->prev; /* go back to enclosing function (if any) */
     T->sp.p--; /* pop kcache table */
     tokuG_checkGC(T); /* try to collect garbage memory */
-    unasmfunc(T, fs->p);
 }
 
 
@@ -692,13 +679,13 @@ static int addupvalue(FunctionState *fs, OString *name, ExpInfo *v) {
     UpValInfo *uv = newupvalue(fs);
     FunctionState *prev = fs->prev;
     if (v->et == EXP_LOCAL) { /* local? */
-        uv->onstack = 1;
+        uv->instack = 1;
         uv->idx = v->u.var.sidx;
         uv->kind = getlocalvar(prev, v->u.var.vidx)->s.kind;
         toku_assert(eqstr(name, getlocalvar(prev, v->u.var.vidx)->s.name));
     } else { /* must be upvalue */
         toku_assert(v->et == EXP_UVAL);
-        uv->onstack = 0;
+        uv->instack = 0;
         uv->idx = cast_ubyte(v->u.info);
         uv->kind = prev->p->upvals[v->u.info].kind;
         toku_assert(eqstr(name, prev->p->upvals[v->u.info].name));
@@ -2227,10 +2214,10 @@ static void foreachstm(Lexer *lx) {
     Scope s;
     enterloop(fs, &ls, 1); /* enter loop (scope for control variables) */
     tokuY_scan(lx); /* skip 'foreach' */
-    addlocallit(lx, "(foreach iter)");      /* iterator         (base)   */
-    addlocallit(lx, "(foreach invariant)"); /* invariant state  (base+1) */
-    addlocallit(lx, "(foreach cntlvar)");   /* control var      (base+2) */
-    addlocallit(lx, "(foreach tbcvar)");    /* to-be-closed var (base+3) */
+    addlocallit(lx, "(foreach1)");  /* iterator         (base)   */
+    addlocallit(lx, "(foreach2)");  /* invariant state  (base+1) */
+    addlocallit(lx, "(foreach3)");  /* control var      (base+2) */
+    addlocallit(lx, "(foreach4)");  /* to-be-closed var (base+3) */
     /* create locals variables */
     newlocalvar(lx, str_expectname(lx), 1); /* at least one var. expected */
     while (match(lx, ',')) {
@@ -2518,7 +2505,7 @@ static void mainfunc(FunctionState *fs, Lexer *lx) {
     env = newupvalue(fs);
     env->name = lx->envn;
     env->idx = 0;
-    env->onstack = 1;
+    env->instack = 0; /* be consistent for 'toku_combine' */
     env->kind = VARREG;
     tokuG_objbarrier(lx->T, fs->p, env->name);
     tokuY_scan(lx); /* scan for first token */

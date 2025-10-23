@@ -44,12 +44,15 @@
 ** in order to ensure that the most significant bit is never set.
 ** This is because immediate operands can be negative values
 ** and we must be able to code them into the bytecode array and
-** later decode them.
+** later decode them. For this we set the 24'th bit in case of long
+** immediate operand and 8th bit in case of short immediate operand to
+** indicate these values are negative.
 */
 #define MAX_IMM         (MAX_ARG_S >> 1)
 #define MIN_IMM         (-MAX_IMM)
 #define MAX_IMML        (MAX_ARG_L >> 1)
 #define MIN_IMML        (-MAX_IMML)
+
 
 /*
 ** Check if value is in range of short/long immediate operand.
@@ -411,11 +414,11 @@ t_sinline void freeslots(FunctionState *fs, int n) {
 }
 
 
-int tokuC_call(FunctionState *fs, int base, int nreturns) {
-    toku_assert(nreturns >= TOKU_MULTRET);
+int tokuC_call(FunctionState *fs, int base, int nres) {
+    toku_assert(nres >= TOKU_MULTRET);
     freeslots(fs, fs->sp - base); /* call removes function and arguments */
     toku_assert(fs->sp == base);
-    return tokuC_emitILL(fs, OP_CALL, base, nreturns + 1);
+    return tokuC_emitILL(fs, OP_CALL, base, nres + 1);
 }
 
 
@@ -1158,7 +1161,7 @@ void tokuC_exp2stack(FunctionState *fs, ExpInfo *e) {
         e->f = e->t = NOJMP;
     }
     toku_assert(e->f == NOJMP && e->t == NOJMP);
-    toku_assert(onstack(e));
+    toku_assert(instack(e));
 }
 
 
@@ -1178,7 +1181,7 @@ void tokuC_exp2val(FunctionState *fs, ExpInfo *e) {
 ** Initialize '.' indexed expression.
 */
 void tokuC_getdotted(FunctionState *fs, ExpInfo *v, ExpInfo *key, int super) {
-    toku_assert(onstack(v) && eisstring(key));
+    toku_assert(instack(v) && eisstring(key));
     v->u.info = stringK(fs, key->u.str);
     v->et = (super) ? EXP_DOTSUPER : EXP_DOT;
 }
@@ -1189,7 +1192,7 @@ void tokuC_getdotted(FunctionState *fs, ExpInfo *v, ExpInfo *key, int super) {
 */
 void tokuC_indexed(FunctionState *fs, ExpInfo *var, ExpInfo *key, int super) {
     int strK = 0;
-    toku_assert(onstack(var));
+    toku_assert(instack(var));
     tokuC_exp2val(fs, key);
     if (eisstring(key)) {
         string2K(fs, key); /* make constant */
@@ -1490,7 +1493,7 @@ t_sinline void swapexp(ExpInfo *e1, ExpInfo *e2) {
 static void codebin(FunctionState *fs, ExpInfo *e1, ExpInfo *e2, Binopr opr,
                     int commutative, int line) {
     OpCode op = binop2opcode(opr, OPR_ADD, OP_ADD);
-    int swap = !commutative && !onstack(e1) && onstack(e2);
+    int swap = !commutative && !instack(e1) && instack(e2);
     tokuC_exp2stack(fs, e1);
     tokuC_exp2stack(fs, e2);
     freeslots(fs, 1); /* e2 */
@@ -1581,7 +1584,7 @@ static void codeEq(FunctionState *fs, ExpInfo *e1, ExpInfo *e2, Binopr opr) {
     int imm; /* immediate */
     int iseq = (opr == OPR_EQ);
     toku_assert(opr == OPR_NE || opr == OPR_EQ);
-    if (!onstack(e1)) {
+    if (!instack(e1)) {
         /* 'e1' is either a numerical or stored string constant */
         toku_assert(e1->et == EXP_K || e1->et == EXP_INT || e1->et == EXP_FLT);
         swapexp(e1, e2);
@@ -1622,10 +1625,10 @@ static void codeorder(FunctionState *fs, ExpInfo *e1, ExpInfo *e2,
     } else { /* regular case, compare two stack values */
         int swap = 0;
         if (!swapped)
-            swap = (!onstack(e1) && onstack(e2));
-        else if (onstack(e2))
+            swap = (!instack(e1) && instack(e2));
+        else if (instack(e2))
             swap = 1;
-        else if (onstack(e1) && !onstack(e2))
+        else if (instack(e1) && !instack(e2))
             swap = 0;
         tokuC_exp2stack(fs, e1);
         tokuC_exp2stack(fs, e2);

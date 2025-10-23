@@ -58,6 +58,13 @@
 #define SET_ARG_L(ip,o,v)   set3bytes(GETPC_L(ip,o), v)
 
 
+/* max code jump offset value */
+#define MAXJMP      MAX_CODE
+
+#define NOJMP       (-1)  /* value indicating there it no jump */
+#define NOPC        NOJMP /* value indicating there it no pc */
+
+
 /*
 ** Decode short immediate operand by moving the immediate operand
 ** sign from 8th bit to the 32nd bit.
@@ -73,14 +80,6 @@
 #define IMML(imm) \
         (((imm) & 0x00800000) ? cast_int(~(cast_uint(imm) & 0xff7fffff) + 1) \
                               : cast_int(imm))
-
-
-
-/* max code jump offset value */
-#define MAXJMP      MAX_CODE
-
-#define NOJMP       (-1)  /* value indicating there it no jump */
-#define NOPC        NOJMP /* value indicating there it no pc */
 
 
 /* 
@@ -197,15 +196,15 @@ OP_BAND,/*         V1 V2 S 'V1 & V2'                                        */
 OP_BOR,/*          V1 V2 S 'V1 | V2'                                        */
 OP_BXOR,/*         V1 V2 S 'V1 ^ V2'                                        */
 
-OP_CONCAT,/*       L       'V{-L} = V{-L} .. V{L - 1}'                      */
+OP_CONCAT,/*       L           'V{-L} = V{-L} .. V{L - 1}'                  */
 
-OP_EQK,/*          V L S   '(V == K{L}) == S'                               */
+OP_EQK,/*          V L S       '(V == K{L}) == S'                           */
 
-OP_EQI,/*          V L S          '(V == I(L)) == S'                        */
-OP_LTI,/*          V L            'V < I(L)'                                */
-OP_LEI,/*          V L            'V <= I(L)'                               */
-OP_GTI,/*          V L            'V > I(L)'                                */
-OP_GEI,/*          V L            'V >= I(L)'                               */ 
+OP_EQI,/*          V L S       '(V == I(L)) == S'                           */
+OP_LTI,/*          V L         'V < I(L)'                                   */
+OP_LEI,/*          V L         'V <= I(L)'                                  */
+OP_GTI,/*          V L         'V > I(L)'                                   */
+OP_GEI,/*          V L         'V >= I(L)'                                  */ 
 
 OP_EQ,/*           V1 V2 S     '(V1 == V2) == S'                            */
 OP_LT,/*           V1 V2 S     '(V1 < V2)  (if (S) swap operands)'          */
@@ -223,8 +222,7 @@ OP_JMPS,/*         L       'pc -= L'                                        */
 OP_TEST,/*         V S     'if (!t_isfalse(V) == S) dojump;'                */
 OP_TESTPOP,/*      V S     'if (!t_isfalse(V) == S) { dojump; } pop;'       */
 
-OP_CALL,/*  L1 L2  'V{L1},...,V{L1+L2-1} = V{L1}(V{L1+1},...,V{offtp-1})'
-                    (check info)                                            */
+OP_CALL,/*  L1 L2   'V{L1},...,V{L1+L2-1} = V{L1}(V{L1+1},...,V{offtp-1})'  */
 
 OP_CLOSE,/*        L           'close all open upvalues >= V{L}'            */
 OP_TBC,/*          L           'mark L{L} at to-be-closed'                  */
@@ -237,7 +235,7 @@ OP_SETLOCAL,/*     V L         'L{L} = V'                                   */
 OP_GETUVAL,/*      L           'U{L}'                                       */
 OP_SETUVAL,/*      V L         'U{L} = V'                                   */
 
-OP_SETLIST,/*      L1 L2 S     'V{-L1}[L2+i] = V{-S+i}, 1 <= i <= S         */
+OP_SETLIST,/*      L1 L2 S     'V{L1}[L2+i] = V{-S+i}, 0 <= i < S           */
 
 OP_SETPROPERTY,/*  V L1 L2     'V{-L1}.K{L2}:string = V'                    */
 OP_GETPROPERTY,/*  V  L        'V.K{L}'                                     */
@@ -261,25 +259,8 @@ OP_FORPREP,/*     L1 L2        'create upvalue V{L1+3}; pc += L2'           */
 OP_FORCALL,/*     L1 L2  'V{L1+4},...,V{L1+3+L2} = V{L1}(V{L1+1}, V{L1+2});'*/
 OP_FORLOOP,/*L1 L2 L3 'if V{L1+4}!=nil {V{L1}=V{L1+2}; pc-=L2} else pop(L3)'*/
 
-OP_RETURN,/*         L1 L2 S      'return V{L1}, ... ,V{L1+L2-2}' (check notet)*/
+OP_RETURN,/*         L1 L2 S      'return V{L1}, ... ,V{L1+L2-2}'           */
 } OpCode;
-
-
-/*
-** Notet:
-**
-** [OP_CALL]
-** L1 is the offset from stack base, where the value being called is located.
-** L2 is the number of expected results biased with +1.
-** If L2 == 0, then 'sp' is set to last return_result+1.
-** 
-** [OP_RETURN]
-** L2 is biased with +1, in order to represent multiple returns when the
-** number of results is only known during runtime. For example L2 == 0
-** represents TOKU_MULTRET, in this case we would return all values up to the
-** top. S indicates if current function needs to close any open upvalues or
-** to-be-closed variables before returning.
-*/
 
 
 /* number of 'OpCode's */
@@ -324,11 +305,6 @@ TOKUI_DEC(const t_ubyte tokuC_opsize[FormatN];)
 #define getopSize(i)    (tokuC_opsize[getopFormat(i)])
 
 
-/* OpCode namet table */ 
-TOKUI_DEC(const char *tokuC_opname[NUM_OPCODES];)
-#define getopName(i)    (tokuC_opname[i])
-
-
 /* 
 ** Number of list items to accumulate before a SETLIST instruction.
 ** Keep this value under MAX_ARG_S.
@@ -352,7 +328,7 @@ TOKUI_FUNC int tokuC_emitILS(FunctionState *fs, Instruction op, int a, int b);
 TOKUI_FUNC int tokuC_emitILL(FunctionState *fs, Instruction i, int a, int b);
 TOKUI_FUNC int tokuC_emitILLL(FunctionState *fs, Instruction i, int a, int b,
                                                                        int c);
-TOKUI_FUNC int tokuC_call(FunctionState *fs, int base, int nreturns);
+TOKUI_FUNC int tokuC_call(FunctionState *fs, int base, int nres);
 TOKUI_FUNC int tokuC_vararg(FunctionState *fs, int nreturns);
 TOKUI_FUNC void tokuC_fixline(FunctionState *fs, int line);
 TOKUI_FUNC void tokuC_removelastjump(FunctionState *fs);

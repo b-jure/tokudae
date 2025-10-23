@@ -49,9 +49,9 @@ endif
 WARNINGS = $(WARN) $(NOWARN)
 
 # System flags
-SYSCFLAGS = -DTOKU_USE_LINUX
+SYSCFLAGS = -DTOKU_USE_POSIX
 SYSLDFLAGS =
-SYSLIBS = -Wl,-E -ldl
+SYSLIBS =
 
 ## Release flags
 #MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
@@ -60,10 +60,8 @@ SYSLIBS = -Wl,-E -ldl
 #MYOBJS =
 
 # Testing flags
-ASANFLAGS = -fsanitize=address -fsanitize=undefined\
- 	    -fsanitize=pointer-subtract -fsanitize=pointer-compare
-MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
-MYLDFLAGS = $(ASANFLAGS)
+MYCFLAGS = -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
+MYLDFLAGS =
 MYLIBS =
 MYOBJS =
 

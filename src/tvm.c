@@ -27,20 +27,30 @@
 #include "tvm.h"
 #include "tmeta.h"
 #include "tstring.h"
-#include "ttrace.h"
 #include "tprotected.h"
 
 
+#if 0 /* (by default do not trace lines) */
 
-/*
-** By default, use jump table.
-*/
+#include <stdio.h>
+
+#define debugline(p,pc) \
+        printf("line: %d\n", tokuD_getfuncline(p, relpc(pc, p)));
+
+#define TOKU_USE_JUMPTABLE      0
+
+#else /* otherwise do not trace lines */
+
+#define debugline(p,pc)     ((void)0)
+
 #if !defined(TOKU_USE_JUMPTABLE)
 #if defined(__GNUC__)
 #define TOKU_USE_JUMPTABLE      1
 #else
 #define TOKU_USE_JUMPTABLE      0
 #endif
+#endif
+
 #endif
 
 
@@ -99,7 +109,7 @@ static void pushclosure(toku_State *T, Proto *p, UpVal **encup, SPtr base) {
     cl->p = p;
     setclTval2s(T, T->sp.p++, cl); /* anchor to stack */
     for (int i = 0; i < nup; i++) { /* fill its upvalues */
-        if (uv[i].onstack) /* upvalue refers to local variable? */
+        if (uv[i].instack) /* upvalue refers to local variable? */
             cl->upvals[i] = tokuF_findupval(T, base + uv[i].idx);
         else /* get upvalue from enclosing function */
             cl->upvals[i] = encup[uv[i].idx];
@@ -725,7 +735,7 @@ t_sinline void poscall(toku_State *T, CallFrame *cf, int nres) {
     if (t_unlikely(T->hookmask && !hastocloseCfunc(wanted)))
         rethook(T, cf, nres);
     /* move results to proper place */
-    moveresults(T, cf->func.p, nres, cf->nresults);
+    moveresults(T, cf->func.p, nres, wanted);
     /* function cannot be in any of these cases when returning */
     toku_assert(!(cf->status & (CFST_HOOKED | CFST_FIN)));
     T->cf = cf->prev; /* back to caller (after closing variables) */
@@ -1261,14 +1271,6 @@ t_sinline void pushtable(toku_State *T, int b) {
 #define savestate(T)        (storepc(T), storesp(T))
 
 
-#if defined(TOKUI_TRACE_EXEC)
-#include "ttrace.h"
-#define tracepc(T,p)        (tokuTR_tracepc(T, sp, p, pc, 1))
-#else
-#define tracepc(T,p)        ((void)0)
-#endif
-
-
 /* protect code that can reallocate stack or change hooks */
 #define Protect(exp)    ((exp), updatetrap(cf))
 
@@ -1285,7 +1287,7 @@ t_sinline void pushtable(toku_State *T, int b) {
         updatebase(cf); /* correct stack */ \
         sp = base + sizestack; /* correct stack pointer */ \
     } \
-    I = (tracepc(T, cl->p), *(pc++)); \
+    I = *(pc++); \
 }
 
 /* fetch short instruction argument */
@@ -1308,10 +1310,12 @@ t_sinline void pushtable(toku_State *T, int b) {
 ** Do a conditional jump: skip next instruction if 'cond_' is not what
 ** was expected, else do next instruction, which must be a jump.
 */
-#define docondjump(pre) \
+#define docondjumppre(pre) \
     { int cond_ = fetch_s(); TValue *v = peek(0); pre; \
       if ((!t_isfalse(v)) != cond_) check_exp(getopSize(*pc) == 4, pc += 4); \
       vm_break; }
+
+#define docondjump()    docondjumppre(((void)0))
 
 
 void tokuV_execute(toku_State *T, CallFrame *cf) {
@@ -1339,6 +1343,7 @@ returning: /* trap already set */
     for (;;) {
         Instruction I; /* instruction being executed */
         fetch();
+        debugline(cl->p, pc);
         toku_assert(base == cf->func.p + 1);
         toku_assert(base <= T->sp.p && T->sp.p <= T->stackend.p);
         vm_dispatch(I) {
@@ -1354,8 +1359,7 @@ returning: /* trap already set */
             }
             vm_case(OP_NIL) {
                 int n = fetch_l();
-                while (n--)
-                    setnilval(s2v(sp++));
+                while (n--) setnilval(s2v(sp++));
                 vm_break;
             }
             vm_case(OP_SUPER) {
@@ -1672,7 +1676,6 @@ returning: /* trap already set */
                 op_bitwise(T, ibxor);
                 vm_break;
             }
-            /* } CONCAT_OP { */
             vm_case(OP_CONCAT) {
                 int total;
                 savestate(T);
@@ -1682,7 +1685,6 @@ returning: /* trap already set */
                 sp -= total - 1;
                 vm_break;
             }
-            /* } ORDERING_OPS { */
             vm_case(OP_EQK) {
                 TValue *v1 = peek(0);
                 const TValue *vk = K(fetch_l());
@@ -1795,10 +1797,10 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_TEST) {
-                docondjump((void)0);
+                docondjump();
             }
             vm_case(OP_TESTPOP) {
-                docondjump(sp--);
+                docondjumppre(sp--);
             }
             vm_case(OP_CALL) {
                 CallFrame *newcf;
@@ -1806,7 +1808,7 @@ returning: /* trap already set */
                 int nres;
                 savestate(T);
                 func = STK(fetch_l());
-                nres = fetch_l()-1;
+                nres = fetch_l() - 1;
                 if ((newcf = precall(T, func, nres)) == NULL) /* C call? */
                     updatetrap(cf); /* done (C function already returned) */
                 else { /* Tokudae call */
@@ -1878,7 +1880,7 @@ returning: /* trap already set */
                         len++;
                     }
                     l->len = len; /* update length */
-                }
+                } /* otherwise list has hole(s), skip setting the list */
                 sp = sl + 1; /* remove list elements off the stack (if any) */
                 vm_break;
             }
@@ -2029,7 +2031,7 @@ returning: /* trap already set */
                 offset = fetch_l();
                 pc += offset;
                 /* go to the next instruction */
-                I = (tracepc(T, cl->p), *(pc++));
+                I = *(pc++);
                 toku_assert(I == OP_FORCALL);
                 goto l_forcall;
             }
@@ -2051,7 +2053,7 @@ returning: /* trap already set */
                 updatestack(cf); /* stack may have changed */
                 sp = T->sp.p; /* correct sp for next instruction */
                 /* go to the next instruction */
-                I = (tracepc(T, cl->p), *(pc++));
+                I = *(pc++);
                 toku_assert(I == OP_FORLOOP);
                 goto l_forloop;
             }}

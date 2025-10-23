@@ -24,8 +24,7 @@
 
 
 /* create new string from literal 'lit' */
-#define tokuS_newlit(T, lit) \
-        tokuS_newl(T, "" lit, (sizeof(lit)/sizeof(char)) - 1)
+#define tokuS_newlit(T, lit)    tokuS_newl(T, "" lit, t_arraysize(lit) - 1)
 
 
 /* test whether a string is a reserved word */

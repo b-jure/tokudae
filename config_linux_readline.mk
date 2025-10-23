@@ -1,4 +1,6 @@
 # Configuration file for building and installing Tokudae
+
+
 # {=========================================================================
 # 			    Version and release
 # ==========================================================================
@@ -49,9 +51,9 @@ endif
 WARNINGS = $(WARN) $(NOWARN)
 
 # System flags
-SYSCFLAGS = -DTOKU_USE_LINUX
+SYSCFLAGS = -DTOKU_USE_LINUX -DTOKU_USE_READLINE
 SYSLDFLAGS =
-SYSLIBS = -Wl,-E -ldl
+SYSLIBS = -Wl,-E -ldl -lreadline
 
 ## Release flags
 #MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
@@ -60,7 +62,7 @@ SYSLIBS = -Wl,-E -ldl
 #MYOBJS =
 
 # Testing flags
-ASANFLAGS = -fsanitize=address -fsanitize=undefined\
+ASANFLAGS = -fsanitize=address -fsanitize=undefined \
  	    -fsanitize=pointer-subtract -fsanitize=pointer-compare
 MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
 MYLDFLAGS = $(ASANFLAGS)

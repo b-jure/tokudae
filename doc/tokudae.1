@@ -1,4 +1,4 @@
-.TH tokudae 1 "20.07.2025" "version 1.0.0"
+.TH tokudae 1 "23.10.2025" "version 1.0.0"
 
 .SH NAME
 tokudae \- Tokudae interpreter
@@ -8,53 +8,103 @@ tokudae \- Tokudae interpreter
 
 .SH DESCRIPTION
 \fBtokudae\fR is the standalone Tokudae interpreter.
-It loads and executes Tokudae programs in textual source form.
+It loads and executes Tokudae programs,
+either in textual source form or in precompiled binary form.
+(Precompiled binaries are output by \fBtokuc\fR, the Tokudae compiler.)
 \fBtokudae\fR can be used as a batch interpreter and also interactively.
+.LP
 After handling the \fIoptions\fP, the Tokudae program in file \fIscript\fP
 is loaded and executed.
 The \fIargs\fP are available to \fIscript\fP as strings in a global list
-called '\fBargs\fR' and also as arguments to its main function.
+called \fBargs\fR and also as arguments to its main function.
 Additionally all the arguments up to \fIscript\fP argument are available
-as strings in global list called '\fBcliargs\fR'.
-When called without arguments, \fBtokudae\fR behaves as '\fBtokudae \-v \-i\fR'
-if the standard input is a terminal, and as '\fBtokudae \-\fR' otherwise.
+as strings in global list called \fBcliargs\fR.
+When called without arguments, \fBtokudae\fR behaves as "\fBtokudae \-v \-i\fR"
+if the standard input is a terminal, and as "\fBtokudae \-\fR" otherwise.
+.LP
+In interactive mode, \fBtokudae\fR prompts the user,
+reads lines from the standard input,
+and executes them as they are read.
+If the line contains an expression,
+then the line is evaluated and the result is printed.
+If a line does not contain a complete declaration or statement,
+then a secondary prompt is displayed and lines are read until a complete
+statement or declaration is formed or a syntax eror is found.
+.LP
+Before handling command line options and scripts,
+\fBtokudae\fR checks the contents of the environment variables
+\fBTOKU_INIT_1_0\fR and \fBTOKU_INIT\fR, in that order.
+If the contents are of the form '@\fIfilename\fR',
+then \fIfilename\fR is executed.
+Otherwise, the contents are assumed to be a Tokudae statement or declaration
+and is executed.
+When \fBTOKU_INIT_1_0\fR is defined,
+\fBTOKU_INIT\fR is ignored.
 
 .SH OPTIONS
 .TP
 .B \-e stat
-Execute string \fIstat\fP.
+execute string \fIstat\fP.
 .TP
 .B \-i
-Enter interactive mode after executing \fIscript\fP.
+enter interactive mode after executing \fIscript\fP.
 .TP
 .B \-l mod
-Import library \fImod\fP into global \fImod\fP.
+import library \fImod\fP into global \fImod\fP.
 .TP
 .B \-l g=mod
-Import library \fImod\fP into global \fIg\fP.
+import library \fImod\fP into global \fIg\fP.
 .TP
 .B \-v
-Show version information.
+show version information.
 .TP
 .B \-W
-Turn warnings on.
+turn warnings on.
 .TP
 .B \-E
-Ignore environment variables.
+ignore environment variables.
 .TP
 .B \-h
 Show help.
 .TP
 .B \-\-
-Stop handling options.
+stop handling options.
 .TP
 .B \-
-Stop handling options and execute stdin.
+stop handling options and execute stdin.
+
+.SH ENVIRONMENT VARIABLES
+The following environment variables affect the execution of \fBtokudae\fR.
+When defined,
+the version-specific variants take priority
+and the version-neutral variants are ignored.
+.TP
+.B TOKU_INIT, TOKU_INIT_1_0
+Code to be executed before command line options and scripts.
+.TP
+.B TOKU_PATH, TOKU_PATH_1_0
+Initial value of package.path,
+the path used by require to search for Tokudae loaders.
+.TP
+.B TOKU_CPATH, TOKU_CPATH_1_0
+Initial value of package.cpath,
+the path used by require to search for C loaders.
 
 .SH EXIT STATUS
+If a script calls os.exit,
+then \fBtokudae\fR exits with the given exit status.
+Otherwise,
 \fBtokudae\fR exits with EXIT_SUCCESS (0 on POSIX systems) if there were no
 errors and with EXIT_FAILURE (1 on POSIX systems) if there were errors.
 Errors raised in interactive mode do not cause exits.
 
+.SH DIAGNOSTICS
+Error messages should be self explanatory.
+
+.SH "SEE ALSO"
+.BR tokuc (1)
+.br
+The documentation provided with the distribution.
+
 .SH AUTHOR
-B. Jure.
+B. Jure

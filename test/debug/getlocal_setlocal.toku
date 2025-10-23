@@ -63,10 +63,10 @@ local fn setloclist(f, l, el, ...) {
             }
             l = getloclist(2);
             assert(l[7].name == "unreach" and l[7].val == "whateva");
-            assert(l[8].name == "(foreach iter)" and typeof(l[8].val) == "function");
-            assert(l[9].name == "(foreach invariant)" and typeof(l[9].val) == "list");
-            assert(l[10].name == "(foreach cntlvar)" and l[10].val == i);
-            assert(l[11].name == "(foreach tbcvar)" and l[11].val == nil);
+            assert(l[8].name == "(foreach1)" and typeof(l[8].val) == "function");
+            assert(l[9].name == "(foreach2)" and typeof(l[9].val) == "list");
+            assert(l[10].name == "(foreach3)" and l[10].val == i);
+            assert(l[11].name == "(foreach4)" and l[11].val == nil);
             assert(l[12].name == "i" and l[12].val == i);
             assert(l[13].name == "var" and l[13].val == var);
         }

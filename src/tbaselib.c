@@ -257,7 +257,6 @@ static void auxclone(toku_State *T, int t, int index) {
 }
 
 
-// TODO: add docs
 static int b_clone(toku_State *T) {
     tokuL_check_any(T, 0);
     toku_setntop(T, 1); /* leave only object to copy on top */
@@ -495,7 +494,6 @@ static int b_getmethods(toku_State *T) {
 }
 
 
-// TODO: test __methodtable
 static int b_setmethods(toku_State *T) {
     tokuL_check_type(T, 0, TOKU_T_CLASS);
     toku_setntop(T, 2);
@@ -822,7 +820,6 @@ static const char *strtoint(const char *s, toku_Unsigned base,
 }
 
 
-// TODO: update docs
 static int b_tonum(toku_State *T) {
     int of = 0; /* overflow flag */
     if (toku_is_noneornil(T, 1)) { /* no base? */

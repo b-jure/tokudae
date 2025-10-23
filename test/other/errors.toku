@@ -257,6 +257,12 @@ checkmessage("reg.gsub(\"s\", \"s\", setmetatable);", "'setmetatable'");
 
 __G.aaa = nil;
 
+/// error in metamethod (__gc is exception, errors are ignored in finalizers)
+checkmessage([=[
+    local class A { __add = list.sort; };
+    local res = A() + A();
+]=], "on a bad 'self'");
+
 /// errors in functions without debug info
 {
     local f = |a| { return a + 1 };
@@ -274,7 +280,7 @@ __G.aaa = nil;
 
 /// testing size of 'source' info; size of buffer for that info is
 /// TOKU_IDSIZE, declared as 60 in tokuconf. Get one position for '\0'.
-local idsize = 60 - 1;
+local idsize = 64 - 1;
 local fn checksize(source) {
     /// syntax error
     local _, msg = load("x;", source);
@@ -282,7 +288,7 @@ local fn checksize(source) {
     assert(len(msg) <= idsize);
 }
 
-for (local i=60-10; i<=60; i=i+1) { /// check border cases around 60
+for (local i=60-10; i<=60; i++) { /// check border cases around 60
     checksize("@" .. string.repeat("x", i)); /// file names
     checksize(string.repeat("x", i - 10)); /// string sources
     checksize("=" .. string.repeat("x", i)); /// exact sources

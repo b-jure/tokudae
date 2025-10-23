@@ -3177,6 +3177,243 @@ typedef struct toku_Debug {
         chunk, this execution occurs without any calls to hooks.
         <p>
 
+        <!-- toku_Opcode -->
+        <hr><h3><a name="toku_Opcode"><code>toku_Opcode</code></a></h3>
+        <pre>
+typedef struct toku_Opcode {
+    int args[TOKU_OPARGS];
+    int line;
+    int offset;
+    int op;
+    char name[TOKU_OPCNAMESIZE];
+    /* private part */
+    <em>other fields</em>
+} toku_Opcode;</pre>
+        <p>
+        A structure used to carry opcode information. Each Tokudae function
+        has code array associated with it.
+        The code is called bytecode,
+        it is a sequence of byte sized numbers,
+        which the Tokudae virtual machine understands and executes.
+        Bytecode that is executed (interpreted) as instruction is called opcode.
+        Not all bytecodes are opcodes, some act as arguments to the opcodes.
+        <br/><br/>
+        The function <a href="#toku_getopcode"><code>toku_getopcode</code></a>
+        fills all of the structure fields with appropriate information.
+        <br/><br/>
+        The fields of <a href="#toku_Opcode"><code>toku_Opcode</code></a>
+        have the following meaning:
+        <ul>
+            <li>
+                <b><code>args</code>: </b>
+                additional numbers associated with the opcode that act as
+                arguments to that opcode, similar to function arguments.
+                These numbers are quite often encoded in a special way
+                depending on the implementation and the opcode in question.
+                Not all opcodes use the same amount of arguments,
+                therefore the value <code>-1</code> indicates the absence of
+                the argument and that there are no more arguments to follow.
+                Maximum number of arguments is
+                <a name="TOKU_OPARGS"><code>TOKU_OPARGS</code></a>
+                (see <code>tokudaeconf.h</code>).
+            </li>
+            <li>
+                <b><code>line</code>: </b>
+                line number where (after the translation of the source code)
+                the opcode is located in the function.
+                This is set to <code>-1</code> if the function has no debug
+                information.
+            </li>
+            <li>
+                <b><code>offset</code>: </b>
+                byte offset of the opcode relative to the beginning of the
+                code array.
+                Beware, Tokudae opcodes are variable in size, meaning that
+                you can't iterate to the next opcode by getting the next byte.
+                Instead, use
+                <a href="#toku_getopcode"><code>toku_getopcode</code></a>,
+                <a href="#toku_getopcodeoff"><code>toku_getopcodeoff</code></a>
+                or <a href="#toku_getopcode_next"><code>toku_getopcode_next</code></a>,
+                to iterate the bytecode.
+            </li>
+            <li>
+                <b><code>op</code>: </b>
+                internal numerical value of the opcode.
+            </li>
+            <li>
+                <b><code>name</code>: </b>
+                a "printable" version of <code>op</code> of maximum size
+                <a name="TOKU_OPNAMESIZE"><code>TOKU_OPNAMESIZE</code></a>
+                (see <code>tokudaeconf.h</code>).
+            </li>
+        </ul>
+        </p>
+
+        <!-- toku_Opdesc -->
+        <hr><h3><a name="toku_Opdesc"><code>toku_Opdesc</code></a></h3>
+        <pre>
+typedef struct toku_Opdesc {
+    struct {
+        int type;
+        union {
+            int b;
+            toku_Number n;
+            const char *s;
+        } value;
+    } extra;
+    char desc[TOKU_OPCDESCSIZE];
+} toku_Opdesc;</pre>
+        <p>
+        Structure that holds the description of the <code>toku_Opcode</code>
+        (see <a href="#toku_Opcode"><code>toku_Opcode</code></a>) and it's
+        associated value (if any).
+        <br/><br/>
+        The fields of <a href="#toku_Opdesc"><code>toku_Opdesc</code></a>
+        have the following meaning:
+        <ul>
+            <li>
+                <b><code>desc</code>: </b>
+                description of the opcode, it is a
+                C&nbsp;&lsquo;<em>code</em>&rsquo; with made up variables and
+                functions which describes what the opcode does.
+                The description is just a simplification and not what
+                actually happens when the opcode is executed.
+                Maximum size of the description is
+                <a name="TOKU_OPCDESCSIZE"><code>TOKU_OPCDESCSIZE</code></a>
+                (see <code>tokudaeconf.h</code>).
+            </li>
+            <li>
+                <b><code>extra</code>: </b>
+                holds the immediate operand value, constant value or the
+                literal value of the opcode.
+                For example, if the opcode has an argument that is an index
+                into the array of constants,
+                then <code>extra.type</code> is set to the type of that
+                constant (see <a href="#toku_type"><code>toku_type</code></a>),
+                and <code>extra.value</code> to the value of that constant.
+            </li>
+        </ul>
+        </p>
+
+        <!-- toku_Cinfo -->
+        <hr><h3><a name="toku_Cinfo"><code>toku_Cinfo</code></a></h3>
+        <pre>
+typedef struct toku_Cinfo {
+    const void *func;
+    const void *constants;
+    const void *functions;
+    const void *code;
+    const char *source;
+    size_t srclen;
+    union {
+        struct {
+            int startoff;
+            int endoff;
+        } l;
+        struct {
+            int instack;
+            int idx;
+        } u;
+    } info;
+    int defline;
+    int lastdefline;
+    int nupvals;
+    int nlocals;
+    int nparams;
+    int nconstants;
+    int nfunctions;
+    int ncode;
+    int nslots;
+    unsigned char isvararg;
+    /* private part */
+    <em>other fields</em>
+} toku_Cinfo;</pre>
+        <p>
+        Structure that holds the information about the pre-compiled Tokudae
+        function. The structure is filled by calling
+        <a href="#toku_getcompinfo"><code>toku_getcompinfo</code></a>.
+        <br/>
+        Some fields are identical to the fields in
+        <a href="#toku_Debug"><code>toku_Debug</code></a>
+        and won't be explained here.
+        <br/><br/>
+        The fields of <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>
+        have the following meaning:
+        <ul>
+            <li>
+                <b><code>func</code>: </b>
+                pointer to the pre-compiled Tokudae function as filled
+                by a call to
+                <a href="#toku_getcompinfo"><code>toku_getcompinfo</code></a>.
+            </li>
+            <li>
+                <b><code>constants</code>: </b>
+                pointer to the array of constant values.
+            </li>
+            <li>
+                <b><code>functions</code>: </b>
+                pointer to the array of the functions
+                (defined in <code>func</code>).
+            </li>
+            <li>
+                <b><code>code</code>: </b>
+                pointer to the array of bytecodes.
+            </li>
+            <li>
+                <b><code>info</code>: </b>
+                union that contains structure for the debug information of
+                a local variable <code>l</code> or an upvalue <code>u</code>.
+                This information is filled by a call to
+                <a href="#toku_getlocalinfo"><code>toku_getlocalinfo</code></a>
+                and
+                <a href="#toku_getupvalueinfo"><code>toku_getupvalueinfo</code></a>.
+                <br/>
+                For the local variable,
+                the <code>l.startoff</code> is the relative offset in
+                bytes from <code>code</code> array where the local variable
+                becomes visible (or active).
+                The <code>l.endoff</code> is the relative offset in bytes
+                from <code>code</code> array where the local variable becomes
+                invisible (or inactive).
+                <br/>
+                For the upvalue,
+                the <code>u.instack</code> is non-zero if the index of the
+                upvalue <code>u.idx</code> refers to the local variable
+                defined in the caller.
+                Otherwise,
+                <code>u.instack</code> will be set to 0,
+                meaning the <code>u.idx</code> refers to the upvalue
+                of the caller.
+                <br/>
+                The exception is the first upvalue of the main chunk,
+                which is the environment
+                (see <a href="#2.2">&sect;2.2</a>),
+                for which the <code>u.instack</code> is always set to&nbsp;0.
+                <br/>
+            </li>
+            <li>
+                <b><code>nlocals</code>: </b>
+                the total number of local variables defined in <code>func</code>.
+            </li>
+            <li>
+                <b><code>nconstants</code>: </b>
+                the total number of constant values in <code>constants</code>.
+            </li>
+            <li>
+                <b><code>nfunctions</code>: </b>
+                the total number of functions in <code>functions</code>.
+            </li>
+            <li>
+                <b><code>ncode</code>: </b>
+                the total number of bytecodes in <code>code</code>.
+            </li>
+            <li>
+                <b><code>nslots</code>: </b>
+                the total number of stack slots reserved for <code>func</code>.
+            </li>
+        </ul>
+        </p>
+
         <hr><h3><a name="toku_upvalueindex"><code>toku_upvalueindex</code></a></h3><p>
         <span class="apii">[-0, +0, &ndash;]</span>
         <pre>int toku_upvalueindex (unsigned short i);</pre>
@@ -4509,8 +4746,7 @@ typedef struct toku_Debug {
         (see <a href="#toku_Debug"><code>toku_Debug</code></a>).
         <br/><br/>
         <code>toku_load</code> automatically detects whether the chunk
-        is text or binary and loads it accordingly
-        (see program <code>tokudaec</code>).
+        is text or binary and loads it accordingly.
         The string <code>mode</code> works as in function
         <a href="#load"><code>load</code></a>, with the addition that a
         <code>NULL</code> value is equivalent to the string "<code>bt</code>".
@@ -5421,6 +5657,121 @@ printf("%d\n", ar.defline);</pre>
         <pre>int toku_gethookcount (toku_State *T, toku_Hook f, int mask, int count);</pre>
         <p>
         Returns the current hook count.
+        </p>
+
+        <!-- toku_getopcode -->
+        <hr><h3><a name="toku_getopcode"><code>toku_getopcode</code></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>int toku_getopcode (toku_State *T, const toku_Cinfo *ci, int n, toku_Opcode *opc);</pre>
+        <p>
+        Fills out the <code>opc</code> structure
+        (see <a href="#toku_Opcode"><code>toku_Opcode</code></a>)
+        with the <code>n</code>-th opcode from the function previously loaded
+        into <code>ci</code>
+        (see <a href="#toku_getcompinfo"><code>toku_getcompinfo</code></a>).
+        The <code>n</code>, if positive, starts from 0,
+        which is the first opcode in the function at index <code>idx</code>.
+        If <code>n</code> is negative,
+        it is the opcodes <code>n</code>th opcode starting from the last
+        opcode in the given function.
+        For example, if <code>n</code> is -1, the last opcode is returned.
+        <br/><br/>
+        If opcode is found, this returns 1, otherwise 0 is returned.
+        </p>
+
+        <!-- toku_getopdesc -->
+        <hr><h3><a name="toku_getopdesc"><desc>toku_getopdesc</desc></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>void toku_getopdesc (toku_State *T, const toku_Opdesc *opd, const toku_Opcode *opc);</pre>
+        <p>
+        Fills out the <code>opd</code> structure
+        (see <a href="#toku_Opdesc"><code>toku_Opdesc</code></a>)
+        with the description of the opcode <code>opc</code>
+        (see <a href="#toku_Opcode"><code>toku_Opcode</code></a>)
+        and the associated value (if any).
+        </p>
+
+        <!-- toku_getcompinfo -->
+        <hr><h3><a name="toku_getcompinfo"><desc>toku_getcompinfo</desc></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>int toku_getcompinfo (toku_State *T, int idx, toku_Cinfo *ci);</pre>
+        <p>
+        If the function at the given index is a Tokudae function,
+        this returns 1 and fills the structure <code>ci</code>
+        (see <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>),
+        otherwise 0 is returned.
+        </p>
+
+        <!-- toku_getconstant -->
+        <hr><h3><a name="toku_getconstant"><desc>toku_getconstant</desc></a></h3>
+        <span class="apii">[-0, +(0|1), &ndash;]</span>
+        <pre>int toku_getconstant (toku_State *T, const toku_Cinfo *ci, int n);</pre>
+        <p>
+        Pushes onto the stack the <code>n</code>'th constant (starting from 0)
+        of the function in the compile information <code>ci</code>
+        (see <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>)
+        which was previously filled by a call to
+        <a href="#toku_getcompinfo"><code>toku_getcompinfo</code></a>.
+        <br/><br/>
+        This returns the type of the constant value that was pushed,
+        however if there is no <code>n</code>'th constant,
+        nothing is pushed and
+        <a href="#TOKU_T_NONE"><code>TOKU_T_NONE</code></a> is returned.
+        </p>
+
+        <!-- toku_getshortsrc -->
+        <hr><h3><a name="toku_getshortsrc"><desc>toku_getshortsrc</desc></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>void toku_getshortsrc (toku_State *T, const toku_Cinfo *ci, char *out);</pre>
+        <p>
+        Fills the <code>out</code> buffer with a "printable" version of
+        <code>source</code> in <code>ci</code>.
+        The size of the <code>out</code> buffer should be at least of size
+        <a href="TOKU_IDSIZE"><code>TOKU_IDSIZE</code></a>.
+        </p>
+
+        <!-- toku_getlocalinfo -->
+        <hr><h3><a name="toku_getlocalinfo"><desc>toku_getlocalinfo</desc></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>const char *toku_getlocalinfo (toku_State *T, toku_Cinfo *ci, int n);</pre>
+        <p>
+        Fills out the <code>ci-&gt;info.l</code> structure
+        (see <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>)
+        with the debug information of the <code>n</code>'th (starting from 0)
+        local variable and returns the name of the local variable.
+        If there is no debug information or the <code>n</code>'th local
+        variable, this returns NULL.
+        </p>
+
+        <!-- toku_getupvalueinfo -->
+        <hr><h3><a name="toku_getupvalueinfo"><desc>toku_getupvalueinfo</desc></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>const char *toku_getupvalueinfo (toku_State *T, toku_Cinfo *ci, int n);</pre>
+        <p>
+        Fills out the <code>ci-&gt;info.u</code> structure
+        (see <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>)
+        with the debug information of the <code>n</code>'th (starting from 0)
+        upvalue and returns the name of the of the upvalue or string
+        <code>"-"</code> if there is no debug information.
+        If there is no <code>n</code>'th upvalue, this returns NULL.
+        </p>
+
+        <!-- toku_getfunction -->
+        <hr><h3><a name="toku_getfunction"><desc>toku_getfunction</desc></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>int toku_getfunction (toku_State *T,
+                      const toku_Cinfo *src,
+                      toku_Cinfo *dest,
+                      int n);</pre>
+        <p>
+        Fills out the compile information <code>dest</code>
+        (see <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>)
+        with the <code>n</code>'th function in <code>src-&gt;functions</code>
+        (the <code>src</code> should already be filled by call to
+        <a href="#toku_getcompinfo"><code>toku_getcompinfo</code></a>)
+        and returns 1.
+        If there is no <code>n</code>'th function in <code>src</code> this
+        returns 0.
         </p>
 
 
@@ -12304,6 +12655,43 @@ assert(!res and err == l);</pre>
         <hr/><h3><a name="debug.stackinuse"><code>debug.stackinuse ([thread])</code></a></h3>
         <p>
         Returns the total stack usage of a thread, a number.
+        </p>
+
+        <!-- debug.getcode -->
+        <hr/><h3><a name="debug.getcode"><code>debug.getcode (function)</code></a></h3>
+        <p>
+        Returns a list representing the complete bytecode of the
+        <code>function</code>.
+        Each list element represents an opcode, and each opcode is a table
+        containing the following fields:
+        <ul>
+            <li>
+                <b>"<code>args</code>"</b>:
+                a list of integers representing opcode arguments in order.
+                This field is absent if opcode has no arguments.
+            </li>
+            <li>
+                <b>"<code>line</code>"</b>:
+                integer representing the line number of the opcode.
+                This is set to <code>-1</code> if the function has no
+                debug information.
+            </li>
+            <li>
+                <b>"<code>offset</code>"</b>:
+                byte offset of the opcode from the beginning of the code.
+            </li>
+            <li>
+                <b>"<code>op</code>"</b>:
+                integer value of the opcode.
+            </li>
+            <li>
+                <b>"<code>name</code>"</b>:
+                "printable" version (a string) of the "<code>op</code>" field.
+            </li>
+        </ul>
+        If <code>function</code> is not a Tokudae function, then it must be a
+        level (see <a href="#debug.getinfo"><code>debug.getinfo</code></a>),
+        in which case the function at the given level will be used.
         </p>
 
         <!-- debug.cstacklimit -->

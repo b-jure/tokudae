@@ -638,7 +638,6 @@ static int reg_gsub(toku_State *T) {
 }
 
 
-// TODO: add docs
 static const tokuL_Entry reglib[] = {
     {"find", reg_find},
     {"match", reg_match},

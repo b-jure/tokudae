@@ -375,9 +375,9 @@ static void addquoted(tokuL_Buffer *B, const char *s, size_t len) {
         else if (iscntrl(uchar(*s))) {
             char buff[10];
             if (!isdigit(uchar(*(s+1))))
-                t_snprintf(buff, sizeof(buff), "\\%d", cast_int(uchar(*s)));
+                snprintf(buff, sizeof(buff), "\\%d", cast_int(uchar(*s)));
             else
-                t_snprintf(buff, sizeof(buff), "\\%03d", cast_int(uchar(*s)));
+                snprintf(buff, sizeof(buff), "\\%03d", cast_int(uchar(*s)));
             tokuL_buff_push_string(B, buff);
         }
         else
@@ -413,7 +413,7 @@ static int quotefloat(toku_State *T, char *buff, toku_Number n) {
         return nb;
     }
     /* for the fixed representations */
-    return t_snprintf(buff, MAX_ITEM, "%s", s);
+    return snprintf(buff, MAX_ITEM, "%s", s);
 }
 
 
@@ -433,9 +433,9 @@ static void addliteral(toku_State *T, tokuL_Buffer *B, int arg) {
             else { /* integers */
                 toku_Integer n = toku_to_integer(T, arg);
                 const char *format = (n == TOKU_INTEGER_MIN) /* corner case? */
-                    ? "0x%" TOKU_INTEGER_FMTLEN "x" /* use hex */
+                    ? "0x" TOKU_XINTEGER_FMT /* use hex format */
                     : TOKU_INTEGER_FMT; /* else use default format */
-                nb = t_snprintf(buff, MAX_ITEM, format, n);
+                nb = snprintf(buff, MAX_ITEM, format, n);
             }
             tokuL_buffadd(B, cast_uint(nb));
             break;
@@ -460,6 +460,23 @@ static const char *get2digits (const char *s) {
 }
 
 
+static const char *lmods[] = {
+    TOKU_UINTEGER_FMTLEN,
+    TOKU_INTEGER_FMTLEN,
+    TOKU_XINTEGER_FMTLEN,
+    TOKU_xINTEGER_FMTLEN,
+    TOKU_OINTEGER_FMTLEN, 
+};
+
+static size_t szmods[] = {
+    LL(TOKU_UINTEGER_FMTLEN),
+    LL(TOKU_INTEGER_FMTLEN),
+    LL(TOKU_XINTEGER_FMTLEN),
+    LL(TOKU_xINTEGER_FMTLEN),
+    LL(TOKU_OINTEGER_FMTLEN),
+};
+
+
 /*
 ** Check whether a conversion specification is valid. When called,
 ** first character in 'form' must be '%' and last character must
@@ -467,7 +484,7 @@ static const char *get2digits (const char *s) {
 ** 'precision' signals whether to accept a precision.
 */
 static void checkformat(toku_State *T, const char *form, const char *flags,
-                        int precision) {
+                        int precision, int imod) {
     const char *spec = form + 1; /* skip '%' */
     spec += strspn(spec, flags); /* skip flags */
     if (*spec != '0') { /* a width cannot start with '0' */
@@ -477,26 +494,50 @@ static void checkformat(toku_State *T, const char *form, const char *flags,
             spec = get2digits(spec); /* skip precision */
         }
     }
-    if (!isalpha(uchar(*spec))) /* did not go to the end? */
+    /* did not go to the end? */
+    if ((imod >= 0 && *lmods[imod] != *spec) || !isalpha(uchar(*spec)))
         tokuL_error(T, "invalid conversion specification: '%s'", form);
 }
 
 
 /*
 ** Get a conversion specification and copy it to 'form'.
-** Return the address of its last character.
+** Additionally for integer specifiers, it copies the length modifier.
+** Return the address of hopefully conversion specifier character.
 */
-static const char *getformat(toku_State *T, const char *strfrmt, char *form) {
-    /* spans flags, width, and precision ('0' is included as a flag) */
-    size_t len = strspn(strfrmt, T_FMTFLAGSF "123456789.");
-    len++;  /* adds following character (should be the specifier) */
-    /* still needs space for '%', '\0', plus a length modifier */
-    if (len >= MAX_FORMAT - 10)
-        tokuL_error(T, "invalid format (too long)");
-    *(form++) = '%';
-    memcpy(form, strfrmt, len * sizeof(char));
-    *(form + len) = '\0';
-    return strfrmt + len - 1;
+static const char *getformat(toku_State *T, const char *strfmt, char *form,
+                                                                 int *mod) {
+    size_t len = strspn(strfmt, T_FMTFLAGSF "123456789.");
+    switch (strfmt[len]) { /* check specifier */
+        case 'u': *mod = 0; goto intcase;
+        case 'd': case 'i': *mod = 1; goto intcase;
+        case 'X': *mod = 2; goto intcase;
+        case 'x': *mod = 3; goto intcase;
+        case 'o': {
+            *mod = 4;
+        intcase: {
+            const char *smod = lmods[*mod];
+            size_t lmod = szmods[*mod];
+            if (len + lmod >= MAX_FORMAT - 2)
+                tokuL_error(T, "invalid format (too long)");
+            *(form++) = '%';
+            memcpy(form, strfmt, len - 1 + sizeof(char));
+            memcpy(form + len, smod, lmod);
+            *(form + len + lmod) = '\0';
+            break;
+        }}
+        default: { /* not an integer */
+            len++; /* add next char (should be the specifier) */
+            if (len >= MAX_FORMAT - 10)
+                tokuL_error(T, "invalid format (too long)");
+            *(form++) = '%';
+            memcpy(form, strfmt, len * sizeof(char));
+            *(form + len) = '\0';
+            len--; /* go back to specifier */
+            break;
+        }
+    }
+    return strfmt + len;
 }
 
 
@@ -532,14 +573,15 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
         t_uint maxitem = MAX_ITEM; /* maximum length for the result */
         char *buff = tokuL_buff_ensure(&B, maxitem); /* to put result */
         int nb = 0; /* number of bytes in result */
+        int imod = -1; /* no integer length modifier */
         if (++arg > top) /* too many format specifiers? */
             return tokuL_error_arg(T, arg, "missing format value");
-        fmt = getformat(T, fmt, form);
+        fmt = getformat(T, fmt, form, &imod);
         switch (*fmt++) {
             case 'c': {
-                checkformat(T, form, T_FMTFLAGSC, 0);
-                nb = t_snprintf(buff, maxitem, form,
-                                cast_int(tokuL_check_integer(T, arg)));
+                checkformat(T, form, T_FMTFLAGSC, 0, -1);
+                nb = snprintf(buff, maxitem, form,
+                              cast_int(tokuL_check_integer(T, arg)));
                 break;
             }
             case 'd': case 'i':
@@ -552,13 +594,13 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
                 flags = T_FMTFLAGSX;
             intcase: {
                 toku_Integer n = tokuL_check_integer(T, arg);
-                checkformat(T, form, flags, 1);
-                addlenmod(form, TOKU_INTEGER_FMTLEN);
-                nb = t_snprintf(buff, maxitem, form, n);
+                checkformat(T, form, flags, 1, imod);
+                /* (length modifier already added) */
+                nb = snprintf(buff, maxitem, form, n);
                 break;
             }
             case 'a': case 'A':
-                checkformat(T, form, T_FMTFLAGSF, 1);
+                checkformat(T, form, T_FMTFLAGSF, 1, -1);
                 addlenmod(form, TOKU_NUMBER_FMTLEN);
                 nb = toku_number2strx(T, buff, maxitem, form,
                                          tokuL_check_number(T, arg));
@@ -569,19 +611,19 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
                      /* fall through */
             case 'e': case 'E': case 'g': case 'G': {
                 toku_Number n = tokuL_check_number(T, arg);
-                checkformat(T, form, T_FMTFLAGSF, 1);
+                checkformat(T, form, T_FMTFLAGSF, 1, -1);
                 addlenmod(form, TOKU_NUMBER_FMTLEN);
-                nb = t_snprintf(buff, maxitem, form, n);
+                nb = snprintf(buff, maxitem, form, n);
                 break;
             }
             case 'p': {
                 const void *p = toku_to_pointer(T, arg);
-                checkformat(T, form, T_FMTFLAGSC, 0);
+                checkformat(T, form, T_FMTFLAGSC, 0, -1);
                 if (p == NULL) { /* avoid calling 'printf' with NULL */
                     p = "(null)"; /* result */
                     form[strlen(form) - 1] = 's'; /* format it as a string */
                 }
-                nb = t_snprintf(buff, maxitem, form, p);
+                nb = snprintf(buff, maxitem, form, p);
                 break;
             }
             case 'q': {
@@ -598,13 +640,13 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
                     tokuL_buff_push_stack(&B); /* keep entire string */
                 else {
                     tokuL_check_arg(T, l == strlen(s), arg, "string contains zeros");
-                    checkformat(T, form, T_FMTFLAGSC, 1);
+                    checkformat(T, form, T_FMTFLAGSC, 1, -1);
                     if (strchr(form, '.') == NULL && l >= 100) {
                         /* no precision and string is too long to be formatted */
                         tokuL_buff_push_stack(&B); /* keep entire string */
                     }
                     else { /* format the string into 'buff' */
-                        nb = t_snprintf(buff, maxitem, form, s);
+                        nb = snprintf(buff, maxitem, form, s);
                         toku_pop(T, 1); /* remove result from 'tokuL_tolstring' */
                     }
                 }

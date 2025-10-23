@@ -302,32 +302,13 @@ static int m_type(toku_State *T) {
 
 #undef Rand64
 #undef SRand64
-#undef RandF
 
 
-#if ((ULONG_MAX >> 31) >> 31) >= 3
-
-/* 'long' has at least 64 bits */
-#define Rand64          unsigned long
-#define SRand64         long
-
-#elif defined(LLONG_MAX)
-
-/* there is a 'long long' type (which must have at least 64 bits) */
-#define Rand64          unsigned long long
-#define SRand64         long long
-
-#elif ((TOKU_UNSIGNED_MAX >> 31) >> 31) >= 3
-
-/* 'toku_Unsigned' has at least 64 bits */
-#define Rand64          toku_Unsigned
-#define SRand64         toku_Integer
-
-#endif
-
-
-#if !defined(Rand64)
-#error Mersenne Twister implementation is missing 64-bit integer type
+#if ((TOKU_UNSIGNED_MAX >> 31) >> 31) >= 3
+#define Rand64      toku_Unsigned
+#define SRand64     toku_Integer
+#else
+#error Mersenne Twister implementation requires 64-bit integer type
 #endif
 
 
@@ -338,29 +319,14 @@ static int m_type(toku_State *T) {
 #define U2R(x)      cast(Rand64, (x))
 
 /* convert unsigned constant to a 'Rand64' */
-#define UK2R(k)     U2R(t_intatt(k))
-
-
-#if defined(DBL_MIN)
-#define RandF       double
-#endif
-
-
-#if !defined(RandF)
-#error Mersenne Twister implementation is missing double precision float type
-#endif
-
-
-/* convert 'RandF' to 'toku_Number' */
-#define Rf2N(x)     cast(toku_Number, x)
-
+#define UK2R(k)     U2R(t_uintatt(k))
 
 
 #define NN          312
 #define MM          156
-#define MATRIX_A    UK2R(0xB5026F5AA96619E9U)
-#define UM          UK2R(0xFFFFFFFF80000000U) /* most significant 33 bits */
-#define LM          UK2R(0x7FFFFFFFU) /* least significant 31 bits */
+#define MATRIX_A    UK2R(0xB5026F5AA96619E9)
+#define UM          UK2R(0xFFFFFFFF80000000) /* most significant 33 bits */
+#define LM          UK2R(0x7FFFFFFF) /* least significant 31 bits */
 
 
 /* Mersenne Twister algo-state */
@@ -375,7 +341,7 @@ static void init_ctx_seed(MT19937 *ctx, Rand64 seed) {
     ctx->mt[0] = seed;
     for (ctx->mti=1; ctx->mti<NN; ctx->mti++) 
         ctx->mt[ctx->mti] =
-            UK2R(6364136223846793005U) *
+            UK2R(6364136223846793005) *
             (ctx->mt[ctx->mti-1] ^ (ctx->mt[ctx->mti-1] >> 62))
             + U2R(cast_uint(ctx->mti));
 }
@@ -388,21 +354,21 @@ static void init_ctx_seed(MT19937 *ctx, Rand64 seed) {
 static void init_ctx_array(MT19937 *ctx, Rand64 key[], Rand64 klen) {
     Rand64 i = 1, j = 0;
     Rand64 k = (NN>klen ? NN : klen);
-    init_ctx_seed(ctx, UK2R(19650218U));
+    init_ctx_seed(ctx, UK2R(19650218));
     for (; k; k--) {
         ctx->mt[i] = (ctx->mt[i] ^ ((ctx->mt[i-1] ^ (ctx->mt[i-1] >> 62))
-                     * UK2R(3935559000370003845U))) + key[j] + j; /* non linear */
+                     * UK2R(3935559000370003845))) + key[j] + j; /* non linear */
         i++; j++;
         if (i >= NN) { ctx->mt[0] = ctx->mt[NN-1]; i = 1; }
         if (j >= klen) j = 0;
     }
     for (k=NN-1; k; k--) {
         ctx->mt[i] = (ctx->mt[i] ^ ((ctx->mt[i-1] ^ (ctx->mt[i-1] >> 62))
-                     * UK2R(2862933555777941757U))) - i; /* non linear */
+                     * UK2R(2862933555777941757))) - i; /* non linear */
         i++;
         if (i >= NN) { ctx->mt[0] = ctx->mt[NN-1]; i = 1; }
     }
-    ctx->mt[0] = UK2R(1U) << 63; /* MSB is 1; assuring non-zero initial array */ 
+    ctx->mt[0] = UK2R(1) << 63; /* MSB is 1; assuring non-zero initial array */ 
 }
 
 
@@ -414,7 +380,7 @@ static void init_ctx_default(toku_State *T, MT19937 *ctx) {
 
 /* generates a random number on [0, 2^64-1] interval */
 static Rand64 genrand_integer(toku_State *T, MT19937 *ctx) {
-    static Rand64 mag01[2]={0ULL, MATRIX_A};
+    static Rand64 mag01[2]={t_uintatt(0), MATRIX_A};
     Rand64 x;
     if (ctx->mti >= NN) { /* generate NN words at one time */
         int i;
@@ -422,28 +388,28 @@ static Rand64 genrand_integer(toku_State *T, MT19937 *ctx) {
             init_ctx_default(T, ctx); /* use default initialization */
         for (i = 0; i < NN-MM; i++) {
             x = (ctx->mt[i]&UM) | (ctx->mt[i+1]&LM);
-            ctx->mt[i] = ctx->mt[i+MM] ^ (x>>1) ^ mag01[cast_int(x&UK2R(1U))];
+            ctx->mt[i] = ctx->mt[i+MM] ^ (x>>1) ^ mag01[cast_int(x&UK2R(1))];
         }
         for (; i < NN-1; i++) {
             x = (ctx->mt[i]&UM) | (ctx->mt[i+1]&LM);
-            ctx->mt[i] = ctx->mt[i+(MM-NN)] ^ (x>>1) ^ mag01[cast_int(x&UK2R(1U))];
+            ctx->mt[i] = ctx->mt[i+(MM-NN)] ^ (x>>1) ^ mag01[cast_int(x&UK2R(1))];
         }
         x = (ctx->mt[NN-1]&UM) | (ctx->mt[0]&LM);
-        ctx->mt[NN-1] = ctx->mt[MM-1] ^ (x>>1) ^ mag01[cast_int(x&UK2R(1U))];
+        ctx->mt[NN-1] = ctx->mt[MM-1] ^ (x>>1) ^ mag01[cast_int(x&UK2R(1))];
         ctx->mti = 0;
     }
     x = ctx->mt[ctx->mti++];
-    x ^= (x >> 29) & UK2R(0x5555555555555555U);
-    x ^= (x << 17) & UK2R(0x71D67FFFEDA60000U);
-    x ^= (x << 37) & UK2R(0xFFF7EEE000000000U);
+    x ^= (x >> 29) & UK2R(0x5555555555555555);
+    x ^= (x << 17) & UK2R(0x71D67FFFEDA60000);
+    x ^= (x << 37) & UK2R(0xFFF7EEE000000000);
     x ^= (x >> 43);
     return x;
 }
 
 
 /* generates a random number on (0,1) real-interval */
-static RandF genrand_float(toku_State *T, MT19937 *ctx) {
-    return (cast(RandF, (genrand_integer(T, ctx)>>12)) + 0.5)
+static toku_Number genrand_float(toku_State *T, MT19937 *ctx) {
+    return (cast_num(genrand_integer(T, ctx) >> 12) + 0.5)
             * (1.0 / 4503599627370496.0);
 }
 
@@ -468,7 +434,7 @@ static void add_seed_element(toku_State *T, SeedArray *sa) {
         seed |= tokuL_makeseed(T);
 #endif
     }
-    if (sa->i >= sizeof(sa->seed)/sizeof(sa->seed[0]))
+    if (sa->i >= t_arraysize(sa->seed))
         sa->i = 0; /* wrap */
     else
         sa->n++; /* new seed element */
@@ -574,7 +540,7 @@ static int m_rand(toku_State *T) {
 
 static int m_randf(toku_State *T) {
     MT19937 *ctx = toprng(toku_to_userdata(T, toku_upvalueindex(0)));
-    toku_push_number(T, Rf2N(genrand_float(T, ctx)));
+    toku_push_number(T, genrand_float(T, ctx));
     return 1;
 }
 

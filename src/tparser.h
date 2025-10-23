@@ -112,7 +112,7 @@ typedef struct ExpInfo {
 } ExpInfo;
 
 
-#define onstack(e)      ((e)->et == EXP_FINEXPR)
+#define instack(e)      ((e)->et == EXP_FINEXPR)
 
 
 /* variable kind */

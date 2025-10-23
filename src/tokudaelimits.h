@@ -218,6 +218,7 @@ typedef t_ubyte Instruction;
 
 #define cast_void(e)        cast(void,(e))
 #define cast_voidp(e)       cast(void *,(e))
+#define cast_cvoidp(e)      cast(const void *,(e))
 #define cast_num(e)         cast(toku_Number,(e))
 #define cast_Integer(e)     cast(toku_Integer,(e))
 #define cast_Unsigned(e)    cast(toku_Unsigned,(e))
@@ -300,8 +301,19 @@ typedef void (*voidf)(void);
 #endif
 
 
+/*
+** Number of bits in a given type.
+*/
 #if !defined(t_nbits)
 #define t_nbits(x)          cast_int(sizeof(x) * CHAR_BIT)
+#endif
+
+
+/*
+** Size of fixed array.
+*/
+#if !defined(t_arraysize)
+#define t_arraysize(x)        (sizeof(x)/sizeof((x)[0]))
 #endif
 
 
@@ -310,6 +322,13 @@ typedef void (*voidf)(void);
 */
 #if !defined(LL)
 #define LL(sl)          (sizeof(sl) - 1)
+#endif
+
+
+#if defined(TOKU_CORE) || defined(TOKU_LIB)
+/* shorter names for internal use */
+#define t_likely(cond)      tokui_likely(cond)
+#define t_unlikely(cond)    tokui_unlikely(cond)
 #endif
 
 

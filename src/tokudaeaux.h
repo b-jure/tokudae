@@ -52,17 +52,17 @@ TOKULIB_API int tokuL_error_type(toku_State *T, int idx, const char *tname);
 TOKULIB_API toku_Number  tokuL_check_number(toku_State *T, int idx);
 TOKULIB_API toku_Integer tokuL_check_integer(toku_State *T, int idx);
 TOKULIB_API const char *tokuL_check_lstring(toku_State *T, int idx, size_t *l);
-TOKULIB_API void    tokuL_check_type(toku_State *T, int idx, int t);
-TOKULIB_API void    tokuL_check_any(toku_State *T, int idx);
-TOKULIB_API void    tokuL_check_stack(toku_State *T, int sz, const char *msg);
+TOKULIB_API void tokuL_check_type(toku_State *T, int idx, int t);
+TOKULIB_API void tokuL_check_any(toku_State *T, int idx);
+TOKULIB_API void tokuL_check_stack(toku_State *T, int sz, const char *msg);
 
 TOKULIB_API void tokuL_check_version_(toku_State *T, toku_Number ver);
 #define tokuL_check_version(T)  tokuL_check_version_(T, TOKU_VERSION_NUM)
 
-TOKULIB_API void   *tokuL_check_userdata(toku_State *T, int idx,
-                                                        const char *tname);
-TOKULIB_API int     tokuL_check_option(toku_State *T, int idx, const char *dfl,
-                                       const char *const opts[]);
+TOKULIB_API void *tokuL_check_userdata(toku_State *T, int idx,
+                                       const char *tname);
+TOKULIB_API int   tokuL_check_option(toku_State *T, int idx, const char *dfl,
+                                     const char *const opts[]);
 /* }======================================================================= */
 
 /* {=======================================================================
@@ -72,8 +72,8 @@ TOKULIB_API toku_Number   tokuL_opt_number(toku_State *T, int idx,
                                            toku_Number dfl);
 TOKULIB_API toku_Integer  tokuL_opt_integer(toku_State *T, int idx,
                                             toku_Integer dfl);
-TOKULIB_API const char *tokuL_opt_lstring(toku_State *T, int idx,
-                                          const char *dfl, size_t *l);
+TOKULIB_API const char   *tokuL_opt_lstring(toku_State *T, int idx,
+                                            const char *dfl, size_t *l);
 /* }======================================================================= */
 
 /* {=======================================================================
@@ -89,10 +89,10 @@ TOKULIB_API int tokuL_loadbufferx(toku_State *T, const char *buff, size_t sz,
 /* {=======================================================================
 ** Userdata and metatable functions
 ** ======================================================================== */
-TOKULIB_API int  tokuL_new_metatable(toku_State *T, const char *tname);
-TOKULIB_API void tokuL_set_metatable(toku_State *T, const char *tname);
-TOKULIB_API int  tokuL_get_metafield(toku_State *T, int idx,const char *event);
-TOKULIB_API int  tokuL_callmeta(toku_State *T, int idx, const char *event);
+TOKULIB_API int   tokuL_new_metatable(toku_State *T, const char *tname);
+TOKULIB_API void  tokuL_set_metatable(toku_State *T, const char *tname);
+TOKULIB_API int   tokuL_get_metafield(toku_State *T, int idx,const char *event);
+TOKULIB_API int   tokuL_callmeta(toku_State *T, int idx, const char *event);
 TOKULIB_API void *tokuL_test_userdata(toku_State *T, int idx,
                                       const char *tname);
 /* }======================================================================= */
@@ -142,7 +142,7 @@ TOKULIB_API void tokuL_unref(toku_State *T, int l, int ref);
 /* {=======================================================================
 ** Useful macros
 ** ======================================================================== */
-#define tokuL_check_string(T,idx)   tokuL_check_lstring(T, idx, NULL)
+#define tokuL_check_string(T,idx)       tokuL_check_lstring(T, idx, NULL)
 
 #define tokuL_check_arg(T,cond,idx,extramsg) \
         ((void)(tokui_likely(cond) || tokuL_error_arg(T, (idx), (extramsg))))

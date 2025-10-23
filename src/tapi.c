@@ -9,6 +9,9 @@
 
 #include "tokudaeprefix.h"
 
+#include <stdio.h>
+#include <string.h>
+
 #include "tapi.h"
 #include "tdebug.h"
 #include "tfunction.h"
@@ -28,8 +31,8 @@
 #include "tstate.h"
 #include "tstring.h"
 #include "ttable.h"
-#include "ttrace.h"
 #include "tvm.h"
+#include "topnames.h"
 
 
 /* first pseudo-index for upvalues */
@@ -677,7 +680,7 @@ TOKU_API void toku_push_instance(toku_State *T, int index) {
     SPtr func = T->sp.p;
     toku_lock(T);
     o = index2value(T, index);
-    api_check(T, ttisclass(o), "expect class");
+    api_check(T, ttisclass(o), "class expected");
     setclsval2s(T, func, classval(o));
     api_inctop(T);
     tokuV_call(T, func, 1);
@@ -1341,21 +1344,66 @@ TOKU_API int toku_pcall(toku_State *T, int nargs, int nresults, int absmsgh) {
 }
 
 
+t_sinline TClosure *posload(toku_State *T) {
+    TClosure *cl = clTval(s2v(T->sp.p - 1)); /* get new function */
+    if (cl->nupvals >= 1) { /* does it have an upvalue? */
+        const TValue *gt = GT(T); /* get global table from clist */
+        /* set global table as 1st upvalue of 'cl' (may be TOKU_ENV) */
+        setobj(T, cl->upvals[0]->v.p, gt);
+        tokuG_barrier(T, cl->upvals[0], gt);
+    }
+    return cl;
+}
+
+
 TOKU_API int toku_load(toku_State *T, toku_Reader reader, void *userdata,
                        const char *chunkname, const char *mode) {
-    BuffReader Z;
+    BuffReader Z = {0};
     int status;
     toku_lock(T);
     if (!chunkname) chunkname = "?";
     tokuR_init(T, &Z, reader, userdata);
     status = tokuPR_parse(T, &Z, chunkname, mode);
-    if (status == TOKU_STATUS_OK) {  /* no errors? */
-        TClosure *cl = clTval(s2v(T->sp.p - 1)); /* get new function */
-        if (cl->nupvals >= 1) { /* does it have an upvalue? */
-            const TValue *gt = GT(T); /* get global table from clist */
-            /* set global table as 1st upvalue of 'cl' (may be TOKU_ENV) */
-            setobj(T, cl->upvals[0]->v.p, gt);
-            tokuG_barrier(T, cl->upvals[0], gt);
+    if (status == TOKU_STATUS_OK) /* no errors? */
+        posload(T);
+    toku_unlock(T);
+    return status;
+}
+
+
+#define FUNCTION        "(fn();)();\n"
+
+static const char *reader(toku_State *T, void *data, size_t *szread) {
+    UNUSED(T);
+    if ((*cast(int *, data))--) {
+        *szread = LL(FUNCTION);
+        return FUNCTION;
+    } else {
+        *szread = 0;
+        return NULL;
+    }
+}
+
+
+TOKU_API int toku_combine(toku_State *T, const char *chunkname, int n) {
+    BuffReader Z = {0};
+    int status;
+    int i = n;
+    toku_lock(T);
+    api_checknelems(T, n);
+    if (!chunkname) chunkname = "=(combined)";
+    tokuR_init(T, &Z, reader, &i);
+    status = tokuPR_parse(T, &Z, chunkname, NULL);
+    if (status == TOKU_STATUS_OK) {
+        Proto *f = posload(T)->p;
+        SPtr first = T->sp.p - n - 1;
+        for (int i=0; i < n; i++) {
+            TValue *o = s2v(first + i);
+            api_check(T, ttisTclosure(o), "Tokudae function expected");
+            f->p[i] = getproto(o);
+            tokuG_objbarrier(T, f, f->p[i]);
+            toku_assert(f->p[i]->sizeupvals == 0 ||
+                        f->p[i]->upvals[0].instack == 0);
         }
     }
     toku_unlock(T);
@@ -1363,7 +1411,6 @@ TOKU_API int toku_load(toku_State *T, toku_Reader reader, void *userdata,
 }
 
 
-// TODO: add docs (also update debug API, and load in basic library)
 /*
 ** Dump a Tokudae function, calling 'fw' to write its parts. Ensure
 ** the stack returns with its original size.
@@ -1615,7 +1662,7 @@ TOKU_API unsigned short toku_numuservalues(toku_State *T, int index) {
 /* }====================================================================== */
 
 
-/* {======================================================================
+/* {{=====================================================================
 ** Debug functions (other functions are defined in tdebug.c)
 ** ======================================================================= */
 
@@ -1665,12 +1712,11 @@ static const char *aux_upvalue(const TValue *func, int n, TValue **val,
         case TOKU_VTCL: { /* Toku closure */
             OString *name;
             TClosure *f = clTval(func);
-            Proto *p = f->p;
-            if (!(cast_uint(n) < cast_uint(p->sizeupvals)))
+            if (!(cast_uint(n) < cast_uint(f->p->sizeupvals)))
                 return NULL; /* 'n' not in [0, fn->sizeupvals) */
             *val = f->upvals[n]->v.p;
             if (owner) *owner = obj2gco(f->upvals[n]);
-            name = p->upvals[n].name;
+            name = f->p->upvals[n].name;
             return (name == NULL) ? "(no name)" : getstr(name);
         }
         default: return NULL; /* not a closure */
@@ -1769,4 +1815,738 @@ TOKU_API void toku_upvaluejoin(toku_State *T, int index1, int n1,
     tokuG_objbarrier(T, f1, *up1);
 }
 
-/* }====================================================================== */
+/* }{=====================================================================
+** Opcode
+** ======================================================================= */
+
+static void fill_opcode_args(Instruction *pi, toku_Opcode *opc) {
+    switch (getopFormat(*pi)) {
+        case FormatI:
+            opc->args[0] = -1;
+            opc->args[1] = -1;
+            opc->args[2] = -1;
+            break;
+        case FormatIS:
+            opc->args[0] = cast_int(GET_ARG_S(pi, 0));
+            opc->args[1] = -1;
+            opc->args[2] = -1;
+            break;
+        case FormatISS:
+            opc->args[0] = cast_int(GET_ARG_S(pi, 0));
+            opc->args[1] = cast_int(GET_ARG_S(pi, 1));
+            opc->args[2] = -1;
+            break;
+        case FormatIL:
+            opc->args[0] = GET_ARG_L(pi, 0);
+            opc->args[1] = -1;
+            opc->args[2] = -1;
+            break;
+        case FormatILS:
+            opc->args[0] = GET_ARG_L(pi, 0);
+            opc->args[1] = cast_int(GET_ARG_S(pi + SIZE_ARG_L, 0));
+            opc->args[2] = -1;
+            break;
+        case FormatILL:
+            opc->args[0] = GET_ARG_L(pi, 0);
+            opc->args[1] = GET_ARG_L(pi, 1);
+            opc->args[2] = -1;
+            break;
+        case FormatILLS:
+            opc->args[0] = GET_ARG_L(pi, 0);
+            opc->args[1] = GET_ARG_L(pi, 1);
+            opc->args[2] = cast_int(GET_ARG_S(pi + SIZE_ARG_L*2, 0));
+            break;
+        case FormatILLL:
+            opc->args[0] = GET_ARG_L(pi, 0);
+            opc->args[1] = GET_ARG_L(pi, 1);
+            opc->args[2] = GET_ARG_L(pi, 2);
+            break;
+        default: toku_assert(0); /* unreachable */
+    }
+}
+
+
+static void fillopcode(Proto *f, int pc, toku_Opcode *opc) {
+    Instruction *pi = &f->code[pc];
+    fill_opcode_args(pi, opc);
+    opc->line = tokuD_getfuncline(f, pc);
+    opc->offset = pc;
+    opc->op = *pi;
+    if (TOKU_OPCNAMESIZE > 1) /* names enabled? */
+        strcpy(opc->name, opnames[*pi]);
+    else /* otherwise names are disabled */
+        opc->name[0] = '\0';
+    opc->f = f;
+}
+
+
+TOKU_API int toku_getopcode(toku_State *T, const toku_Cinfo *ci, int n,
+                            toku_Opcode *opc) {
+    Proto *f = ci->f;
+    int pc;
+    UNUSED(T);
+    if (f->sizeinstpc > 0) { /* have debug info? */
+        if (n < 0) /* negative 'n'? */
+            n = f->sizeinstpc + n;
+        if (0 <= n && n < f->sizeinstpc) /* 'n' in range? */
+            pc = f->instpc[n];
+         else /* otherwise 'n' too large */
+            return 0;
+    } else if (n < f->sizecode) { /* 'n' seems to be in range? */
+        Instruction *code = f->code;
+        int limitpc = f->sizecode - getopSize(OP_RETURN);
+        toku_assert(code[limitpc] == OP_RETURN);
+        if (0 <= n) { /* positive 'n'? */
+            for (pc = 0; 0 < n && pc < limitpc; n--)
+                pc += getopSize(code[pc]); /* walk the bytecode */
+            if (n != 0) /* 'n' too large? */
+                return 0;
+        } else { /* otherwise negative 'n' */
+            int limit = (n < 0) ? -n - 1 : n;
+            if (limitpc <= limit) /* 'limit' (obviously) out of range? */
+                return 0;
+            else { /* otherwise 'limit' might be in range */
+                int targetpc = 0;
+                int distance = 0;
+                pc = 0;
+                while (pc < limitpc) { /* walk until last instruction */
+                    if (distance == limit)
+                        targetpc += getopSize(code[targetpc]);
+                    else
+                        distance++;
+                    pc += getopSize(code[pc]);
+                }
+                if (distance != limit) /* not found? */
+                    return 0;
+                pc = targetpc;
+            }
+        }
+    } else /* otherwise 'n' is (obviously) out of range */
+        return 0;
+    fillopcode(f, pc, opc);
+    return 1; /* ok */
+}
+
+
+/* {=====================================================================
+** Opcode Description
+** ====================================================================== */
+
+/* absence of instruction argument */
+#define NOARG       (-1)
+
+/* shorter alias */
+#define MAXD        (TOKU_OPCDESCSIZE)
+
+#define D(msg)          snprintf(opd->desc, MAXD, msg)
+#define DA(n,msg)       snprintf(&opd->desc[n], cast_sizet(MAXD-(n)), msg)
+#define DX(fmt,...)     snprintf(opd->desc, MAXD, fmt, __VA_ARGS__)
+#define DAX(x,fmt,...) \
+        snprintf(&opd->desc[x], cast_sizet(MAXD-(x)), fmt, __VA_ARGS__)
+
+#define COMMENT(n,msg)          DA(n, "/* "msg" */")
+#define COMMENTX(n,fmt,...)     DAX(n, "/* "fmt" */", __VA_ARGS__)
+
+#define preCall(n,nres) \
+    { toku_assert((nres) >= TOKU_MULTRET); \
+      if ((nres) == TOKU_MULTRET) \
+        COMMENT(n, "returns all results"); \
+      else \
+        COMMENTX(n, "returns %d result%s", nres, (nres)==1 ? "" : "s"); }
+
+
+#define setExtraStr(opd,str) \
+    { (opd)->extra.type = TOKU_T_STRING; (opd)->extra.value.s = (str); }
+
+#define setExtraNum(opd,num) \
+    { (opd)->extra.type = TOKU_T_NUMBER; (opd)->extra.value.n = (num); }
+
+static const char *setExtraTagstr(toku_State *T, toku_Opdesc *opd, int event) {
+    const char *tm = getstr(eventstring(T, event));
+    setExtraStr(opd, tm);
+    return tm;
+}
+
+static void setExtraK(Proto *f, toku_Opdesc *opd, int k) {
+    TValue *kv = &f->k[k];
+    opd->extra.type = ttype(kv);
+    switch (opd->extra.type) {
+        case TOKU_T_STRING: {
+            OString *str = strval(kv);
+            opd->extra.value.s = getstr(str);
+            break;
+        }
+        case TOKU_T_NUMBER:
+            if (ttisflt(kv))
+                opd->extra.value.n = fval(kv);
+            else
+                opd->extra.value.n = cast_num(ival(kv));
+            break;
+        case TOKU_T_BOOL:
+            opd->extra.value.b = ttistrue(kv);
+            break;
+        default: break;
+    }
+}
+
+static int setExtraI(toku_Opdesc *opd, int imm, int l) {
+    imm = l ? IMML(imm) : IMM(imm);
+    setExtraNum(opd, cast_num(imm));
+    return imm;
+}
+
+#define setExtraB(opd,bt) \
+    { (opd)->extra.type = TOKU_T_BOOL; \
+      (opd)->extra.value.b = ((bt) == TOKU_VTRUE); }
+
+
+/*
+**
+** Description legend:
+**
+** pc           <- integer, current offset in the bytecode
+** nextra       <- integer, total number of extra arguments
+** arity        <- integer, total number of named parameters
+** nreturns     <- integer, number of results this call returns,
+**                 value of -1 means it returns all results
+**
+** sptr         <- stack pointer
+** base         <- base pointer, at base[-1] is the currently active function
+**                 and after the adjustment, below the base[-1], are the extra
+**                 arguments, in the interval [base[-nextra - 1], base[-2]]
+**                 (this interval might be empty aka no extra arguments)
+**
+** functions    <- array, precompiled functions defined in the active function
+** constants    <- array, constants of the active function
+** upvalues     <- array, upvalues of the active function
+**
+** callee       <- macro equivalent to base[-1]
+** top          <- macro equivalent to sptr[-1]
+** btop         <- macro equivalent to sptr[-2]
+** varg(x)      <- macro equivalent to base[-nextra - 1 + x]
+**
+** isfalse(x)   <- function, returns true if 'x' is false or nil
+** getsuper(x)  <- function, returns the superclass of 'x'
+** copytable(x) <- function, if 'x' is a table it returns a copy of 'x',
+**                 otherwise it returns nil
+** concat(x,y)  <- function, return concatenation of 'x' with 'y'
+** markclose(x) <- function, marks 'x' (pointer to stack) as to-be-closed
+** close(x)     <- function, close appropriate values in ['x', &top]
+** new_cl(x)    <- function, returns new closure from function 'x'
+** new_list(x)  <- function, returns new list of size 'x'
+** new_table(x) <- function, returns new table of size 'x'
+** new_class(mt,n)  <- function, returns new class, if 'mt' is true class
+**                     will have newly allocated empty metatable, 'n' is the
+**                     size of method table
+** setsuper(x,y)    <- function, sets 'y' as superclass of class 'x'
+** stackrange(x,y)  <- function, 'x' and 'y' are pointers to stack, so this
+**                     returns all the stack values in ['x', 'y']
+** append(l, ...)   <- function, 'l' is list, all the values after are
+**                     appended into the list 'l'
+** stackcpy(x,y,n)  <- function, equivalent to memcpy, 'x' and 'y' are stack
+**                     pointers and 'n' is the number of stack values
+**
+*/
+
+static void DPushBool(toku_Opdesc *opd, int t) {
+    toku_assert(t == TOKU_VTRUE || t == TOKU_VFALSE);
+    DX("*sptr++ = %s;", (t == TOKU_VTRUE) ? "true" : "false");
+    setExtraB(opd, t);
+}
+
+#define DSuper(opd)      D("top = getsuper(top);");
+
+static void DNil(toku_Opdesc *opd, int n) {
+    DX("int n=%d; while (n--) { *sptr++ = nil; }", n);
+    opd->extra.type = TOKU_T_NIL;
+}
+
+#define DPop(opd,n)     DX("sptr -= %d;", n);
+
+static void DK(Proto *f, toku_Opdesc *opd, int k) {
+    setExtraK(f, opd, k);
+    DX("*sptr++ = constants[%d];", k);
+}
+
+static void DI(toku_Opdesc *opd, int imm, int l, int f) {
+    imm = setExtraI(opd, imm, l);
+    if (f) /* float? */
+        DX("*sptr++ = "TOKU_NUMBER_FMT";", cast_num(imm));
+    else /* otherwise integer */
+        DX("*sptr++ = %d;", imm);
+}
+
+static void DVarargPrep(toku_Opdesc *opd, int arity) {
+    int n = DX("for (int i=-1; i<%d", arity);
+    n += COMMENT(n, "arity");
+    n += DA(n, "; i++) { *sptr++ = base[i]; }");
+    DAX(n, " base = sptr - %d;", arity);
+}
+
+static void DVarargs(toku_Opdesc *opd, int n) {
+    if (n == TOKU_MULTRET)
+        D("for (int i=0; i<nextra; i++) *stpr++ = varg(i);");
+    else
+        DX("for (int i=0; i<%d; i++) *sptr++ = varg(i);", n);
+}
+
+static void DClosure(Proto *f, toku_Opdesc *opd, int i) {
+    Proto *cl = f->p[i];
+    int n = DX("*sptr++ = new_cl(functions[%d]); ", i);
+    COMMENTX(n, "%p", cast_voidp(cl));
+}
+
+#define decodesize(sz)      (((sz) > 0) ? (1<<((sz)-1)) : 0)
+
+#define DList(opd,sz)       DX("*sptr++ = new_list(%d);", decodesize(sz));
+
+#define DTable(opd,sz)      DX("*sptr++ = new_table(%d);", decodesize(sz));
+
+static void DClass(toku_Opdesc *opd, int mask) {
+    int hasmt = mask & 0x80;
+    int nmethods = mask & 0x7f;
+    nmethods = decodesize(nmethods);
+    DX("*sptr++ = new_class(%d, %d);", hasmt, nmethods);
+}
+
+static void DClassProp(Proto *f, toku_Opdesc *opd, int k, const char *what) {
+    setExtraK(f, opd, k);
+    DX("btop.%s[constants[%d]] = top; sptr--;", what, k);
+}
+
+static void DTagMethod(toku_State *T, toku_Opdesc *opd, int event) {
+    const char *tm = setExtraTagstr(T, opd, event);
+    DX("btop.metatable.%s = top; sptr--;", tm);
+}
+
+static void DMetaBin(toku_State *T, toku_Opdesc *opd, int event) {
+    const char *tm = setExtraTagstr(T, opd, event);
+    DX("btop = btop.metatable.%s(btop, top); sptr--;", tm);
+}
+
+static const char *binops[] = {
+    "+", "-", "*", "/", "//", "%", "**",
+    "<<", ">>", "&", "|", "^"
+};
+
+static void descBinK(Proto *f, toku_Opdesc *opd, int k, int op) {
+    setExtraK(f, opd, k);
+    DX("top %s= constants[%d];", binops[op - OP_ADDK], k);
+}
+
+static void descBinI(toku_Opdesc *opd, int imm, int binop) {
+    imm = setExtraI(opd, imm, 1);
+    DX("top %s= %d;", binops[binop- OP_ADDI], imm);
+}
+
+static void descBin(toku_Opdesc *opd, int swap, int binop) {
+    const char *sym = binops[binop - OP_ADD];
+    if (!swap)
+        DX("btop %s= top; sptr--;", sym);
+    else
+        DX("btop = top %s btop; sptr--;", sym);
+}
+
+static void DEqK(Proto *f, toku_Opdesc *opd, int k) {
+    setExtraK(f, opd, k);
+    DX("top = (top == constants[%d]);", k);
+}
+
+static void DEqI(toku_Opdesc *opd, int imm) {
+    imm = setExtraI(opd, imm, 1);
+    DX("top = (top == %d);", imm);
+}
+
+static void DOrd(toku_Opdesc *opd, int ordop) {
+    static const char *ops[] = { "==", "<", "<=" };
+    DX("btop = (btop %s top); sptr--;", ops[ordop - OP_EQ]);
+}
+
+#define DEqp(opd)    D("top = (btop == top);");
+
+static void descOrdI(toku_Opdesc *opd, int imm, int ordop) {
+    static const char *ops[] = { "<", "<=", ">", ">=" };
+    imm = setExtraI(opd, imm, 1);
+    DX("top = (top %s %d);", ops[ordop - OP_LTI], imm);
+}
+
+static void DConcat(toku_Opdesc *opd, int i) {
+    int n = DX("for (int i=%d; 1<i; i--)", i);
+    n += DA(n, " { sptr[-i] = concat(sptr[-i], sptr[-i+1]); } ");
+    DAX(n, "sptr -= %d;", i - 1);
+}
+
+static void DUnop(toku_Opdesc *opd, int unop) {
+    static const char *ops[] = { "-", "~", "!" };
+    DX("top = %stop;", ops[unop - OP_UNM]);
+}
+
+#define jumpoffset(off,back)        ((back) ? -(off) : (off))
+#define jumptarget(from,off,op)     ((from) + getopSize(op) + (off))
+
+static void DJump(toku_Opdesc *opd, int pc, int off, int back) {
+    int offset = jumpoffset(off, back);
+    int target = jumptarget(pc, offset, OP_JMP);
+    toku_assert(getopSize(OP_JMP) == getopSize(OP_JMPS));
+    int n = DX("pc += %d; ", offset);
+    COMMENTX(n, "jump to %d", target);
+}
+
+static void DTest(toku_Opdesc *opd, int pc, int cond, int pop) {
+    const char *extra = pop ? " sptr--;" : "";
+    int opsz = getopSize(OP_JMP);
+    int off = jumpoffset(opsz, 0);
+    int n = DX("if (!isfalse(top) == %d) { pc += %d; ", cond, opsz);
+    toku_assert(getopSize(OP_TEST) == getopSize(OP_TESTPOP));
+    n += COMMENTX(n, "jump to %d", jumptarget(pc, off, OP_TEST));
+    DAX(n, " }%s", extra);
+
+}
+
+static void DCall(toku_Opdesc *opd, int func, int nres) {
+    int n = DX("base[%d](stackrange(&base[%d], &top)); ", func, func+1);
+    preCall(n, nres);
+}
+
+#define DTbc(opd,slot)      DX("markclose(&base[%d]);", slot)
+
+#define DClose(opd,slot)    DX("close(&base[%d]);", slot)
+
+static void DCheck(toku_Opdesc *opd, int first) {
+    int n = DX("if (!base[%d]) { return ", first);
+    n += COMMENT(n, "all results from previous call");
+    DA(n, " }");
+}
+
+static void DLocal(toku_Opdesc *opd, int slot, int get) {
+    if (get)
+        DX("*sptr++ = base[%d];", slot);
+    else
+        DX("base[%d] = *--sptr;", slot);
+}
+
+static void DUpvalue(toku_Opdesc *opd, int idx, int get) {
+    if (get)
+        DX("*sptr++ = upvalues[%d];", idx);
+    else
+        DX("upvalues[%d] = *--sptr;", idx);
+
+}
+
+static void DSetlist(toku_Opdesc *opd, int slot, int len) {
+    int n = DX("append(base[%d], stackrange(&base[%d], &top)); ", slot, slot+1);
+    COMMENTX(n, "list length is %d (before append)", len);
+}
+
+static void DIndex(toku_Opdesc *opd, int slot, int get) {
+    if (get)
+        D("btop = btop[top];");
+    else
+        DX("base[%d][base[%d]] = *--sptr;", slot, slot+1);
+}
+
+static void DIndexK(Proto *f, toku_Opdesc *opd, int slot, int k, int dot) {
+    int n;
+    if (slot == NOARG)
+        n = DX("top = top[constant[%d]];", k);
+    else
+        n = DX("base[%d][constant[%d]] = *--sptr;", slot, k);
+    if (dot) {
+        n += DA(n, " ");
+        COMMENT(n, "raw index");
+    }
+    setExtraK(f, opd, k);
+}
+
+static void DIndexI(toku_Opdesc *opd, int slot, int imm, int l) {
+    imm = setExtraI(opd, imm, l);
+    if (slot != NOARG)
+        DX("top = top[%d];", imm);
+    else
+        DX("base[%d][%d] = *--sptr;", slot, imm);
+}
+
+static void DGetSuper(Proto *f, toku_Opdesc *opd, int k) {
+    if (k != NOARG) {
+        DX("top = getsuper(top)[constant[%d]]; ", k);
+        setExtraK(f, opd, k);
+    } else
+         D("dtop = getsuper(dtop)[*--sptr];");
+}
+
+static void DInherit(toku_Opdesc *opd) {
+    int n = D("dtop.methods = copytable(top.methods); ");
+    n += DA(n, "dtop.metatable = copytable(top.metatable); ");
+    DA(n, "setsuper(dtop, top);");
+}
+
+static void DForPrep(toku_Opdesc *opd, int slot, int offset) {
+    slot += VAR_TBC;
+    int n = DX("if (base[%d]) { markclose(&base[%d]); }", slot, slot);
+    DAX(n, " pc += %d;", offset);
+}
+
+static void DForCall(toku_Opdesc *opd, int src, int nres) {
+    int dest, n;
+    src += VAR_ITER;
+    dest = src + VAR_N;
+    n = DX("stackcpy(&base[%d], &base[%d], %d); ", dest, src, VAR_N - 1);
+    n += DAX(n, "sptr = &base[%d]; ", src + VAR_N + VAR_CNTL + 1);
+    n += DAX(n, "base[%d](base[%d], base[%d]); ", dest, dest+1, dest+2);
+    preCall(n, nres);
+}
+
+static void DForLoop(toku_Opdesc *opd, int slot, int offset, int npop) {
+    int n = DX("if (base[%d] != nil) { base[%d] = base[%d]; pc -= %d; }",
+                slot+VAR_N, slot+VAR_CNTL, slot+VAR_N+VAR_ITER, offset);
+    DAX(n, " else { sptr -= %d; }", npop);
+}
+
+static void DReturn(Proto *f, toku_Opdesc *opd, int slot, int nres, int close) {
+    int n = 0;
+    if (close)
+        n = D("close(&base[0]); ");
+    if (nres != TOKU_MULTRET)
+        n += DAX(n, "int nres = %d; sptr = &base[%d] + nres; ", nres, slot);
+    else
+        n += DAX(n, "int nres = top - &base[%d]; ", slot);
+    if (f->isvararg)
+        n += DA(n, "base -= (nextra + arity + 1); ");
+    n += DA(n, "if (nres > nreturns) nres = nreturns; ");
+    n += DA(n, "stackcpy(&base[0], sptr - nres, nres); ");
+    n += DA(n, "while (nres < nreturns) { base[nres++] = nil; } ");
+    DA(n, "sptr = base + nreturns; ");
+}
+
+static void setdescription(toku_State *T, toku_Opdesc *opd,
+                                          const toku_Opcode *opc) {
+    Proto *f = opc->f;
+    int flag = 0;
+    int get = 1;
+    switch (opc->op) {
+        case OP_TRUE: DPushBool(opd, TOKU_VTRUE); break;
+        case OP_FALSE: DPushBool(opd, TOKU_VFALSE); break;
+        case OP_NIL: DNil(opd, opc->args[0]); break;
+        case OP_POP: DPop(opd, opc->args[0]); break;
+        case OP_SUPER: DSuper(opd); break;
+        case OP_VARARGPREP: DVarargPrep(opd, opc->args[0]); break;
+        case OP_VARARG: DVarargs(opd, opc->args[0]); break;
+        case OP_CLOSURE: DClosure(f, opd, opc->args[0]); break;
+        case OP_NEWLIST: DList(opd, opc->args[0]); break;
+        case OP_NEWCLASS: DClass(opd, opc->args[0]); break;
+        case OP_NEWTABLE: DTable(opd, opc->args[0]); break;
+        case OP_METHOD: DClassProp(f, opd, opc->args[0], "methods"); break;
+        case OP_SETTM: DTagMethod(T, opd, opc->args[0]); break;
+        case OP_SETMT: DClassProp(f, opd, opc->args[0], "metatable"); break;
+        case OP_MBIN: DMetaBin(T, opd, opc->args[0]); break;
+        case OP_EQK: DEqK(f, opd, opc->args[0]); break;
+        case OP_EQI: DEqI(opd, opc->args[0]); break;
+        case OP_EQPRESERVE: DEqp(opd); break;
+        case OP_CONCAT: DConcat(opd, opc->args[0]); break;
+        case OP_CALL: DCall(opd, opc->args[0]+1, opc->args[1]-1); break;
+        case OP_CLOSE: DClose(opd, opc->args[0]); break;
+        case OP_TBC: DTbc(opd, opc->args[0]); break;
+        case OP_CHECKADJ: DCheck(opd, opc->args[0]); break;
+        case OP_GETSUP: DGetSuper(f, opd, opc->args[0]); break;
+        case OP_GETSUPIDX: DGetSuper(f, opd, NOARG); break;
+        case OP_GETINDEX: DIndex(opd, NOARG, 1); break;
+        case OP_SETINDEX: DIndex(opd, opc->args[0], 0); break;
+        case OP_SETLIST: DSetlist(opd, opc->args[0], opc->args[1]); break;
+        case OP_INHERIT: DInherit(opd); break;
+        case OP_FORPREP: DForPrep(opd, opc->args[0], opc->args[1]); break;
+        case OP_FORCALL: DForCall(opd, opc->args[0], opc->args[1]-1); break;
+        case OP_SETLOCAL:
+            get = 0; /* fall through */
+        case OP_LOAD: case OP_GETLOCAL:
+            DLocal(opd, opc->args[0], get);
+            break;
+        case OP_SETUVAL:
+            get = 0; /* fall through */
+        case OP_GETUVAL:
+            DUpvalue(opd, opc->args[0], get);
+            break;
+        case OP_CONSTFL:
+            flag = 1; /* fall through */
+        case OP_CONSTF:
+            DI(opd, opc->args[0], flag, 1);
+            break;
+        case OP_CONSTIL:
+            flag = 1; /* fall through */
+        case OP_CONSTI:
+            DI(opd, opc->args[0], flag, 0);
+            break;
+        case OP_CONST: case OP_CONSTL:
+            DK(f, opd, opc->args[0]);
+            break;
+        case OP_EQ: case OP_LT: case OP_LE:
+            DOrd(opd, opc->op);
+            break;
+        case OP_UNM: case OP_BNOT: case OP_NOT:
+            DUnop(opd, opc->op);
+            break;
+        case OP_JMPS:
+            flag = 1; /* fall through */
+        case OP_JMP:
+            DJump(opd, opc->offset, opc->args[0], flag);
+            break;
+        case OP_TESTPOP:
+            flag = 1; /* fall through */
+        case OP_TEST:
+            DTest(opd, opc->offset, opc->args[0], flag);
+            break;
+        case OP_FORLOOP:
+            DForLoop(opd, opc->args[0], opc->args[1], opc->args[2]);
+            break;
+        case OP_RETURN:
+            DReturn(f, opd, opc->args[0], opc->args[1]-1, opc->args[2]);
+            break;
+        case OP_GETINDEXINTL:
+            flag = 1; /* fall through */
+        case OP_GETINDEXINT:
+            DIndexI(opd, NOARG, opc->args[0], flag);
+            break;
+        case OP_SETINDEXINTL:
+            flag = 1; /* fall through */
+        case OP_SETINDEXINT:
+            DIndexI(opd, opc->args[0], opc->args[1], flag);
+            break;
+        case OP_GETPROPERTY:
+            flag = 1; /* fall through */
+        case OP_GETINDEXSTR:
+            DIndexK(f, opd, NOARG, opc->args[0], flag);
+            break;
+        case OP_SETPROPERTY:
+            flag = 1; /* fall through */
+        case OP_SETINDEXSTR:
+            DIndexK(f, opd, opc->args[0], opc->args[1], flag);
+            break;
+        case OP_LTI: case OP_LEI: case OP_GTI: case OP_GEI:
+            descOrdI(opd, opc->args[0], opc->op);
+            break;
+        case OP_ADDK: case OP_SUBK: case OP_MULK: case OP_DIVK:
+        case OP_IDIVK: case OP_MODK: case OP_POWK: case OP_BSHLK:
+        case OP_BSHRK: case OP_BANDK: case OP_BORK: case OP_BXORK:
+            descBinK(f, opd, opc->args[0], opc->op);
+            break;
+        case OP_ADDI: case OP_SUBI: case OP_MULI: case OP_DIVI:
+        case OP_IDIVI: case OP_MODI: case OP_POWI: case OP_BSHLI:
+        case OP_BSHRI: case OP_BANDI: case OP_BORI: case OP_BXORI:
+            descBinI(opd, opc->args[0], opc->op);
+            break;
+        case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV:
+        case OP_IDIV: case OP_MOD: case OP_POW: case OP_BSHL:
+        case OP_BSHR: case OP_BAND: case OP_BOR: case OP_BXOR:
+            descBin(opd, opc->args[0], opc->op);
+            break;
+        default: toku_assert(0); /* unreachable */
+    }
+}
+
+
+TOKU_API void toku_getopdesc(toku_State *T, toku_Opdesc *opd,
+                                            const toku_Opcode *opc) {
+    opd->extra.type = TOKU_T_NONE;
+    opd->extra.value.b = 0;
+    setdescription(T, opd, opc);
+}
+
+/* }===================================================================== */
+
+
+t_sinline void setcompileinfo(toku_Cinfo *ci) {
+    Proto *f = ci->f;
+    ci->func = cast_cvoidp(f);
+    ci->constants = cast_cvoidp(f->k);
+    ci->functions = cast_cvoidp(f->p);
+    ci->code = cast_cvoidp(f->code);
+    if (f->source) {
+        ci->source = getstr(f->source);
+        ci->srclen = getstrlen(f->source);
+    } else {
+        ci->source = "=?";
+        ci->srclen = LL("=?");
+    }
+    ci->defline = f->defline;
+    ci->lastdefline = f->deflastline;
+    ci->nupvals = f->sizeupvals;
+    ci->nlocals = f->sizelocals;
+    ci->nparams = f->arity;
+    ci->nconstants = f->sizek;
+    ci->nfunctions = f->sizep;
+    ci->ncode = f->sizecode;
+    ci->nslots = f->maxstack;
+}
+
+
+TOKU_API int toku_getcompinfo(toku_State *T, int idx, toku_Cinfo *ci) {
+    const TValue *o = index2value(T, idx);
+    api_check(T, ttisfunction(o), "function expected");
+    if (ttisTclosure(o)) {
+        ci->f = getproto(o);
+        setcompileinfo(ci);
+        return 1; /* true; got prototype information */
+    }
+    return 0; /* false; only Tokudae closures have prototypes */
+}
+
+
+TOKU_API int toku_getconstant(toku_State *T, const toku_Cinfo *ci, int n) {
+    Proto *f = ci->f;
+    int t;
+    toku_lock(T);
+    if (cast_uint(n) < cast_uint(f->sizek)) {
+        TValue *k = &f->k[cast_uint(n)];
+        t = ttype(k);
+        setobj2s(T, T->sp.p, k);
+        api_inctop(T);
+    } else
+        t = TOKU_T_NONE;
+    toku_unlock(T);
+    return t;
+}
+
+
+TOKU_API void toku_getshortsrc(toku_State *T, const toku_Cinfo *ci, char *out) {
+    UNUSED(T);
+    tokuS_chunkid(out, ci->source, ci->srclen);
+}
+
+
+TOKU_API const char *toku_getlocalinfo(toku_State *T, toku_Cinfo *ci, int n) {
+    Proto *f = ci->f;
+    UNUSED(T);
+    if (cast_uint(n) < cast_uint(f->sizelocals)) {
+        LVarInfo *lvar = &f->locals[cast_uint(n)];
+        ci->info.l.startoff = lvar->startpc;
+        ci->info.l.endoff = lvar->endpc;
+        return getstr(lvar->name);
+    }
+    return NULL;
+}
+
+
+TOKU_API const char *toku_getupvalueinfo(toku_State *T, toku_Cinfo *ci, int n) {
+    Proto *f = ci->f;
+    UNUSED(T);
+    if (cast_uint(n) < cast_uint(f->sizeupvals)) {
+        UpValInfo *uvar = &f->upvals[cast_uint(n)];
+        ci->info.u.idx = uvar->idx;
+        ci->info.u.instack = uvar->instack;
+        return uvar->name ? getstr(uvar->name) : "-";
+    }
+    return NULL;
+}
+
+
+TOKU_API int toku_getfunction(toku_State *T, const toku_Cinfo *src,
+                                             toku_Cinfo *dest, int n) {
+    UNUSED(T);
+    if (cast_uint(n) < cast_uint(src->f->sizep)) { /* 'n' in bounds? */
+        dest->f = src->f->p[cast_uint(n)];
+        setcompileinfo(dest);
+        return 1;
+    }
+    return 0;
+}
+
+/* }}====================================================================== */

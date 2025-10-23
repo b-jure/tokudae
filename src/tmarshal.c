@@ -234,7 +234,7 @@ static void dump_upvalues(MarshalState *M, const Proto *f) {
     dump_int(M, n);
     for (int i = 0; i < n; i++) {
         dump_int(M, f->upvals[i].idx);
-        dump_byte(M, f->upvals[i].onstack);
+        dump_byte(M, f->upvals[i].instack);
         dump_byte(M, f->upvals[i].kind);
     }
 }
@@ -530,7 +530,7 @@ static void load_upvalues(MarshalState *M, Proto *f) {
         f->upvals[i].name = NULL;
     for (int i = 0; i < n; i++) { /* following calls can raise errors */
         f->upvals[i].idx = load_int(M);
-        f->upvals[i].onstack = load_byte(M);
+        f->upvals[i].instack = load_byte(M);
         f->upvals[i].kind = load_byte(M);
     }
 }

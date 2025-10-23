@@ -1,5 +1,7 @@
 #!../tokudae
 
+/* {{=================================================================== */
+
 /* Quick version check, keep this first! */
 local version = "Tokudae 1.0";
 if __VERSION != version { /* test script and core version mismatch? */
@@ -23,19 +25,14 @@ __opts = {
     abort_on_fail = true, /* -a (true) | -A (false) */
     run_isolated = false, /* -i (true) | -I (false) */
     enter_debug = false, /* -d (true) | -D (false) */
-    rebuild = true, /* -b (true) | -B (false) */
+    rebuild = false, /* -b (true) | -B (false) */
     testsuites_to_skip = [], /* -e testsuite */
     testsuites_to_run = [], /* non-flag arguments */
     cli_tests = [], /* -t test_file */
     tests_script = "testsuites.toku", /* -s tests_script */
 };
 
-
-/*
-** {=====================================================================
-** Additional (environment specific) settings
-** ======================================================================
-*/
+/* }{==Environment specific settings===================================== */
 
 /* false if not running heavy tests */
 __heavy = __G.__heavy or true; /* default is true */
@@ -61,16 +58,8 @@ local dev_null12 = dev_null1 .. " 2>&1";
 
 local cp = "cp";
 
-/* }===================================================================== */
+/* }{==Internals========================================================= */
 
-
-/*
-** {=====================================================================
-** Test driver and internals
-** ======================================================================
-*/
-
-/* save program name */
 local prog =  "../tokudae";
 local oldprog = prog .. ".old";
 
@@ -642,14 +631,7 @@ local fn run_all_testsuites(tests_script) {
     }
 }
 
-/* }===================================================================== */
-
-
-/*
-** {====================================================================
-** Command-line-interface
-** =====================================================================
-*/
+/* }{==Command-line-interface=========================================== */
 
 /*
 ** Usage string.
@@ -1215,17 +1197,14 @@ local fn rmoldprog(restore) {
         error("can't restore/remove backup executable (no such file)");
 }
 
-/* }==================================================================== */
-
-
-/* ============ MAIN ============= */
+/* }{==Main============================================================= */
 
 handle_cli_args();
 
 if showinfo /* only show enabled/disabled options? */
     display_run_information();
 else if !out_tests and __opts.rebuild { /* rebuild standalone interpreter? */
-    loginfo("rebuilding Takudae standalone interpreter...");
+    loginfo("rebuilding Tokudae standalone interpreter...");
     report(true, "can't create executable backup",
            execute(buildcmd(cp, prog, oldprog, dev_null1)));
     loginfo(fmt("%s backup executable '%s'", GREEN("created"), oldprog));
@@ -1259,3 +1238,5 @@ else if !out_tests and __opts.rebuild { /* rebuild standalone interpreter? */
     else if !gen_dir_tests and !gen_script_tests
         run_args();
 }
+
+/* }}=================================================================== */

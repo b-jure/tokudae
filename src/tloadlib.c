@@ -125,7 +125,7 @@ static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym) {
 static void setprogdir(toku_State *T) {
     char buff[MAX_PATH + 1];
     char *lb;
-    DWORD nsize = sizeof(buff)/sizeof(char);
+    DWORD nsize = t_arraysize(buff);
     DWORD n = GetModuleFileNameA(NULL, buff, nsize); /* get exec. name */
     if (n == 0 || n == nsize || (lb = strrchr(buff, '\\')) == NULL)
         tokuL_error(T, "unable to get ModuleFileName");
@@ -139,10 +139,10 @@ static void setprogdir(toku_State *T) {
 
 static void pusherror(toku_State *T) {
     int error = GetLastError();
-    char buffer[128];
+    char buff[128];
     if (FormatMessageA(FORMAT_MESSAGE_IGNORE_INSERTS|FORMAT_MESSAGE_FROM_SYSTEM,
-                NULL, error, 0, buffer, sizeof(buffer)/sizeof(char), NULL))
-        toku_push_string(T, buffer);
+                NULL, error, 0, buff, t_arraysize(buff), NULL))
+        toku_push_string(T, buff);
     else
         toku_push_fstring(T, "system error %d\n", error);
 }
@@ -591,7 +591,7 @@ static void create_searchers_array(toku_State *T) {
         NULL
     };
     /* create 'searchers' list ('package' table is on stack top) */
-    toku_push_list(T, sizeof(searchers)/sizeof(searchers[0]) - 1);
+    toku_push_list(T, t_arraysize(searchers));
     /* fill it with predefined searchers */
     for (int i = 0; searchers[i] != NULL; i++) {
         toku_push(T, -2); /* set 'package' as upvalue for all searchers */

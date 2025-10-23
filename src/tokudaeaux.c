@@ -170,8 +170,6 @@ TOKULIB_API int tokuL_error_arg(toku_State *T, int arg, const char *extra) {
         return tokuL_error(T, "bad argument #%d (%s)", arg+1, extra);
     toku_getinfo(T, "n", &ar);
     if (strcmp(ar.namewhat, "metamethod") == 0) {
-        /* NOTE: currently, this is unreachable! */
-        toku_assert(0);
         arg--; /* ignore 'self' */
         if (arg == -1) /* 'self' is the invalid argument? */
             tokuL_error(T, "calling '%s' on a bad 'self' (%s)", ar.name, extra);

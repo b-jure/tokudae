@@ -94,18 +94,18 @@ static void print_usage(const char *badopt) {
             ewritefmt("unknown option '%s'\n", badopt);
     } else fp = stdout;
     toku_writefmt(fp,
-    "usage: %s [options] [script [args]]\n"
+    "usage: %s [subcommand] [options] [script [args]]\n"
     "Available options are:\n"
     "   -e stat     execute string 'stat'\n"
     "   -i          enter interactive mode after executing 'script'\n"
     "   -l mod      import library 'mod' into global 'mod'\n"
     "   -l g=mod    import library 'mod' into global 'g'\n"
-    "   -v          show version information\n"
     "   -W          turn warnings on\n"
     "   -E          ignore environment variables\n"
-    "   -h          show help (this)\n"
-    "   --          stop handling options\n"
-    "   -           stop handling options and execute stdin\n",
+    "   -v          show version information\n"
+    "   -h          show help\n"
+    "    --          stop handling options\n"
+    "    -           stop handling options and execute stdin\n",
     progname);
 }
 
@@ -542,7 +542,7 @@ static int addreturn(toku_State *T) {
 
 
 #define EOFTEXT     "<eof>"
-#define EOFLEN      (sizeof(EOFTEXT)/sizeof(char) - 1)
+#define EOFLEN      (t_arraysize(EOFTEXT) - 1)
 
 /*
 ** If the status is syntax error, then this message checks the

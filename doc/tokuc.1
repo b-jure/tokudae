@@ -1,0 +1,106 @@
+.TH tokuc 1 "23.10.2025" "version 1.0.0"
+
+.SH NAME
+tokuc \- Tokudae compiler
+
+.SH SYNOPSIS
+.B tokuc [ \fIoptions\fP ] [ \fIfilenames\fP ]
+
+.SH DESCRIPTION
+\fBtokuc\fR is the Tokudae compiler.
+It translates programs written in the Tokudae programming language
+into binary files containing precompiled chunks that can be later loaded
+and executed.
+.LP
+The main advantages of precompiling chunks are:
+faster loading,
+protecting source code from accidental user changes,
+and off-line syntax checking.
+Precompiling does not imply faster execution
+because in Tokudae chunks are always compiled into bytecodes
+before being executed.
+\fBtokuc\fR simply allows those bytecodes to be saved in a file for later
+execution.
+Precompiled chunks are not necessarily smaller than the corresponding source.
+The main goal in precompiling is faster loading.
+.LP
+In the command line, you can mix text files containing Tokudae source and
+binary files containing precompiled chunks.
+\fBtokuc\fR produces a single output file containing the combined bytecodes
+for all files given.
+Executing the combined file is equivalent to executing the given files in
+order they were provided to the command line as arguments.
+By default, the output file is named \fBtokuc.out\fR, but you can change
+this with the \fB\-o\fR option.
+.LP
+Precompiled chunks are \fInot\fP portable across different architectures.
+Moreover, the internal format of precompiled chunks is likely to change
+when a new version of Tokudae is released.
+Make sure you save the source files of all Tokudae programs that you precompile.
+
+.SH OPTIONS
+.TP
+.BI \-l " n"
+list compiled opcodes for Tokudae's virtual machine.
+Verbosity of the listing is determinted by the argument \fIn\fP which
+is an integer in interval [0, 3].
+If \fIn\fP is 0, the header, line numbers, offsets, and names will be listed.
+If \fIn\fP is 1 or greater, the instruction arguments will be listed.
+If \fIn\fP is 2 or greater, the debug information will be listed.
+If \fIn\fP is 3, the values of the constants will be listed.
+Listing opcodes is useful to learn about Tokudae's virtual machine.
+If no files are given, then \fBtokuc\fR loads \fBtokuc.out\fR and lists
+its contents.
+.TP
+.BI \-D
+provide description for each opcode in the listing (\fI\-l\fP).
+This is quite verbose, however it does provide more information on what
+each opcode does. Beware, the actual opcode operations are not quite as simple
+as shown in the description, instead use this description to get surface-level
+understanding on the complexity of each opcode.
+.TP
+.B \-o " file"
+output to \fIfile\fR, instead of the default \fBtokuc.out\fR.
+(You can use \fB"\-"\fR for standard output,
+but not on platforms that open standard output in text mode.)
+The output file may be one of the given files because all files are loaded
+before the output file is written.
+Be careful not to overwrite precious files.
+.TP
+.B \-p
+load files but do not generate any output file.
+Used mainly for syntax checking and for testing precompiled chunks:
+corrupted files will probably generate errors when loaded.
+If no files are given, then \fBtokuc\fR loads \fBtokuc.out\fR and tests
+its contents.
+No messages are displayed if the file loads without errors.
+.TP
+.B \-s
+strip debug information before writing the output file.
+This saves some space in very large chunks,
+but if errors occur when running a stripped chunk,
+then the error messages may not contain the full information they usually do.
+In particular, line numbers and names of local variables are lost.
+.TP
+.B \-v
+show version information.
+.TP
+.B \-h
+show help.
+.TP
+.B \-\-
+stop handling options.
+.TP
+.B \-
+stop handling options and process standard input.
+
+.SH DIAGNOSTICS
+Error messages should be self explanatory.
+
+.SH "SEE ALSO"
+.BR tokudae (1)
+.br
+The documentation provided with the distribution.
+
+.SH AUTHORS
+B. Jure
