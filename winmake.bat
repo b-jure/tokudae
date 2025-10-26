@@ -32,11 +32,11 @@ set TOKUDAE_E=tokudae1.exp
 set TOKUDAE_L=tokudae1.lib
 
 :: Warning flags
-set WDISABLED=/wd4324 /wd4310 /wd4709 /wd4334 /wd4456 /wd4457
+set WDISABLED=/wd4324 /wd4310 /wd4709 /wd4334 /wd4456 /wd4457 /wd4127 /wd4702
 set WARNINGS=/W4 /WX !WDISABLED!
 
 :: User flags
-set MYCFLAGS=-DTOKU_BUILD_AS_DLL -DTOKUI_ASSERT
+set MYCFLAGS=-DTOKU_BUILD_AS_DLL
 set MYLDFLAGS=
 set MYLIBS=
 
@@ -76,7 +76,7 @@ set TO_BIN=!TOKUDAE_T! !TOKUDAEC_T!
 set TO_INC=src\tokudae.h src\tokudaeconf.h src\tokudaelib.h src\tokudaeaux.h
 set TO_INC=!TO_INC! src\tokudaelimits.h src\tokudae.hpp
 set TO_LIB=!TOKUDAE_A! !TOKUDAE_L! !TOKUDAE_E!
-set TO_DOC=doc\tokudae.1 doc\manual.html doc\manual.css doc\contents.html
+set TO_DOC=doc\tokudae.1 doc\tokuc.1 doc\manual.html doc\manual.css doc\contents.html
 set TO_DOC=!TO_DOC! doc\contents.css doc\tokudae.css doc\grammar.ebnf
 
 :: }=== END OF CONFIGURATION ==={
@@ -86,11 +86,11 @@ set TO_DOC=!TO_DOC! doc\contents.css doc\tokudae.css doc\grammar.ebnf
 
 echo BEGIN >> !LOGFILE!
 :: handle commands
-if "%1"=="" goto build;
-if "%1"=="install" goto install;
-if "%1"=="local" goto local;
-if "%1"=="uninstall" goto uninstall;
-if "%1"=="clean" goto clean;
+if "%1"=="" goto build
+if "%1"=="install" goto install
+if "%1"=="local" goto local
+if "%1"=="uninstall" goto uninstall
+if "%1"=="clean" goto clean
 :: otherwise invalid command
 echo Usage: winmake.bat [ clean ^| install ^| uninstall ^| local ]
 echo - if no arguments are provided, this recompiles and builds the DLL and the executable
@@ -140,6 +140,7 @@ if errorlevel 1 (
     echo END >> !LOGFILE!
     exit /b 1
 )
+call :log "linking !TOKUDAEC_T!..."
 !CLINK! /NOLOGO /OUT:!TOKUDAEC_T! !TOKUDAEC_O! !TOKUDAE_L! !LDFLAGS! !LIBS! >> !LOGFILE!
 if errorlevel 1 (
     call :logerror "compiler executable linking failed"
@@ -147,13 +148,13 @@ if errorlevel 1 (
     exit /b 1
 )
 call :log "build complete (!TOKUDAE_T!, !TOKUDAEC_T!, !TOKUDAE_A!, !TOKUDAE_L!, !TOKUDAE_E!)"
-goto end;
+goto end
 
 :: install tokudae distribution locally
 :local
-set INSTALL_ROOT=".\local"
-goto install;
-goto end;
+set INSTALL_ROOT=.\local
+goto install
+goto end
 
 :: install tokudae distribution onto the system
 :install
@@ -178,7 +179,7 @@ call :installfiles "!INSTALL_INC!" !TO_INC!
 call :installfiles "!INSTALL_LIB!" !TO_LIB! 
 call :installfiles "!INSTALL_DOC!" !TO_DOC! 
 call :log "installation complete"
-goto end;
+goto end
 
 :: install routine
 :installfiles
@@ -193,7 +194,7 @@ if errorlevel 1 (
     exit 1
 )
 shift
-goto nextarg;
+goto nextarg
 goto :eof
 
 :: uninstall files
@@ -201,7 +202,7 @@ goto :eof
 call :log "uninstalling (!INSTALL_ROOT!)..."
 powershell -Command "!UNINSTALL! -Recurse '!INSTALL_ROOT!' -ErrorAction SilentlyContinue"
 call :log "uninstall complete"
-goto end;
+goto end
 
 :: clean build artifacts
 :clean
@@ -209,7 +210,7 @@ call :log "cleaning build artifacts..."
 powershell -Command "$env:ALL_O -split '\s+' | !UNINSTALL! -ErrorAction SilentlyContinue"
 powershell -Command "$env:ALL_T -split '\s+' | !UNINSTALL! -ErrorAction SilentlyContinue"
 call :log "clean complete"
-goto end;
+goto end
 
 :: log routine
 :log

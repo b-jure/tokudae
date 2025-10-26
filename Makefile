@@ -6,6 +6,8 @@ PLATFORM ::= $(strip $(PLATFORM))
 # By default, assume linux_readline
 ifeq ($(PLATFORM),)
 PLATFORM ::= linux_readline
+else
+PLATFORM ::= $(strip $(PLATFORM))
 endif
 
 ifeq ($(filter $(PLATFORM),$(PLATFORMS)),$(PLATFORM))
@@ -93,7 +95,7 @@ echobuild:
 	@echo "RM = $(RM)"
 	@echo "UNAME = $(UNAME)"
 
-install:
+install: all
 	$(MKDIR) $(INSTALL_BIN) $(INSTALL_INC) $(INSTALL_LIB) \
 		$(INSTALL_MAN) $(INSTALL_TMOD) $(INSTALL_CMOD) $(INSTALL_DOC)
 	$(INSTALL_EXEC) $(TO_BIN) $(INSTALL_BIN)

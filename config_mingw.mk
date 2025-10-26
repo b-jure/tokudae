@@ -84,6 +84,6 @@ UNAME = uname
 # 			       Targets
 # ==========================================================================
 TOKUDAE_T = tokudae.exe
-TOKUDAEC_C = tokuc.exe
+TOKUDAEC_T = tokuc.exe
 TOKUDAE_A = tokudae1.dll
 # }=========================================================================

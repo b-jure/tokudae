@@ -53,19 +53,19 @@ SYSCFLAGS = -DTOKU_USE_LINUX
 SYSLDFLAGS =
 SYSLIBS = -Wl,-E -ldl
 
-## Release flags
-#MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
-#MYLDFLAGS =
-#MYLIBS =
-#MYOBJS =
-
-# Testing flags
-ASANFLAGS = -fsanitize=address -fsanitize=undefined\
- 	    -fsanitize=pointer-subtract -fsanitize=pointer-compare
-MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
-MYLDFLAGS = $(ASANFLAGS)
+# Release flags
+MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
+MYLDFLAGS =
 MYLIBS =
 MYOBJS =
+
+# Testing flags
+#ASANFLAGS = -fsanitize=address -fsanitize=undefined\
+# 	    -fsanitize=pointer-subtract -fsanitize=pointer-compare
+#MYCFLAGS = $(ASANFLAGS) -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
+#MYLDFLAGS = $(ASANFLAGS)
+#MYLIBS =
+#MYOBJS =
 
 # Special flags for compiler modules; -Os reduces code size.
 CMCFLAGS = 

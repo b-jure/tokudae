@@ -53,17 +53,17 @@ SYSCFLAGS = -DTOKU_USE_POSIX
 SYSLDFLAGS =
 SYSLIBS =
 
-## Release flags
-#MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
-#MYLDFLAGS =
-#MYLIBS =
-#MYOBJS =
-
-# Testing flags
-MYCFLAGS = -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
+# Release flags
+MYCFLAGS = -O2 -march=native -fno-stack-protector -fno-common
 MYLDFLAGS =
 MYLIBS =
 MYOBJS =
+
+# Testing flags
+#MYCFLAGS = -O0 -g3 -DTOKU_USE_APICHECK -DTOKUI_ASSERT
+#MYLDFLAGS =
+#MYLIBS =
+#MYOBJS =
 
 # Special flags for compiler modules; -Os reduces code size.
 CMCFLAGS = 
