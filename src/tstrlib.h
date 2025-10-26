@@ -20,7 +20,7 @@
 #include "tokudaelimits.h"
 
 
-#define uchar(c)    cast_ubyte(c)
+#define uchar(c)    cast_u8(c)
 
 
 /*

@@ -8,11 +8,11 @@
 #define TOKU_CORE
 
 #include <memory.h>
+#include <ctype.h>
 
 #include "tokudaeprefix.h"
 
 #include "tobject.h"
-#include "ttypes.h"
 #include "tgc.h"
 #include "tlexer.h"
 #include "tdebug.h"
@@ -38,6 +38,10 @@
 #define save_and_advance(lx)    (save(lx), advance(lx))
 
 
+#define isodigit(c)    (cast_u32(c) - '0' < 8u)
+#define isbdigit(c)    (cast_u32(c) - '0' < 2u)
+
+
 static const char *tkstr[] = { /* ORDER TK */
     "and", "break", "case", "continue", "class",
     "default", "else", "false", "for", "foreach", "fn", "if",
@@ -59,7 +63,7 @@ typedef enum DigType {
 
 
 void tokuY_setinput(toku_State *T, Lexer *lx, BuffReader *Z, OString *source,
-                    int firstchar) {
+                    int32_t firstchar) {
     toku_assert(lx->dyd && lx->buff);
     lx->c = firstchar;
     lx->line = 1;
@@ -78,21 +82,21 @@ void tokuY_init(toku_State *T) {
     OString *e = tokuS_newlit(T, TOKU_ENV); /* create env name */
     tokuG_fix(T, obj2gco(e)); /* never collect this name */
     /* create keyword names and never collect them */
-    toku_assert(NUM_KEYWORDS <= TOKU_MAXUBYTE);
-    for (int i = 0; i < NUM_KEYWORDS; i++) {
+    toku_assert(NUM_KEYWORDS <= UINT8_MAX);
+    for (int32_t i = 0; i < NUM_KEYWORDS; i++) {
         OString *s = tokuS_new(T, tkstr[i]);
-        s->extra = cast_ubyte(i + 1);
+        s->extra = cast_u8(i + 1);
         tokuG_fix(T, obj2gco(s));
     }
 }
 
 
 /* forward declare */
-static t_noret lexerror(Lexer *lx, const char *err, int token);
+static t_noret lexerror(Lexer *lx, const char *err, int32_t token);
 
 
 /* pushes character into token buffer */
-t_sinline void savec(Lexer *lx, int c) {
+t_sinline void savec(Lexer *lx, int32_t c) {
     if (tokuR_bufflen(lx->buff) >= tokuR_buffsize(lx->buff)) {
         size_t newsize;
         if (tokuR_buffsize(lx->buff) >= TOKU_MAXSIZE / 2)
@@ -105,7 +109,7 @@ t_sinline void savec(Lexer *lx, int c) {
 
 
 /* if current char matches 'c' advance */
-t_sinline int lxmatch(Lexer *lx, int c) {
+t_sinline int32_t lxmatch(Lexer *lx, int32_t c) {
     if (c == lx->c) {
         advance(lx);
         return 1;
@@ -114,7 +118,7 @@ t_sinline int lxmatch(Lexer *lx, int c) {
 }
 
 
-const char *tokuY_tok2str(Lexer *lx, int t) {
+const char *tokuY_tok2str(Lexer *lx, int32_t t) {
     toku_assert(t <= TK_NAME);
     if (t >= FIRSTTK) {
         const char *str = tkstr[t - FIRSTTK];
@@ -122,7 +126,7 @@ const char *tokuY_tok2str(Lexer *lx, int t) {
             return tokuS_pushfstring(lx->T, "'%s'", str);
         return str;
     } else {
-        if (tisprint(t))
+        if (isprint(t))
             return tokuS_pushfstring(lx->T, "'%c'", t);
         else
             return tokuS_pushfstring(lx->T, "'<\\%d>'", t);
@@ -130,7 +134,7 @@ const char *tokuY_tok2str(Lexer *lx, int t) {
 }
 
 
-static const char *lextok2str(Lexer *lx, int t) {
+static const char *lextok2str(Lexer *lx, int32_t t) {
     switch (t) {
         case TK_FLT: case TK_INT:
         case TK_STRING: case TK_NAME:
@@ -141,7 +145,7 @@ static const char *lextok2str(Lexer *lx, int t) {
 }
 
 
-static const char *lexmsg(Lexer *lx, const char *msg, int token) {
+static const char *lexmsg(Lexer *lx, const char *msg, int32_t token) {
     toku_State *T = lx->T;
     msg = tokuD_addinfo(T, msg, lx->src, lx->line);
     if (token)
@@ -150,7 +154,7 @@ static const char *lexmsg(Lexer *lx, const char *msg, int token) {
 }
 
 
-static void lexwarn(Lexer *lx, const char *msg, int token) {
+static void lexwarn(Lexer *lx, const char *msg, int32_t token) {
     toku_State *T = lx->T;
     SPtr oldsp = T->sp.p;
     tokuT_warning(T, lexmsg(lx, msg, token), 0);
@@ -158,7 +162,7 @@ static void lexwarn(Lexer *lx, const char *msg, int token) {
 }
 
 
-static t_noret lexerror(Lexer *lx, const char *err, int token) {
+static t_noret lexerror(Lexer *lx, const char *err, int32_t token) {
     lexmsg(lx, err, token);
     tokuPR_throw(lx->T, TOKU_STATUS_ESYNTAX);
 }
@@ -171,7 +175,7 @@ t_noret tokuY_syntaxerror(Lexer *lx, const char *err) {
 
 
 static void inclinenr(Lexer *lx) {
-    int old_c = lx->c;
+    int32_t old_c = lx->c;
     toku_assert(currIsNewline(lx));
     advance(lx); /* skip '\n' or '\r' */
     if (currIsNewline(lx) && lx->c != old_c) /* have "\r\n" or "\n\r"? */
@@ -184,7 +188,7 @@ static void inclinenr(Lexer *lx) {
 OString *anchorstring(Lexer *lx, OString *s) {
     toku_State *T = lx->T;
     TValue olds;
-    t_ubyte tag = tokuH_getstr(lx->tab, s, &olds);
+    uint8_t tag = tokuH_getstr(lx->tab, s, &olds);
     if (!tagisempty(tag)) /* string already present? */
         return strval(&olds); /* use stored value */
     else {
@@ -204,9 +208,9 @@ OString *tokuY_newstring(Lexer *lx, const char *str, size_t l) {
 }
 
 
-/* -----------------------------------------------------------------------
+/* =======================================================================
 ** Read comments
-** ----------------------------------------------------------------------- */
+** ======================================================================= */
 
 /* read single line comment */
 static void read_comment(Lexer *lx) {
@@ -233,12 +237,12 @@ static void read_long_comment(Lexer *lx) {
 }
 
 
-/* -----------------------------------------------------------------------
+/* =======================================================================
 ** Read string
-** ----------------------------------------------------------------------- */
+** ======================================================================= */
 
 
-static void checkcond(Lexer *lx, int cond, const char *msg) {
+static void checkcond(Lexer *lx, int32_t cond, const char *msg) {
     if (t_unlikely(!cond)) { /* condition fails? */
         if (lx->c != TEOF) /* not end-of-file? */
             save_and_advance(lx); /* add current char to buffer for err msg */
@@ -247,16 +251,16 @@ static void checkcond(Lexer *lx, int cond, const char *msg) {
 }
 
 
-static t_ubyte expect_hexdig(Lexer *lx){
+static uint8_t expect_hexdig(Lexer *lx){
     save_and_advance(lx);
-    checkcond(lx, tisxdigit(lx->c), "hexadecimal digit expected");
+    checkcond(lx, isxdigit(lx->c), "hexadecimal digit expected");
     return tokuS_hexvalue(lx->c);
 }
 
 
-static t_ubyte read_hexesc(Lexer *lx) {
-    t_ubyte hd = expect_hexdig(lx);
-    hd = cast_ubyte(hd << 4) + expect_hexdig(lx);
+static uint8_t read_hexesc(Lexer *lx) {
+    uint8_t hd = expect_hexdig(lx);
+    hd = cast_u8(hd << 4) + expect_hexdig(lx);
     tokuR_buffpopn(lx->buff, 2); /* remove saved chars from buffer */
     return hd;
 }
@@ -268,9 +272,9 @@ static t_ubyte read_hexesc(Lexer *lx) {
 ** UTF-8 4 byte sequence. If the escape sequence is strict UTF-8
 ** sequence, then it indicates that to caller through 'strict'.
 */
-static t_uint read_utf8esc(Lexer *lx, int *strict) {
-    t_uint r;
-    int i = 4; /* chars to be removed: '\', 'u', '{', and first digit */
+static uint32_t read_utf8esc(Lexer *lx, int32_t *strict) {
+    uint32_t r;
+    int32_t i = 4; /* chars to be removed: '\', 'u', '{', and first digit */
     toku_assert(strict != NULL);
     *strict = 0;
     save_and_advance(lx); /* skip 'u' */
@@ -280,7 +284,7 @@ static t_uint read_utf8esc(Lexer *lx, int *strict) {
         checkcond(lx, lx->c == '{', "missing '{'");
     r = expect_hexdig(lx); /* must have at least one digit */
     /* Read up to 7 hexadecimal digits (last digit is reserved for UTF-8) */
-    while (cast_void(save_and_advance(lx)), tisxdigit(lx->c)) {
+    while (cast_void(save_and_advance(lx)), isxdigit(lx->c)) {
         i++;
         checkcond(lx, r <= (0x7FFFFFFFu >> 4), "UTF-8 value too large");
         r = (r << 4) + tokuS_hexvalue(lx->c);
@@ -300,7 +304,7 @@ static t_uint read_utf8esc(Lexer *lx, int *strict) {
 ** Invalid first bytes:
 ** 1000XXXX(8), 1001XXXX(9), 1010XXXX(A), 1011XXXX(B)
 */
-static t_ubyte const utf8len_[] = {
+static uint8_t const utf8len_[] = {
 /* 0 1 2 3 4 5 6 7 8 9 A B C D E F */
    1,1,1,1,1,1,1,1,0,0,0,0,2,2,3,4
 };
@@ -312,7 +316,7 @@ static t_ubyte const utf8len_[] = {
 #define utf8len(n)      utf8len_[((n) & 0xFF) >> 4]
 
 
-static int check_utf8(Lexer *lx, t_uint n) {
+static int32_t check_utf8(Lexer *lx, uint32_t n) {
     if (!utf8len(n))
         lexerror(lx, "invalid first byte in UTF-8 sequence", 0);
     else if (n <= 0x7F) /* ascii? */
@@ -333,8 +337,8 @@ static int check_utf8(Lexer *lx, t_uint n) {
 }
 
 
-static void utf8verfied(char *buff, t_uint n, int len) {
-    int i = 1; /* number of bytes in the buffer */
+static void utf8verfied(char *buff, uint32_t n, int32_t len) {
+    int32_t i = 1; /* number of bytes in the buffer */
     toku_assert(n <= 0x7FFFFFFFu);
     do {
         buff[UTF8BUFFSZ - i++] = cast_char(0xFF & n);
@@ -346,24 +350,24 @@ static void utf8verfied(char *buff, t_uint n, int len) {
 
 static void utf8esc(Lexer *lx) {
     char buff[UTF8BUFFSZ];
-    int strict;
-    int n = cast_int(read_utf8esc(lx, &strict));
+    int32_t strict;
+    int32_t n = cast_i32(read_utf8esc(lx, &strict));
     if (strict) { /* n should already be valid UTF-8? */
-        t_uint temp = cast_uint(n);
+        uint32_t temp = cast_u32(n);
         n = check_utf8(lx, temp);
         utf8verfied(buff, temp, n);
     } else /* otherwise create non-strict UTF-8 sequence */
-        n = tokuS_utf8esc(buff, cast_uint(n));
+        n = tokuS_utf8esc(buff, cast_u32(n));
     for (; n > 0; n--) /* add 'buff' to string */
         savec(lx, buff[UTF8BUFFSZ - n]);
 }
 
 
-static int read_decesc(Lexer *lx) {
-    int i;
-    int r = 0;
-    for (i = 0; i < 3 && tisdigit(lx->c); i++) {
-        r = 10 * r + ttodigit(lx->c);
+static int32_t read_decesc(Lexer *lx) {
+    int32_t i;
+    int32_t r = 0;
+    for (i = 0; i < 3 && isdigit(lx->c); i++) {
+        r = 10 * r + (lx->c & 0x0F);
         save_and_advance(lx);
     }
     checkcond(lx, r <= UCHAR_MAX, "decimal escape too large");
@@ -374,7 +378,7 @@ static int read_decesc(Lexer *lx) {
 
 static size_t skipsep(Lexer *lx) {
     size_t count = 0;
-    int s = lx->c;
+    int32_t s = lx->c;
     toku_assert(s == '[' || s == ']');
     save_and_advance(lx);
     if (lx->c != '=')
@@ -390,7 +394,7 @@ static size_t skipsep(Lexer *lx) {
 
 
 static void read_long_string(Lexer *lx, Literal *k, size_t sep) {
-    int line = lx->line; /* initial line */
+    int32_t line = lx->line; /* initial line */
     save_and_advance(lx); /* skip second '[' */
     if (currIsNewline(lx)) /* string starts with a newline? */
         inclinenr(lx); /* skip it */
@@ -433,7 +437,7 @@ static void read_string(Lexer *lx, Literal *k) {
                 lexerror(lx, "unterminated string", TK_STRING);
                 break; /* to avoid warnings */
             case '\\': { /* escape sequences */
-                int c; /* final character to be saved */
+                int32_t c; /* final character to be saved */
                 save_and_advance(lx); /* keep '\\' for error messages */
                 switch (lx->c) {
                     case 'a': c = '\a'; goto read_save;
@@ -456,7 +460,7 @@ static void read_string(Lexer *lx, Literal *k) {
                     }
                     case TEOF: goto no_save; /* raise err on next iteration */
                     default: {
-                        checkcond(lx, tisdigit(lx->c), "invalid escape sequence");
+                        checkcond(lx,isdigit(lx->c),"invalid escape sequence");
                         c = read_decesc(lx); /* '\ddd' */
                         goto only_save;
                     }
@@ -475,7 +479,8 @@ static void read_string(Lexer *lx, Literal *k) {
         }
     } /* while byte is not a delimiter */
     save_and_advance(lx); /* skip delimiter */
-    k->str = tokuY_newstring(lx, tokuR_buff(lx->buff)+1, tokuR_bufflen(lx->buff)-2);
+    k->str = tokuY_newstring(lx, tokuR_buff(lx->buff) + 1,
+                                 tokuR_bufflen(lx->buff) - 2);
 }
 
 
@@ -485,8 +490,8 @@ static void read_string(Lexer *lx, Literal *k) {
 ** ----------------------------------------------------------------------- */
 
 /* reads a literal character */
-static int read_char(Lexer *lx, Literal *k) {
-    int c = 0; /* to prevent warnings */
+static int32_t read_char(Lexer *lx, Literal *k) {
+    int32_t c = 0; /* to prevent warnings */
     save_and_advance(lx); /* skip ' */
 repeat:
     switch (lx->c) {
@@ -511,7 +516,7 @@ repeat:
                     c = lx->c; break;
                 case TEOF: goto repeat;
                 default: { /* error */
-                    checkcond(lx, tisdigit(lx->c), "invalid escape sequence");
+                    checkcond(lx, isdigit(lx->c), "invalid escape sequence");
                     c = read_decesc(lx); /* '\ddd' */
                     goto only_save;
                 }
@@ -519,7 +524,7 @@ repeat:
             tokuR_buffpop(lx->buff);
             break;
         }
-        default: c = cast_ubyte(lx->c);
+        default: c = cast_u8(lx->c);
     }
     advance(lx);
 only_save:
@@ -533,8 +538,8 @@ only_save:
 
 
 /* convert lexer buffer bytes into number constant */
-static int lexstr2num(Lexer *lx, Literal *k) {
-    int f; /* flag for float overflow; -1 underflow; 1 overflow; 0 ok */
+static int32_t lexstr2num(Lexer *lx, Literal *k) {
+    int32_t f; /* flag for float overflow; -1 underflow; 1 overflow; 0 ok */
     TValue o;
     savec(lx, '\0'); /* terminate */
     if (t_unlikely(tokuS_tonum(tokuR_buff(lx->buff), &o, &f) == 0))
@@ -554,7 +559,7 @@ static int lexstr2num(Lexer *lx, Literal *k) {
 }
 
 
-static int check_next(Lexer *lx, int c) {
+static int32_t check_next(Lexer *lx, int32_t c) {
     if (lx->c == c) {
         advance(lx);
         return 1;
@@ -563,7 +568,7 @@ static int check_next(Lexer *lx, int c) {
 }
 
 
-static int check_next2(Lexer *lx, const char *set) {
+static int32_t check_next2(Lexer *lx, const char *set) {
     if (lx->c == set[0] || lx->c == set[1]) {
         save_and_advance(lx);
         return 1;
@@ -576,16 +581,16 @@ static int check_next2(Lexer *lx, const char *set) {
 ** Read digits, additionally allow '_' separators if these are
 ** not digits in the fractional part denoted by 'frac'.
 */
-static int read_digits(Lexer *lx, DigType dt, int frac) {
-    int digits = 0;
+static int32_t read_digits(Lexer *lx, DigType dt, int32_t frac) {
+    int32_t digits = 0;
     for (;;) {
         if (!frac && check_next(lx, '_')) /* separator? */
             continue; /* skip */
         switch (dt) { /* otherwise get the digit */
-            case DigDec: if (!tisdigit(lx->c)) return digits; break;
-            case DigHex: if (!tisxdigit(lx->c)) return digits; break;
-            case DigOct: if (!tisodigit(lx->c)) return digits; break;
-            case DigBin: if (!tisbdigit(lx->c)) return digits; break;
+            case DigDec: if (!isdigit(lx->c)) return digits; break;
+            case DigHex: if (!isxdigit(lx->c)) return digits; break;
+            case DigOct: if (!isodigit(lx->c)) return digits; break;
+            case DigBin: if (!isbdigit(lx->c)) return digits; break;
             default: toku_assert(0); /* invalid 'dt' */
         }
         save_and_advance(lx);
@@ -595,17 +600,17 @@ static int read_digits(Lexer *lx, DigType dt, int frac) {
 
 
 /* read exponent digits (in base 10) */
-static int read_exponent(Lexer *lx) {
-    int gotzero = 0;
+static int32_t read_exponent(Lexer *lx) {
+    int32_t gotzero = 0;
     check_next2(lx, "-+"); /* optional sign */
     if (check_next(lx, '0')) { /* leading zero? */
         gotzero = 1;
         while (lx->c == '_' || lx->c == '0')
             advance(lx); /* skip separators and leading zeros */
     }
-    if (tisalpha(lx->c)) /* exponent touching a letter? */
+    if (isalpha(lx->c)) /* exponent touching a letter? */
         save_and_advance(lx); /* force an error */
-    else if (tisdigit(lx->c)) /* got at least one non-zero digit? */
+    else if (isdigit(lx->c)) /* got at least one non-zero digit? */
         return read_digits(lx, DigDec, 0);
     else if (t_unlikely(!gotzero)) /* no digits? */
         lexerror(lx, "at least one exponent digit expected", TK_FLT);
@@ -618,15 +623,15 @@ static int read_exponent(Lexer *lx) {
 
 
 /* read base 16 (hexadecimal) numeral */
-static int read_hexnum(Lexer *lx, Literal *k) {
-    int ndigs = 0;
-    int gotexp, gotrad;
-    if (tisxdigit(lx->c)) /* can't have separator before first digit */
+static int32_t read_hexnum(Lexer *lx, Literal *k) {
+    int32_t ndigs = 0;
+    int32_t gotexp, gotrad;
+    if (isxdigit(lx->c)) /* can't have separator before first digit */
         ndigs = read_digits(lx, DigHex, 0);
     if ((gotrad = lx->c == '.')) {
         save_and_advance(lx);
         if (t_unlikely(!read_digits(lx, DigHex, 1) && !ndigs))
-            lexerror(lx,"hexadecimal constant expects at least one digit", TK_FLT);
+            lexerror(lx,"hex constant expects at least one digit", TK_FLT);
     } else if (!ndigs)
         lexerror(lx, "invalid suffix 'x|X' on integer constant", TK_FLT);
     if ((gotexp = check_next2(lx, "pP"))) { /* have exponent? */
@@ -634,28 +639,28 @@ static int read_hexnum(Lexer *lx, Literal *k) {
             goto convert;
     }
     if (t_unlikely(gotrad && !gotexp))
-        lexerror(lx, "hexadecimal float constant is missing exponent 'p|P'", TK_FLT);
-    if (tisalpha(lx->c)) /* numeral touching a letter? */
+        lexerror(lx, "hex float constant is missing exponent 'p|P'", TK_FLT);
+    if (isalpha(lx->c)) /* numeral touching a letter? */
         save_and_advance(lx); /* force an error */
 convert:
     return lexstr2num(lx, k);
 }
 
 
-static int read_binnum(Lexer *lx, Literal *k) {
-    if (t_unlikely(!tisbdigit(lx->c)))
+static int32_t read_binnum(Lexer *lx, Literal *k) {
+    if (t_unlikely(!isbdigit(lx->c)))
         lexerror(lx, "invalid suffix 'b|B' on integer constant", TK_INT);
     read_digits(lx, DigBin, 0);
-    if (t_unlikely(tisalpha(lx->c))) /* binary numeral touching a letter? */
+    if (t_unlikely(isalpha(lx->c))) /* binary numeral touching a letter? */
         save_and_advance(lx); /* force an error */
     return lexstr2num(lx, k);
 }
 
 
 /* read base 10 (decimal) numeral */
-static int read_decnum(Lexer *lx, Literal *k, int c) {
-    int fp = (c == '.'); /* check if '.' is first */
-    int ndigs = read_digits(lx, DigDec, fp) + !fp;
+static int32_t read_decnum(Lexer *lx, Literal *k, int32_t c) {
+    int32_t fp = (c == '.'); /* check if '.' is first */
+    int32_t ndigs = read_digits(lx, DigDec, fp) + !fp;
     if (!fp && lx->c == '.') { /* have fractional part? ('.' was not first) */
         save_and_advance(lx); /* skip '.' */
         ndigs += read_digits(lx, DigDec, 1);
@@ -666,7 +671,7 @@ static int read_decnum(Lexer *lx, Literal *k, int c) {
         if (read_exponent(lx) == 0) /* error? */
             goto convert;
     }
-    if (tisalpha(lx->c)) /* numeral touching a letter? */
+    if (isalpha(lx->c)) /* numeral touching a letter? */
         save_and_advance(lx); /* force an error */
 convert:
     return lexstr2num(lx, k);
@@ -674,25 +679,25 @@ convert:
 
 
 /* read base 8 (octal) numeral */
-static int read_octnum(Lexer *lx, Literal *k) {
-    int digits = read_digits(lx, DigOct, 0);
-    if (digits == 0 || tisdigit(lx->c)) /* no digits or has decimal digit? */
+static int32_t read_octnum(Lexer *lx, Literal *k) {
+    int32_t digits = read_digits(lx, DigOct, 0);
+    if (digits == 0 || isdigit(lx->c)) /* no digits or has decimal digit? */
         return read_decnum(lx, k, lx->c); /* try as decimal numeral */
-    else if (tisalpha(lx->c)) /* octal numeral touching a letter? */
+    else if (isalpha(lx->c)) /* octal numeral touching a letter? */
         save_and_advance(lx); /* force an error */
     return lexstr2num(lx, k);
 }
 
 
 /* read a numeral string */
-static int read_numeral(Lexer *lx, Literal *k) {
-    int c = lx->c;
+static int32_t read_numeral(Lexer *lx, Literal *k) {
+    int32_t c = lx->c;
     save_and_advance(lx);
     if (c == '0' && check_next2(lx, "xX"))
         return read_hexnum(lx, k);
     else if (c == '0' && check_next2(lx, "bB"))
         return read_binnum(lx, k);
-    else if (c == '0' && tisdigit(lx->c))
+    else if (c == '0' && isdigit(lx->c))
         return read_octnum(lx, k);
     else
         return read_decnum(lx, k, c);
@@ -704,7 +709,7 @@ static int read_numeral(Lexer *lx, Literal *k) {
 ** ======================================================================= */
 
 /* scan for tokens */
-static int scan(Lexer *lx, Literal *k) {
+static int32_t scan(Lexer *lx, Literal *k) {
     tokuR_buffreset(lx->buff);
     for (;;) {
         switch (lx->c) {
@@ -795,25 +800,25 @@ static int scan(Lexer *lx, Literal *k) {
                     else
                         return TK_CONCAT;
                 }
-                if (!tisdigit(lx->c)) 
+                if (!isdigit(lx->c)) 
                     return '.';
                 else
                     return read_decnum(lx, k, '.');
             case TEOF:
                 return TK_EOS;
             default: {
-                if (!tisalpha(lx->c) && lx->c != '_') {
-                    int c = lx->c;
+                if (!isalpha(lx->c) && lx->c != '_') {
+                    int32_t c = lx->c;
                     advance(lx);
                     return c;
                 } else {
                     do {
                         save_and_advance(lx);
-                    } while (tisalnum(lx->c) || lx->c == '_');
+                    } while (isalnum(lx->c) || lx->c == '_');
                     k->str = tokuY_newstring(lx, tokuR_buff(lx->buff),
                                                  tokuR_bufflen(lx->buff));
                     if (isreserved(k->str)) { /* reserved keywword? */
-                        int tk = k->str->extra + FIRSTTK - 1;
+                        int32_t tk = k->str->extra + FIRSTTK - 1;
                         if (tk == TK_INF || tk == TK_INFINITY)
                             return lexstr2num(lx, k);
                         else
@@ -840,7 +845,7 @@ void tokuY_scan(Lexer *lx) {
 
 
 /* fetch next token into 'tahead' */
-int tokuY_scanahead(Lexer *lx) {
+int32_t tokuY_scanahead(Lexer *lx) {
     toku_assert(lx->t.tk != TK_EOS);
     lx->tahead.tk = scan(lx, &lx->t.lit);
     return lx->tahead.tk;

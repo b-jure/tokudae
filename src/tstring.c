@@ -14,7 +14,6 @@
 #include "tstring.h"
 #include "tobject.h"
 #include "tgc.h"
-#include "ttypes.h"
 #include "tdebug.h"
 #include "tmem.h"
 #include "tvm.h"
@@ -22,6 +21,7 @@
 #include "tprotected.h"
 
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -31,7 +31,7 @@
 /*
 ** Maximum size for string table.
 */
-#define MAXSTRTABLE     cast_int(tokuM_limitN(INT_MAX, OString*))
+#define MAXSTRTABLE     cast_i32(tokuM_limitN(INT_MAX, OString*))
 
 
 /*
@@ -46,7 +46,7 @@
 
 
 /* string equality */
-int tokuS_eqlngstr(const OString *s1, const OString *s2) {
+int32_t tokuS_eqlngstr(const OString *s1, const OString *s2) {
     size_t len = s1->u.lnglen;
     return (s1 == s2) || /* same instance or... */
         ((len == s2->u.lnglen) && /* equal length and... */
@@ -59,8 +59,8 @@ int tokuS_eqlngstr(const OString *s1, const OString *s2) {
 ** a non-collectable string.)
 */
 void tokuS_clearcache(GState *gs) {
-    for (int i = 0; i < TOKUI_STRCACHE_N; i++) {
-        for (int j = 0; j < TOKUI_STRCACHE_M; j++) {
+    for (int32_t i = 0; i < TOKUI_STRCACHE_N; i++) {
+        for (int32_t j = 0; j < TOKUI_STRCACHE_M; j++) {
             if (iswhite(gs->strcache[i][j])) /* will entry be collected? */
                 gs->strcache[i][j] = gs->memerror;
         }
@@ -68,15 +68,15 @@ void tokuS_clearcache(GState *gs) {
 }
 
 
-t_uint tokuS_hash(const char *str, size_t l, unsigned int seed) {
-    t_uint h = seed ^ cast_uint(l);
+uint32_t tokuS_hash(const char *str, size_t l, uint32_t seed) {
+    uint32_t h = seed ^ cast_u32(l);
     for (; l > 0; l--)
-        h ^= ((h<<5) + (h>>2) + cast_ubyte(str[l - 1]));
+        h ^= ((h<<5) + (h>>2) + cast_u8(str[l - 1]));
     return h;
 }
 
 
-t_uint tokuS_hashlngstr(OString *s) {
+uint32_t tokuS_hashlngstr(OString *s) {
     toku_assert(s->tt_ == TOKU_VLNGSTR);
     if (s->extra == 0) { /* no hash? */
         size_t len = s->u.lnglen;
@@ -87,8 +87,8 @@ t_uint tokuS_hashlngstr(OString *s) {
 }
 
 
-static void rehashtable(OString **arr, int osz, int nsz) {
-    int i;
+static void rehashtable(OString **arr, int32_t osz, int32_t nsz) {
+    int32_t i;
     for (i = osz; i < nsz; i++) /* clear new part */
         arr[i] = NULL;
     for (i = 0; i < osz; i++) { /* rehash old part */
@@ -96,7 +96,7 @@ static void rehashtable(OString **arr, int osz, int nsz) {
         arr[i] = NULL; /* clear the slot */
         while (s) { /* for each string in the chain */
             OString *next = s->u.next; /* save 'next' */
-            t_uint h = cast_uint(tmod(s->hash, cast_uint(nsz)));/* hash pos. */
+            uint32_t h = cast_u32(tmod(s->hash, cast_u32(nsz)));/* hash pos. */
             s->u.next = arr[h]; /* chain it into array */
             arr[h] = s;
             s = next;
@@ -108,9 +108,9 @@ static void rehashtable(OString **arr, int osz, int nsz) {
 /* 
 ** Resize string table. If allocation fails, keep the current size.
 */
-void tokuS_resize(toku_State *T, int nsz) {
+void tokuS_resize(toku_State *T, int32_t nsz) {
     StringTable *tab = &G(T)->strtab;
-    int osz = tab->size;
+    int32_t osz = tab->size;
     OString **newarr;
     toku_assert(nsz <= MAXSTRTABLE);
     if (nsz < osz) /* shrinking ? */
@@ -140,13 +140,14 @@ void tokuS_init(toku_State *T) {
     /* allocate the memory-error message */
     gs->memerror = tokuS_newlit(T, MEMERRMSG);
     tokuG_fix(T, obj2gco(gs->memerror)); /* fix it */
-    for (int i = 0; i < TOKUI_STRCACHE_N; i++) /* fill cache with valid strings */
-        for (int j = 0; j < TOKUI_STRCACHE_M; j++)
+    /* fill cache with valid strings */
+    for (int32_t i = 0; i < TOKUI_STRCACHE_N; i++)
+        for (int32_t j = 0; j < TOKUI_STRCACHE_M; j++)
             gs->strcache[i][j] = gs->memerror;
 }
 
 
-static OString *newstrobj(toku_State *T, size_t l, int tag, t_uint h) {
+static OString *newstrobj(toku_State *T, size_t l, int32_t tag, uint32_t h) {
     GCObject *o = tokuG_new(T, sizeofstring(l), tag);
     OString *s = gco2str(o);
     s->hash = h;
@@ -166,7 +167,7 @@ OString *tokuS_newlngstrobj(toku_State *T, size_t len) {
 
 void tokuS_remove(toku_State *T, OString *s) {
     StringTable *tab = &G(T)->strtab;
-    OString **pp = &tab->hash[tmod(s->hash, cast_uint(tab->size))];
+    OString **pp = &tab->hash[tmod(s->hash, cast_u32(tab->size))];
     while (*pp != s) /* find previous element */
         pp = &(*pp)->u.next;
     *pp = (*pp)->u.next; /* remove it from list */
@@ -190,8 +191,8 @@ static OString *internshrstr(toku_State *T, const char *str, size_t l) {
     OString *s;
     GState *gs = G(T);
     StringTable *tab = &gs->strtab;
-    t_uint h = tokuS_hash(str, l, gs->seed);
-    OString **list = &tab->hash[tmod(h, cast_uint(tab->size))];
+    uint32_t h = tokuS_hash(str, l, gs->seed);
+    OString **list = &tab->hash[tmod(h, cast_u32(tab->size))];
     toku_assert(str != NULL); /* otherwise 'memcmp'/'memcpy' are undefined */
     for (s = *list; s != NULL; s = s->u.next) { /* probe chain */
         if (s->shrlen==l && (memcmp(str, getshrstr(s), l*sizeof(char))==0)) {
@@ -203,10 +204,11 @@ static OString *internshrstr(toku_State *T, const char *str, size_t l) {
     /* else must create a new string */
     if (tab->nuse >= tab->size) { /* need to grow the table? */
         growtable(T, tab);
-        list = &tab->hash[tmod(h, cast_uint(tab->size))]; /* rehash with new size */
+        /* rehash with new size */
+        list = &tab->hash[tmod(h, cast_u32(tab->size))];
     }
     s = newstrobj(T, l, TOKU_VSHRSTR, h);
-    s->shrlen = cast_ubyte(l);
+    s->shrlen = cast_u8(l);
     memcpy(getshrstr(s), str, l*sizeof(char));
     s->u.next = *list;
     *list = s;
@@ -236,9 +238,9 @@ OString *tokuS_newl(toku_State *T, const char *str, size_t l) {
 ** only zero-terminated strings, so it is safe to use 'strcmp'.
 */
 OString *tokuS_new(toku_State *T, const char *str) {
-    t_uint i = pointer2uint(str) % TOKUI_STRCACHE_N; /* hash */
+    uint32_t i = pointer2u32(str) % TOKUI_STRCACHE_N; /* hash */
     OString **p = G(T)->strcache[i]; /* address as key */
-    int j;
+    int32_t j;
     for (j = 0; j < TOKUI_STRCACHE_M; j++) {
         if (strcmp(str, getstr(p[j])) == 0) /* hit? */
             return p[j]; /* done */
@@ -256,13 +258,13 @@ OString *tokuS_new(toku_State *T, const char *str) {
 ** Comparison similar to 'strcmp' but this works on strings that
 ** might have null terminator before their end.
 */
-int tokuS_cmp(const OString *s1, const OString *s2) {
+int32_t tokuS_cmp(const OString *s1, const OString *s2) {
     const char *p1 = s1->bytes;
     size_t lreal1 = getstrlen(s1);
     const char *p2 = s2->bytes;
     size_t lreal2 = getstrlen(s2);
     for (;;) { /* for each segment */
-        int temp = strcoll(p1, p2);
+        int32_t temp = strcoll(p1, p2);
         if (temp != 0) { /* not equal? */
             return temp; /* done */
         } else { /* strings are equal up to '\0' */
@@ -285,20 +287,20 @@ int tokuS_cmp(const OString *s1, const OString *s2) {
 ** ====================================================================== */
 
 /* convert hex character into digit */
-t_sinline t_ubyte hexvalue(int c) {
+t_sinline uint8_t hexvalue(int32_t c) {
     if (c > '9') /* hex digit? */ 
-        return cast_ubyte((ttolower(c) - 'a') + 10);
+        return cast_u8((tolower(c) - 'a') + 10);
     else  /* decimal digit */
-        return cast_ubyte(c - '0');
+        return cast_u8(c - '0');
 }
 
-t_ubyte tokuS_hexvalue(int c) {
-    return check_exp(tisxdigit(c), hexvalue(c));
+uint8_t tokuS_hexvalue(int32_t c) {
+    return check_exp(isxdigit(c), hexvalue(c));
 }
 
 
 /* Lookup table for digit values. -1==255>=36 -> invalid */
-static const unsigned char table[] = { 255,
+static const uint8_t table[] = { 255,
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
@@ -318,26 +320,26 @@ static const unsigned char table[] = { 255,
 };
 
 static const char *str2int(const char *s, toku_Integer *i) {
-    const t_ubyte *val = table + 1;
+    const uint8_t *val = table + 1;
     toku_Unsigned lim = t_castS2U(TOKU_INTEGER_MIN);
-    int sign = 1;
+    int32_t sign = 1;
     uint32_t x;
     toku_Unsigned y = 0;
-    t_uint base;
-    int c, empty;
+    uint32_t base;
+    int32_t c, empty;
     empty = 1;
     c = *s++;
-    while (tisspace(c)) c = *s++; /* skip leading spaces */
+    while (isspace(c)) c = *s++; /* skip leading spaces */
     if (c == '-' || c == '+') { /* have sign? */
         sign -= 2*(c == '-'); /* adjust sign value */
         c = *s++;
     }
     /* handle prefix to get base (if any) */
     if (c == '0') {
-        if (ttolower(*s) == 'x') { /* hexadecimal? */
+        if (tolower(*s) == 'x') { /* hexadecimal? */
             s++; /* skip x|X */
             base = 16;
-        } else if (ttolower(*s) == 'b') { /* binary? */
+        } else if (tolower(*s) == 'b') { /* binary? */
             s++; /* skip b|B */
             base = 2;
         } else { /* otherwise octal */
@@ -359,7 +361,7 @@ static const char *str2int(const char *s, toku_Integer *i) {
         }
     } else if (t_ispow2(base)) { /* base is power of 2? (up to base 32) */
         if (!empty) {
-            int bs = "\0\1\2\4\7\3\6\5"[(0x17*base)>>5&7];
+            int32_t bs = "\0\1\2\4\7\3\6\5"[(0x17*base)>>5&7];
             for (x=0; val[c] < base && x <= UINT_MAX/32; c=*s++)
                 x = x<<bs | val[c];
             for (y=x; val[c]<base && y <= TOKU_UNSIGNED_MAX>>bs; c=*s++)
@@ -383,7 +385,7 @@ static const char *str2int(const char *s, toku_Integer *i) {
           !((base == 16 || base == 2) && y <= TOKU_UNSIGNED_MAX))))) {
         return NULL; /* over(under)flow (do not accept it as integer) */
     } else {
-        while (tisspace(c)) c = *s++; /* skip trailing spaces */
+        while (isspace(c)) c = *s++; /* skip trailing spaces */
         if (empty || c != '\0') return NULL; /* conversion failed? */
         *i = t_castU2S((sign < 0) ? 0u - y : y);
         return s - 1;
@@ -397,7 +399,7 @@ static const char *str2int(const char *s, toku_Integer *i) {
 #endif
 
 
-static const char *loc_str2flt(const char *s, toku_Number *res, int *pf) {
+static const char *loc_str2flt(const char *s, toku_Number *res, int32_t *pf) {
     char *eptr = NULL; /* to avoid warnings */
     toku_assert(pf != NULL);
     *pf = 0;
@@ -413,15 +415,15 @@ static const char *loc_str2flt(const char *s, toku_Number *res, int *pf) {
             *pf = -1; /* underflow (very large negative exponent) */
         }
     }
-    while (tisspace(*eptr)) eptr++; /* skip trailing spaces */
+    while (isspace(*eptr)) eptr++; /* skip trailing spaces */
     return (*eptr == '\0') ? eptr : NULL;
 }
 
 
-static const char *str2flt(const char *s, toku_Number *res, int *pf) {
+static const char *str2flt(const char *s, toku_Number *res, int32_t *pf) {
     const char *endptr;
     const char *p = strpbrk(s, ".xXbBnN");
-    if (p && ttolower(p[0]) == 'n' && ttolower(p[1]) == 'a') /* NaN? */
+    if (p && tolower(p[0]) == 'n' && tolower(p[1]) == 'a') /* NaN? */
         return NULL; /* reject it */
     endptr = loc_str2flt(s, res, pf); /* try to convert */
     if (endptr == NULL) { /* failed? may be a different locale */
@@ -439,11 +441,11 @@ static const char *str2flt(const char *s, toku_Number *res, int *pf) {
 }
 
 
-size_t tokuS_tonum(const char *s, TValue *o, int *pf) {
+size_t tokuS_tonum(const char *s, TValue *o, int32_t *pf) {
     const char *e;
     toku_Integer i;
     toku_Number n;
-    int f = 0; /* flag for float overflow */
+    int32_t f = 0; /* flag for float overflow */
     if ((e = str2int(s, &i)) != NULL) {
         setival(o, i);
     } else if ((e = str2flt(s, &n, &f)) != NULL) {
@@ -455,8 +457,8 @@ size_t tokuS_tonum(const char *s, TValue *o, int *pf) {
 }
 
 
-t_uint tokuS_tostringbuff(const TValue *obj, char *buff) {
-    int len;
+uint32_t tokuS_tostringbuff(const TValue *obj, char *buff) {
+    int32_t len;
     toku_assert(ttisnum(obj));
     if (ttisint(obj)) {
         len = toku_integer2str(buff, TOKU_N2SBUFFSZ, ival(obj));
@@ -469,24 +471,24 @@ t_uint tokuS_tostringbuff(const TValue *obj, char *buff) {
         }
     }
     toku_assert(len < TOKU_N2SBUFFSZ);
-    return cast_uint(len);
+    return cast_u32(len);
 }
 
 
 void tokuS_tostring(toku_State *T, TValue *obj) {
     char buff[TOKU_N2SBUFFSZ];
-    t_uint len = tokuS_tostringbuff(obj, buff);
+    uint32_t len = tokuS_tostringbuff(obj, buff);
     setstrval(T, obj, tokuS_newl(T, buff, len));
 }
 
 
-int tokuS_utf8esc(char *buff, t_uint n) {
-    int x = 1; /* number of bytes put in buffer (backwards) */
+int32_t tokuS_utf8esc(char *buff, uint32_t n) {
+    int32_t x = 1; /* number of bytes put in buffer (backwards) */
     toku_assert(n <= 0x7FFFFFFFu);
     if (n < 0x80) /* ascii? */
         buff[UTF8BUFFSZ - 1] = cast_char(n);
     else { /* need continuation bytes */
-        t_uint mfb = 0x3f; /* maximum that fits in first byte */
+        uint32_t mfb = 0x3f; /* maximum that fits in first byte */
         do { /* add continuation bytes */
             buff[UTF8BUFFSZ - (x++)] = cast_char(0x80 | (n & 0x3f));
             n >>= 6; /* remove added bits */
@@ -517,8 +519,8 @@ int tokuS_utf8esc(char *buff, t_uint n) {
 /* buffer for 'tokuS_newvstringf' */
 typedef struct BuffVFS {
     toku_State *T;
-    int pushed; /* true if 'space' was pushed on the stack */
-    int len; /* string length in 'space' */
+    int32_t pushed; /* true if 'space' was pushed on the stack */
+    int32_t len; /* string length in 'space' */
     char space[BUFFVFSSIZ];
 } BuffVFS;
 
@@ -547,13 +549,13 @@ static void pushstr(BuffVFS *buff, const char *str, size_t len) {
 
 /* pushes buffer 'space' on the stack */
 static void pushbuff(BuffVFS *buff) {
-    pushstr(buff, buff->space, cast_uint(buff->len));
+    pushstr(buff, buff->space, cast_u32(buff->len));
     buff->len = 0;
 }
 
 
 /* ensure up to buffer space (up to 'BUFFVFSSIZ') */
-static char *getbuff(BuffVFS *buff, int n) {
+static char *getbuff(BuffVFS *buff, int32_t n) {
     toku_assert(n <= BUFFVFSSIZ);
     if (n > BUFFVFSSIZ - buff->len)
         pushbuff(buff);
@@ -564,9 +566,9 @@ static char *getbuff(BuffVFS *buff, int n) {
 /* add string to buffer */
 static void buffaddstring(BuffVFS *buff, const char *str, size_t len) {
     if (len < BUFFVFSSIZ) {
-        char *p = getbuff(buff, cast_int(len));
+        char *p = getbuff(buff, cast_i32(len));
         memcpy(p, str, len);
-        buff->len += cast_int(len);
+        buff->len += cast_i32(len);
     } else {
         pushbuff(buff);
         pushstr(buff, str, len);
@@ -576,15 +578,15 @@ static void buffaddstring(BuffVFS *buff, const char *str, size_t len) {
 
 /* add number to buffer */
 static void buffaddnum(BuffVFS *buff, const TValue *nv) {
-    t_uint n = tokuS_tostringbuff(nv, getbuff(buff, TOKU_N2SBUFFSZ));
-    buff->len += cast_int(n);
+    uint32_t n = tokuS_tostringbuff(nv, getbuff(buff, TOKU_N2SBUFFSZ));
+    buff->len += cast_i32(n);
 }
 
 
 /* add pointer to buffer */
 static void buffaddptr(BuffVFS *buff, const void *p) {
-    const int psize = 3 * sizeof(void*) + 8;
-    buff->len += toku_pointer2str(getbuff(buff, psize), cast_uint(psize), p);
+    const int32_t psize = 3 * sizeof(void*) + 8;
+    buff->len += toku_pointer2str(getbuff(buff, psize), cast_u32(psize), p);
 }
 
 
@@ -598,16 +600,16 @@ const char *tokuS_pushvfstring(toku_State *T, const char *fmt, va_list argp) {
         buffaddstring(&buff, fmt, cast_diff2sz(end - fmt));
         switch (*(end + 1)) {
             case 'c': { /* 'char' */
-                char c = cast_char(va_arg(argp, int));
+                char c = cast_char(va_arg(argp, int32_t));
                 buffaddstring(&buff, &c, sizeof(c));
                 break;
             }
-            case 'd': /* 'int' */
-                setival(&nv, va_arg(argp, int));
+            case 'd': /* 'int32_t' */
+                setival(&nv, va_arg(argp, int32_t));
                 buffaddnum(&buff, &nv);
                 break;
-            case 'u':  /* 'unsigned int' */
-                setival(&nv, va_arg(argp, t_uint));
+            case 'u':  /* 'unsigned int32_t' */
+                setival(&nv, va_arg(argp, uint32_t));
                 buffaddnum(&buff, &nv);
                 break;
             case 'I': /* 'toku_Integer' */
@@ -621,8 +623,8 @@ const char *tokuS_pushvfstring(toku_State *T, const char *fmt, va_list argp) {
             }
             case 'U': {  /* a 'long' as a UTF-8 sequence */
                 char bf[UTF8BUFFSZ];
-                int len = tokuS_utf8esc(bf, va_arg(argp, t_uint));
-                buffaddstring(&buff, bf + UTF8BUFFSZ - len, cast_uint(len));
+                int32_t len = tokuS_utf8esc(bf, va_arg(argp, uint32_t));
+                buffaddstring(&buff, bf + UTF8BUFFSZ - len, cast_u32(len));
                 break;
             }
             case 's': { /* 'string' */
@@ -638,7 +640,7 @@ const char *tokuS_pushvfstring(toku_State *T, const char *fmt, va_list argp) {
                 buffaddstring(&buff, "%", 1);
                 break;
             default: {
-                t_ubyte c = cast(unsigned char, *(end + 1));
+                uint8_t c = cast(unsigned char, *(end + 1));
                 tokuD_runerror(T, "invalid format specifier '%%%c'", c);
                 return NULL; /* to avoid warnings */
             }
@@ -705,7 +707,7 @@ void tokuS_chunkid(char *out, const char *source, size_t srclen) {
     } else { /* string; format as [string "source"] */
         const char *nl = strchr(source, '\n'); /* find first new line */
         addstr(out, PRE, LL(PRE)); /* add prefix */
-        bufflen -= LL(PRE DOTS POS) + 1; /* save space for prefix+suffix+'\0' */
+        bufflen -= LL(PRE DOTS POS) + 1; /* save space for prefix+suffix+'\0'*/
         if (srclen < bufflen && nl == NULL) /* small one-line source? */
             addstr(out, source, srclen); /* keep it */
         else {

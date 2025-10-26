@@ -102,13 +102,13 @@ typedef struct ExpInfo {
         toku_Integer i; /* integer constant  */
         OString *str; /* string literal */
         struct {
-            int vidx; /* compiler index */
-            int sidx; /* stack slot index */
+            int32_t vidx; /* compiler index */
+            int32_t sidx; /* stack slot index */
         } var; /* local var */
-        int info; /* pc or tome other generic information */
+        int32_t info; /* pc or tome other generic information */
     } u;
-    int t; /* jmp to patch if true */
-    int f; /* jmp to patch if false */
+    int32_t t; /* jmp to patch if true */
+    int32_t f; /* jmp to patch if false */
 } ExpInfo;
 
 
@@ -125,10 +125,10 @@ typedef struct ExpInfo {
 typedef union LVar {
     struct {
         TValueFields;
-        t_ubyte kind;
-        int sidx; /* stack slot index holding the variable value */
-        int pidx; /* index of variable in Proto's 'locals' array */
-        int linenum; /* line where the local variable is declared */
+        uint8_t kind;
+        int32_t sidx; /* stack slot index holding the variable value */
+        int32_t pidx; /* index of variable in Proto's 'locals' array */
+        int32_t linenum; /* line where the local variable is declared */
         OString *name;
     } s;
     TValue val; /* constant value */
@@ -138,7 +138,7 @@ typedef union LVar {
 /* switch statement constant description */
 typedef struct LiteralInfo {
     Literal lit; /* constant */
-    int tt; /* type tag */
+    int32_t tt; /* type tag */
 } LiteralInfo;
 
 
@@ -148,17 +148,17 @@ typedef struct LiteralInfo {
 ** instead this structure refers to the 'break' and some 'continue' jumps.
 */
 typedef struct Goto {
-    int pc; /* position in the code */
-    int nactlocals; /* number of active local variables in that position */
-    t_ubyte close; /* true if goto jump escapes upvalues */
-    t_ubyte bk; /* true if goto it break (otherwise continue in gen. loop) */
+    int32_t pc; /* position in the code */
+    int32_t nactlocals; /* number of active local variables in that position */
+    uint8_t close; /* true if goto jump escapes upvalues */
+    uint8_t bk; /* true if goto it break (otherwise continue in gen. loop) */
 } Goto;
 
 
 /* list of goto jumps */
 typedef struct GotoList {
-    int len; /* number of labels in use */
-    int size; /* size of 'arr' */
+    int32_t len; /* number of labels in use */
+    int32_t size; /* size of 'arr' */
     Goto *arr; /* array of pending goto jumps */
 } GotoList;
 
@@ -168,13 +168,13 @@ typedef struct GotoList {
 */
 typedef struct DynData {
     struct { /* list of all active local variables */
-        int len; /* number of locals in use */
-        int size; /* size of 'arr' */
+        int32_t len; /* number of locals in use */
+        int32_t size; /* size of 'arr' */
         LVar *arr; /* array of compiler local variables */
     } actlocals;
     struct { /* list of all switch constants */
-        int len; /* number of constants in use */
-        int size; /* size of 'arr' */
+        int32_t len; /* number of constants in use */
+        int32_t size; /* size of 'arr' */
         struct LiteralInfo *arr; /* array of switch constants */
     } literals;
     GotoList gt; /* idem */
@@ -197,34 +197,35 @@ typedef struct FunctionState {
     struct Scope *loopscope;    /* chain, innermost loop scope */
     struct Scope *switchscope;  /* chain, innermost switch scope */
     Table *kcache;      /* cache for reusing constants */
-    int firstlocal;     /* index of first local in 'lvars' */
-    int prevpc;         /* previous instruction pc */
-    int prevline;       /* previous instruction line */
-    int sp;             /* first free compiler stack index */
-    int nactlocals;     /* number of active local variables */
-    int np;             /* number of elements in 'p' */
-    int nk;             /* number of elements in 'k' */
-    int pc;             /* number of elements in 'code' (aka 'ncode') */
-    int nabslineinfo;   /* number of elements in 'abslineinfo' */
-    int ninstpc;        /* number of elements in 'instpc' */
-    int nlocals;        /* number of elements in 'locals' */
-    int nupvals;        /* number of elements in 'upvals' */
-    int lasttarget;     /* latest 'pc' that is jump target */
-    t_ubyte ismethod;   /* if true, the function is a class method */
-    t_ubyte nonilmerge; /* if true, merging NIL instructions is prohibited */
-    t_ubyte iwthabs;    /* instructions issued since last abs. line info */
-    t_ubyte needclose;  /* if true, needs to close upvalues before returning */
-    t_ubyte callcheck;  /* if true, last call has false check ('?') */
-    t_ubyte lastisend;  /* if true, last statement ends control flow
+    int32_t firstlocal;     /* index of first local in 'lvars' */
+    int32_t prevpc;         /* previous opcode pc */
+    int32_t prevline;       /* previous opcode line */
+    int32_t sp;             /* first free compiler stack index */
+    int32_t nactlocals;     /* number of active local variables */
+    int32_t np;             /* number of elements in 'p' */
+    int32_t nk;             /* number of elements in 'k' */
+    int32_t pc;             /* number of elements in 'code' (aka 'ncode') */
+    int32_t nabslineinfo;   /* number of elements in 'abslineinfo' */
+    int32_t nopcodepc;        /* number of elements in 'opcodepc' */
+    int32_t nlocals;        /* number of elements in 'locals' */
+    int32_t nupvals;        /* number of elements in 'upvals' */
+    int32_t lasttarget;     /* latest 'pc' that is jump target */
+    uint8_t ismethod;   /* if true, the function is a class method */
+    uint8_t nonilmerge; /* if true, merging NIL opcodes are prohibited */
+    uint8_t iwthabs;    /* opcodes issued since last abs. line info */
+    uint8_t needclose;  /* if true, needs to close upvalues before returning */
+    uint8_t callcheck;  /* if true, last call has false check ('?') */
+    uint8_t lastisend;  /* if true, last statement ends control flow
                            (1==return, 2==break, 3==continue) */
 } FunctionState;
 
 
 TOKUI_FUNC t_noret tokuP_semerror(Lexer *lx, const char *err);
-TOKUI_FUNC void tokuP_checklimit(FunctionState *fs, int n,
-                                 int limit, const char *what);
+TOKUI_FUNC void tokuP_checklimit(FunctionState *fs, int32_t n,
+                                 int32_t limit, const char *what);
 TOKUI_FUNC TClosure *tokuP_parse(toku_State *T, BuffReader *Z, Buffer *buff,
-                                 DynData *dyd, const char *name, int firstchar);
+                                 DynData *dyd, const char *name,
+                                 int32_t firstchar);
 
 
 #endif

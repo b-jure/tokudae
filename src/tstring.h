@@ -46,29 +46,29 @@
 #define eqshrstr(a,b)   check_exp((a)->tt_ == TOKU_VSHRSTR, (a) == (b))
 
 
-TOKUI_FUNC int tokuS_eqlngstr(const OString *s1, const OString *s2);
+TOKUI_FUNC int32_t tokuS_eqlngstr(const OString *s1, const OString *s2);
 TOKUI_FUNC void tokuS_clearcache(GState *gs);
-TOKUI_FUNC t_uint tokuS_hash(const char *str, size_t len, t_uint seed);
-TOKUI_FUNC t_uint tokuS_hashlngstr(OString *s);
-TOKUI_FUNC void tokuS_resize(toku_State *T, int nsz);
+TOKUI_FUNC uint32_t tokuS_hash(const char *str, size_t len, uint32_t seed);
+TOKUI_FUNC uint32_t tokuS_hashlngstr(OString *s);
+TOKUI_FUNC void tokuS_resize(toku_State *T, int32_t nsz);
 TOKUI_FUNC void tokuS_init(toku_State *T);
 TOKUI_FUNC OString *tokuS_newlngstrobj(toku_State *T, size_t len);
 TOKUI_FUNC void tokuS_remove(toku_State *T, OString *s);
 TOKUI_FUNC OString *tokuS_new(toku_State *T, const char *str);
 TOKUI_FUNC OString *tokuS_newl(toku_State *T, const char *str, size_t len);
 TOKUI_FUNC void tokuS_free(toku_State *T, OString *s);
-TOKUI_FUNC int tokuS_cmp(const OString *s1, const OString *s2);
+TOKUI_FUNC int32_t tokuS_cmp(const OString *s1, const OString *s2);
 TOKUI_FUNC const char *tokuS_pushvfstring(toku_State *T, const char *fmt,
-                                          va_list ap);
+                                                         va_list ap);
 TOKUI_FUNC const char *tokuS_pushfstring(toku_State *T, const char *fmt, ...);
-TOKUI_FUNC size_t tokuS_tonum(const char *s, TValue *o, int *of);
-TOKUI_FUNC t_uint tokuS_tostringbuff(const TValue *o, char *buff);
+TOKUI_FUNC size_t tokuS_tonum(const char *s, TValue *o, int32_t *of);
+TOKUI_FUNC uint32_t tokuS_tostringbuff(const TValue *o, char *buff);
 TOKUI_FUNC void tokuS_tostring(toku_State *T, TValue *obj);
-TOKUI_FUNC t_ubyte tokuS_hexvalue(int c);
+TOKUI_FUNC uint8_t tokuS_hexvalue(int32_t c);
 TOKUI_FUNC void tokuS_trimstr(char *out, size_t lout, const char *s, size_t l);
 TOKUI_FUNC void tokuS_chunkid(char *out, const char *source, size_t srclen);
 
 #define UTF8BUFFSZ  8
-TOKUI_FUNC int tokuS_utf8esc(char *buff, t_uint n);
+TOKUI_FUNC int32_t tokuS_utf8esc(char *buff, uint32_t n);
 
 #endif

@@ -1,10 +1,18 @@
 # Makefile for installing Tokudae
 
-# Use one of these configurations (or add yours)
-#include config_linux.mk
-include config_linux_readline.mk
-#include config_posix.mk
-#include config_mingw.mk
+PLATFORMS = linux linux_readline mingw posix
+PLATFORM ::= $(strip $(PLATFORM))
+
+# By default, assume linux_readline
+ifeq ($(PLATFORM),)
+PLATFORM ::= linux_readline
+endif
+
+ifeq ($(filter $(PLATFORM),$(PLATFORMS)),$(PLATFORM))
+include config_$(PLATFORM).mk
+else
+$(error Invalid PLATFORM '$(PLATFORM)'. Must be one of: {$(PLATFORMS)})
+endif
 
 CORE_O = src/tapi.o src/tlist.o src/tcode.o src/tdebug.o src/tfunction.o\
 	 src/tgc.o src/ttable.o src/tlexer.o src/tmem.o src/tmeta.o\
@@ -18,7 +26,7 @@ BASE_O = $(CORE_O) $(LIB_O) $(MYOBJS)
 TOKUDAE_O = src/tokudae.o
 TOKUDAEC_O = src/tokuc.o
 
-ALL_O= $(BASE_O) $(TOKUDAE_O)
+ALL_O= $(BASE_O) $(TOKUDAE_O) $(TOKUDAEC_O)
 ALL_T= $(TOKUDAE_A) $(TOKUDAE_T) $(TOKUDAEC_T)
 ALL_A= $(TOKUDAE_A)
 
@@ -52,6 +60,9 @@ clean:
 
 depend:
 	@$(CC) $(CFLAGS) -MM src/t*.c
+
+platforms:
+	@echo $(PLATFORMS)
 
 # Echo all config parameters.
 echo: echobuild
@@ -103,6 +114,7 @@ local:
 
 help:
 	@echo "Do 'make' to build targets, or:"
+	@echo "platforms  - print available platforms"
 	@echo "echo       - print build and configuration parameters"
 	@echo "echobuild  - print build parameters"
 	@echo "clean      - remove build artifacts"
@@ -156,9 +168,9 @@ tgc.o: src/tgc.c src/tokudaeprefix.h src/tgc.h src/tbits.h src/tobject.h \
 tiolib.o: src/tiolib.c src/tokudaeprefix.h src/tokudae.h \
  src/tokudaeconf.h src/tokudaeaux.h src/tokudaelib.h src/tokudaelimits.h
 tlexer.o: src/tlexer.c src/tokudaeprefix.h src/tobject.h src/tokudae.h \
- src/tokudaeconf.h src/tokudaelimits.h src/ttypes.h src/tgc.h src/tbits.h \
- src/tstate.h src/tlist.h src/tmeta.h src/tlexer.h src/treader.h \
- src/tmem.h src/tdebug.h src/tprotected.h src/ttable.h src/tstring.h
+ src/tokudaeconf.h src/tokudaelimits.h src/tgc.h src/tbits.h src/tstate.h \
+ src/tlist.h src/tmeta.h src/tlexer.h src/treader.h src/tmem.h \
+ src/tdebug.h src/tprotected.h src/ttable.h src/tstring.h
 tlist.o: src/tlist.c src/tokudaeprefix.h src/tlist.h src/tobject.h \
  src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tstring.h \
  src/tstate.h src/tmeta.h src/tlexer.h src/treader.h src/tmem.h src/tgc.h \
@@ -218,8 +230,7 @@ tstate.o: src/tstate.c src/tokudaeprefix.h src/ttable.h src/tobject.h \
 tstring.o: src/tstring.c src/tokudaeprefix.h src/tstate.h src/tobject.h \
  src/tokudae.h src/tokudaeconf.h src/tokudaelimits.h src/tlist.h \
  src/tmeta.h src/tstring.h src/tlexer.h src/treader.h src/tmem.h \
- src/tgc.h src/tbits.h src/ttypes.h src/tdebug.h src/tvm.h \
- src/tprotected.h
+ src/tgc.h src/tbits.h src/tdebug.h src/tvm.h src/tprotected.h
 tstrlib.o: src/tstrlib.c src/tokudaeprefix.h src/tokudae.h \
  src/tokudaeconf.h src/tstrlib.h src/tokudaelimits.h src/tokudaeaux.h \
  src/tokudaelib.h

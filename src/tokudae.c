@@ -33,10 +33,7 @@
 #define TOKU_INITVARVERSION     TOKU_INIT_VAR TOKU_VERSUFFIX
 
 
-#define ewritefmt(fmt,...)      toku_writefmt(stderr, fmt, __VA_ARGS__)
-
-
-static toku_State *globalT = NULL;
+static toku_State *gT = NULL; /* global 'T' */
 
 static const char *progname = TOKU_PROGNAME;
 
@@ -46,7 +43,7 @@ static const char *progname = TOKU_PROGNAME;
 /*
 ** Use 'sigaction' when available.
 */
-static void setsignal(int sig, void (*handler)(int)) {
+static void setsignal(int32_t sig, void (*handler)(int)) {
     struct sigaction sa;
     sa.sa_handler = handler;
     sa.sa_flags = 0;
@@ -77,10 +74,10 @@ static void tstop(toku_State *T, toku_Debug *ar) {
 ** this function only sets a hook that, when called, will stop the
 ** interpreter.
 */
-static void taction(int i) {
-    int flag = TOKU_MASK_CALL | TOKU_MASK_RET | TOKU_MASK_LINE | TOKU_MASK_COUNT;
+static void taction(int32_t i) {
+    int32_t flag = TOKU_MASK_CALL|TOKU_MASK_RET|TOKU_MASK_LINE|TOKU_MASK_COUNT;
     setsignal(i, SIG_DFL); /* if another SIGINT happens, terminate process */
-    toku_sethook(globalT, tstop, flag, 1);
+    toku_sethook(gT, tstop, flag, 1);
 }
 
 
@@ -89,11 +86,12 @@ static void print_usage(const char *badopt) {
     if (badopt) {
         fp = stderr;
         if (badopt[1] == 'e' || badopt[1] == 'l')
-            ewritefmt("option '%s' needs argument\n", badopt);
+            t_writestringerr("option '%s' needs argument\n", badopt);
         else
-            ewritefmt("unknown option '%s'\n", badopt);
-    } else fp = stdout;
-    toku_writefmt(fp,
+            t_writestringerr("unknown option '%s'\n", badopt);
+    } else
+        fp = stdout;
+    fprintf(fp,
     "usage: %s [subcommand] [options] [script [args]]\n"
     "Available options are:\n"
     "   -e stat     execute string 'stat'\n"
@@ -110,21 +108,18 @@ static void print_usage(const char *badopt) {
 }
 
 
-static void print_version(void) {
-    toku_writelen(stdout, TOKU_COPYRIGHT, sizeof(TOKU_COPYRIGHT)-1);
-    toku_writeline(stdout);
-}
+#define print_version()     printf("%s\n", TOKU_COPYRIGHT);
 
 
 /* write 'msg' to 'stderr' */
 static void errmsg(const char *prog, const char *msg) {
-    if (prog) ewritefmt("%s: ", prog);
-    ewritefmt("%s\n", msg);
+    if (prog) t_writestringerr("%s: ", prog);
+    t_writestringerr("%s\n", msg);
 }
 
 
 /* report 'status' if it is error status */
-static int report(toku_State *T, int status) {
+static int32_t report(toku_State *T, int32_t status) {
     if (status != TOKU_STATUS_OK) { /* have errors? */
         const char *msg = toku_to_string(T, -1);
         if (msg == NULL) msg = "(error object not a string)";
@@ -150,8 +145,8 @@ static int report(toku_State *T, int status) {
 ** bad argument. Otherwise 'first' is -1 if there is no program name,
 ** 0 if there is no script name, or the index of the script name.
 */
-static int collect_args(char **argv, int *first) {
-    int args = 0;
+static int32_t collect_args(char **argv, int32_t *first) {
+    int32_t args = 0;
     if (*argv) { /* is there a program name? */
         if (argv[0][0]) /* not empty? */
             progname = *argv; /* save it */
@@ -159,7 +154,7 @@ static int collect_args(char **argv, int *first) {
         *first = -1;
         return 0;
     }
-    for (int i = 1; argv[i] != NULL; i++) {
+    for (int32_t i = 1; argv[i] != NULL; i++) {
         *first = i;
         if (argv[i][0] != '-') /* no more args? */
             return args;
@@ -202,7 +197,7 @@ static int collect_args(char **argv, int *first) {
                 if (argv[i][2] == '\0') { /* no concatenated argument? */
                     i++; /* try next 'argv' */
                     if (argv[i] == NULL || argv[i][0] == '-')
-                        return arg_error; /* no next arg or it is another opt */
+                        return arg_error;/* no next arg or it is another opt */
                 }
                 break;
             default: /* invalid option */
@@ -217,7 +212,7 @@ static int collect_args(char **argv, int *first) {
 /*
 ** Message handler for protected calls.
 */
-static int msghandler(toku_State *T) {
+static int32_t msghandler(toku_State *T) {
     const char *msg = toku_to_string(T, -1);
     if (msg == NULL) { /* error object is not a string? */
         if (tokuL_callmeta(T, -1, "__tostring") && /* it has a metamethod, */
@@ -232,13 +227,13 @@ static int msghandler(toku_State *T) {
 }
 
 
-static int docall(toku_State *T, int nargs, int nres) {
-    int status;
-    int base = toku_gettop(T) - nargs; /* function index */
+static int32_t docall(toku_State *T, int32_t nargs, int32_t nres) {
+    int32_t status;
+    int32_t base = toku_gettop(T) - nargs; /* function index */
     toku_assert(base >= 0);
     toku_push_cfunction(T, msghandler); /* push 'msghandler' on top */
     toku_insert(T, base); /* insert 'msghandler' below the function */
-    globalT = T; /* to be available to 'taction' */
+    gT = T; /* to be available to 'taction' */
     setsignal(SIGINT, taction); /* set C-signal handler */
     status = toku_pcall(T, nargs, nres, base);
     setsignal(SIGINT, SIG_DFL); /* reset C-signal handler */
@@ -247,18 +242,18 @@ static int docall(toku_State *T, int nargs, int nres) {
 }
 
 
-static int run_chunk(toku_State *T, int status) {
+static int32_t run_chunk(toku_State *T, int32_t status) {
     if (status == TOKU_STATUS_OK) status = docall(T, 0, 0);
     return report(T, status);
 }
 
 
-static int run_file(toku_State *T, const char *filename) {
+static int32_t run_file(toku_State *T, const char *filename) {
     return run_chunk(T, tokuL_loadfile(T, filename));
 }
 
 
-static int run_string(toku_State *T, const char *str, const char *name) {
+static int32_t run_string(toku_State *T, const char *str, const char *name) {
     return run_chunk(T, tokuL_loadbuffer(T, str, strlen(str), name));
 }
 
@@ -269,8 +264,8 @@ static int run_string(toku_State *T, const char *str, const char *name) {
 ** the suffix after '-' (the "version") to make the global name.
 ** The '-' might be something different, depends on the value of TOKU_IGMARK.
 */
-static int run_library(toku_State *T, char *globname) {
-    int status;
+static int32_t run_library(toku_State *T, char *globname) {
+    int32_t status;
     char *suffix = NULL;
     char *modname = strchr(globname, '=');
     if (modname == NULL) { /* no explicit name? */
@@ -297,13 +292,13 @@ static int run_library(toku_State *T, char *globname) {
 ** also affects the state.
 ** Returns 0 if some code raises an error.
 */
-static int run_args(toku_State *T, char **argv, int n)  {
-    for (int i = 1; i < n; i++) {
-        int option = argv[i][1];
+static int32_t run_args(toku_State *T, char **argv, int32_t n)  {
+    for (int32_t i = 1; i < n; i++) {
+        int32_t option = argv[i][1];
         toku_assert(argv[i][0] == '-');
         switch (option) {
             case 'e': case 'l': {
-                int status;
+                int32_t status;
                 char *extra = argv[i] + 2; /* both options need an argument */
                 if (*extra == '\0') extra = argv[++i];
                 toku_assert(extra != NULL);
@@ -324,14 +319,14 @@ static int run_args(toku_State *T, char **argv, int n)  {
 }
 
 
-static int pushargs(toku_State *T) {
-    int i, nargs;
+static int32_t pushargs(toku_State *T) {
+    int32_t i, nargs;
     if (toku_get_global_str(T, "cliargs") != TOKU_T_LIST)
         tokuL_error(T, "'cliargs' is not a list");
     toku_pop(T, 1); /* remove 'cliargs' */
     if (toku_get_global_str(T, "args") != TOKU_T_LIST)
         tokuL_error(T, "'args' is not a list");
-    nargs = cast_int(toku_len(T, -1));
+    nargs = cast_i32(toku_len(T, -1));
     tokuL_check_stack(T, nargs + 3, "too many arguments to script");
     for (i = 1; i <= nargs; i++) /* push all args */
         toku_get_index(T, -i, i - 1);
@@ -340,21 +335,21 @@ static int pushargs(toku_State *T) {
 }
 
 
-static int handle_script(toku_State *T, char **argv) {
-    int status;
+static int32_t handle_script(toku_State *T, char **argv) {
+    int32_t status;
     const char *filename = argv[0];
     if (strcmp(filename, "-") == 0 && strcmp(argv[-1], "--") != 0)
         filename = NULL; /* stdin */
     status = tokuL_loadfile(T, filename);
     if (status == TOKU_STATUS_OK) {
-        int nargs = pushargs(T);
+        int32_t nargs = pushargs(T);
         status = docall(T, nargs, TOKU_MULTRET);
     }
     return report(T, status);
 }
 
 
-static int handle_tokudaeinit(toku_State *T) {
+static int32_t handle_tokudaeinit(toku_State *T) {
     const char *name = "=" TOKU_INITVARVERSION;
     const char *init = getenv(name + 1);
     if (init == NULL) {
@@ -493,8 +488,8 @@ static void toku_initreadline(toku_State *T) {
 #endif                      /* } */
 
 
-static const char *getprompt(toku_State *T, int firstline) {
-    if (toku_get_global_str(T, firstline ? "__PROMPT" : "__PROMPT2") == TOKU_T_NIL)
+static const char *getprompt(toku_State *T, int32_t firstline) {
+    if (toku_get_global_str(T, firstline?"__PROMPT":"__PROMPT2") == TOKU_T_NIL)
         return (firstline ? TOKU_PROMPT1 : TOKU_PROMPT2); /* use default */
     else { /* apply 'to_string' over the value */
         const char *p = tokuL_to_lstring(T, -1, NULL);
@@ -507,7 +502,7 @@ static const char *getprompt(toku_State *T, int firstline) {
 /*
 ** Prompt the user, read a line, and push it into the Tokudae stack.
 */
-static int pushline(toku_State *T, int firstline) {
+static int32_t pushline(toku_State *T, int32_t firstline) {
     char buffer[TOKU_MAXINPUT];
     size_t l;
     const char *pr = getprompt(T, firstline);
@@ -528,10 +523,10 @@ static int pushline(toku_State *T, int firstline) {
 ** Try to compile line on the stack as 'return <line>;'; on return, stack
 ** has either compiled chunk or original line (if compilation failed).
 */
-static int addreturn(toku_State *T) {
+static int32_t addreturn(toku_State *T) {
     const char *line = toku_to_string(T, -1); /* original line */
     const char *retline = toku_push_fstring(T, "return %s;", line);
-    int status = tokuL_loadbuffer(T, retline, strlen(retline), "=stdin");
+    int32_t status = tokuL_loadbuffer(T, retline, strlen(retline), "=stdin");
     /* stack: [line][retline][result] */
     if (status == TOKU_STATUS_OK)
         toku_remove(T, -2); /* remove modified line ('retline') */
@@ -550,7 +545,7 @@ static int addreturn(toku_State *T) {
 ** that error occurred at the end of file, then the expression/statement
 ** is considered as incomplete.
 */
-static int incomplete(toku_State *T, int status) {
+static int32_t incomplete(toku_State *T, int32_t status) {
     if (status == TOKU_STATUS_ESYNTAX) {
         size_t len;
         const char *msg = toku_to_lstring(T, -1, &len);
@@ -566,8 +561,8 @@ static void checklocal(const char *line) {
     static const char space[] = " \t";
     line += strspn(line, space); /* skip spaces */
     if (strncmp(line, "local", szloc) == 0 && /* "local"? */
-            strchr(space, *(line + szloc)) != NULL) { /* followed by a space? */
-        ewritefmt("%s\n",
+            strchr(space, *(line + szloc)) != NULL) {/* followed by a space? */
+        t_writestringerr("%s\n",
             "warning: locals do not survive across lines in interactive mode");
     }
 }
@@ -576,12 +571,12 @@ static void checklocal(const char *line) {
 /*
 ** Read multiple lines until a complete Tokudae declaration/statement.
 */
-static int multiline(toku_State *T) {
+static int32_t multiline(toku_State *T) {
     size_t len;
     const char *line = toku_to_lstring(T, 0, &len); /* get first line */
     checklocal(line);
     for (;;) { /* repeat until complete declaration/statement */
-        int status = tokuL_loadbuffer(T, line, len, "=stdin");
+        int32_t status = tokuL_loadbuffer(T, line, len, "=stdin");
         if (!incomplete(T, status) || !pushline(T, 0))
             return status; /* cannot or should not try to add continuation */
         toku_remove(T, -2); /* remove error message (from incomplete line) */
@@ -599,14 +594,17 @@ static int multiline(toku_State *T) {
 ** the final status of load/call with the resulting function (if any)
 ** in the top of the stack.
 */
-static int loadline(toku_State *T) {
+static int32_t loadline(toku_State *T) {
     const char *line;
-    int status;
+    int32_t status;
     toku_setntop(T, 0); /* remove all values */
     if (!pushline(T, 1))
         return -1; /* no input */
-    if ((status = addreturn(T)) != TOKU_STATUS_OK) /* 'return ...;' did not work? */
-        status = multiline(T); /* try as command, maybe with continuation lines */
+    if ((status = addreturn(T)) != TOKU_STATUS_OK) {
+        /* 'return ...;' didn't work */
+        /* try as command, maybe with continuation lines */
+        status = multiline(T);
+    }
     line = toku_to_string(T, 0);
     if (*line != '\0') /* non empty line? */
         toku_saveline(line); /* keep history */
@@ -620,7 +618,7 @@ static int loadline(toku_State *T) {
 ** Prints (calling the Tokudae 'print' function) any values on the stack.
 */
 static void print_result(toku_State *T) {
-    int n = toku_getntop(T);
+    int32_t n = toku_getntop(T);
     if (n > 0) { /* have result to print? */
         tokuL_check_stack(T, TOKU_MINSTACK, "too many results to print");
         toku_get_global_str(T, "print");
@@ -637,7 +635,7 @@ static void print_result(toku_State *T) {
 ** print any results.
 */
 static void run_repl(toku_State *T) {
-    int status;
+    int32_t status;
     const char *old_progname = progname;
     progname = NULL;
     toku_initreadline(T);
@@ -650,7 +648,7 @@ static void run_repl(toku_State *T) {
             report(T, status);
     }
     toku_setntop(T, 0); /* remove all values */
-    toku_writeline(stdout);
+    printf("\n");
     progname = old_progname;
 }
 
@@ -668,10 +666,11 @@ static void run_repl(toku_State *T) {
 ** interpreter executable, flags arguments, up to the script name.
 ** 'args' holds script name, and all the arguments after it.
 */
-static void create_arg_lists(toku_State *T, char **argv, int argc, int script) {
-    int i;
-    int nargs; /* number of arguments for 'args' list */
-    int ncliargs; /* number of arguments for 'cliargs' list */
+static void create_arg_lists(toku_State *T, char **argv, int32_t argc,
+                                                         int32_t script) {
+    int32_t i;
+    int32_t nargs; /* number of arguments for 'args' list */
+    int32_t ncliargs; /* number of arguments for 'cliargs' list */
     if (script == 0) /* no script name? */
         script = argc; /* make it so that 'nargs' is 0 */
     nargs = argc - script; 
@@ -683,7 +682,7 @@ static void create_arg_lists(toku_State *T, char **argv, int argc, int script) {
     }
     toku_set_global_str(T, "cliargs");
     toku_push_list(T, nargs); /* make 'args' */
-    for (int j = 0; i < argc; i++) {
+    for (int32_t j = 0; i < argc; i++) {
         toku_push_string(T, argv[i]);
         toku_set_index(T, -2, j++);
     }
@@ -695,13 +694,13 @@ static void create_arg_lists(toku_State *T, char **argv, int argc, int script) {
 ** Main body of interpereter (called in protected mode).
 ** Reads all options and handles them all.
 */
-static int pmain(toku_State *T) {
-    int argc = cast_int(toku_to_integer(T, -2));
+static int32_t pmain(toku_State *T) {
+    int32_t argc = cast_i32(toku_to_integer(T, -2));
     char **argv = cast(char**, toku_to_userdata(T, -1));
-    int script;
-    int args = collect_args(argv, &script);
-    int optlimit = (script > 0 ? script : argc);
-    tokuL_check_version(T); /* check that the interpreter has correct version */
+    int32_t script;
+    int32_t args = collect_args(argv, &script);
+    int32_t optlimit = (script > 0 ? script : argc);
+    tokuL_check_version(T);/* check that the interpreter has correct version */
     if (args == arg_error) { /* bad argument? */
         print_usage(argv[script]); /* 'script' is index of bad argument */
         return 0;
@@ -745,8 +744,8 @@ end:
 }
 
 
-int main(int argc, char* argv[]) {
-    int status, res;
+int32_t main(int32_t argc, char* argv[]) {
+    int32_t status, res;
     toku_State *T = tokuL_newstate();
     if (T == NULL) {
         errmsg(progname, "cannot create state: out of memory");

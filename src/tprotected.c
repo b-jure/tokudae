@@ -37,7 +37,7 @@
 typedef struct toku_longjmp {
     struct toku_longjmp *prev;
     jmp_buf buf;
-    volatile int status;
+    volatile int32_t status;
 } toku_longjmp;
 
 
@@ -54,7 +54,8 @@ typedef struct toku_longjmp {
 /* C++ exceptions */
 #define TOKUI_THROW(T,c)        throw(c)
 
-static void TOKUI_TRY(toku_State *T, toku_longjmp *c, ProtectedFn f, void *ud) {
+static void TOKUI_TRY(toku_State *T, toku_longjmp *c, ProtectedFn f,
+                                                      void *ud) {
     try {
         f(T, ud); /* call function protected */
     }
@@ -89,7 +90,7 @@ static void TOKUI_TRY(toku_State *T, toku_longjmp *c, ProtectedFn f, void *ud) {
 #endif                                                  /* } */
 
 
-void tokuPR_seterrorobj(toku_State *T, int errcode, SPtr oldtop) {
+void tokuPR_seterrorobj(toku_State *T, int32_t errcode, SPtr oldtop) {
     switch (errcode) {
         case TOKU_STATUS_EMEM: { /* memory error? */
             setstrval2s(T, oldtop, G(T)->memerror);
@@ -118,7 +119,7 @@ void tokuPR_seterrorobj(toku_State *T, int errcode, SPtr oldtop) {
 ** error handler or invoke panic if hook for it is present.
 ** In case none of the above occurs, program is aborted.
 */
-t_noret tokuPR_throw(toku_State *T, int errcode) {
+t_noret tokuPR_throw(toku_State *T, int32_t errcode) {
     if (T->errjmp) { /* thread has error handler? */
         T->errjmp->status = errcode; /* set status */
         TOKUI_THROW(T, T->errjmp); /* jump to it */
@@ -140,8 +141,8 @@ t_noret tokuPR_throw(toku_State *T, int errcode) {
 }
 
 
-int tokuPR_rawcall(toku_State *T, ProtectedFn f, void *ud) {
-    t_uint32 old_nCcalls = T->nCcalls;
+int32_t tokuPR_rawcall(toku_State *T, ProtectedFn f, void *ud) {
+    uint32_t old_nCcalls = T->nCcalls;
     toku_longjmp lj;
     lj.status = TOKU_STATUS_OK;
     lj.prev = T->errjmp;
@@ -155,11 +156,11 @@ int tokuPR_rawcall(toku_State *T, ProtectedFn f, void *ud) {
 /* }====================================================== */
 
 
-int tokuPR_call(toku_State *T, ProtectedFn f, void *ud, ptrdiff_t old_top,
-                                                        ptrdiff_t ef) {
-    int status;
+int32_t tokuPR_call(toku_State *T, ProtectedFn f, void *ud, ptrdiff_t old_top,
+                                                            ptrdiff_t ef) {
+    int32_t status;
     CallFrame *old_cf = T->cf;
-    t_ubyte old_allowhook = T->allowhook;
+    uint8_t old_allowhook = T->allowhook;
     ptrdiff_t old_errfunc = T->errfunc;
     T->errfunc = ef;
     status = tokuPR_rawcall(T, f, ud);
@@ -178,7 +179,7 @@ int tokuPR_call(toku_State *T, ProtectedFn f, void *ud, ptrdiff_t old_top,
 /* auxiliary structure to call 'tokuF_close' in protected mode */
 struct PCloseData {
     SPtr level;
-    int status;
+    int32_t status;
 };
 
 
@@ -190,9 +191,9 @@ static void closep(toku_State *T, void *ud) {
 
 
 /* call 'tokuF_close' in protected mode */
-int tokuPR_close(toku_State *T, ptrdiff_t level, int status) {
+int32_t tokuPR_close(toku_State *T, ptrdiff_t level, int32_t status) {
     CallFrame *old_cf = T->cf;
-    t_ubyte old_allowhook = T->allowhook;
+    uint8_t old_allowhook = T->allowhook;
     for (;;) { /* keep closing upvalues until no more errors */
         struct PCloseData cd = {
             .level = restorestack(T, level),
@@ -233,7 +234,7 @@ static void pparse(toku_State *T, void *userdata) {
     TClosure *cl;
     struct PParseData *p = cast(struct PParseData *, userdata);
     const char *mode = p->mode ? p->mode : "bt";
-    int c = zgetc(p->Z);
+    int32_t c = zgetc(p->Z);
     if (c == TOKU_SIGNATURE[0]) { /* binary chunk? */
         checkmode(T, mode, "binary");
         cl = tokuZ_undump(T, p->Z, p->name);
@@ -247,9 +248,9 @@ static void pparse(toku_State *T, void *userdata) {
 
 
 /* call 'tokuP_parse' in protected mode */
-int tokuPR_parse(toku_State *T, BuffReader *Z, const char *name,
-                                               const char *mode) {
-    int status;
+int32_t tokuPR_parse(toku_State *T, BuffReader *Z, const char *name,
+                                                   const char *mode) {
+    int32_t status;
     struct PParseData p = { .Z = Z, .name = name, .mode = mode };
     incnnyc(T);
     status = tokuPR_call(T, pparse, &p, savestack(T, T->sp.p), T->errfunc);

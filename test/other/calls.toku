@@ -472,8 +472,8 @@ cannotload("hhi", load(fn() { error("hhi"); }));
         "\x19\x93\r\n\x1a\n",   # a binary string
         string.packsize("i"),   # size of an int
         -69,                    # an int
-        1,                      # size of an instruction
-        0xf1,                   # an instruction (1 byte)
+        1,                      # size of an opcode
+        0xf1,                   # an opcode (1 byte)
         string.packsize("j"),   # size of a Tokudae integer
         -69,                    # a Tokudae integer
         string.packsize("n"),   # size of a Tokudae float

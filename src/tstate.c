@@ -79,7 +79,7 @@ static void stackinit(toku_State *T1, toku_State *T) {
     toku_assert(!statefullybuilt(G(T1)) == (T1 == T));
     T1->stack.p = tokuM_newarray(T, INIT_STACKSIZE + EXTRA_STACK, SValue);
     T1->tbclist.p = T1->stack.p;
-    for (int i = 0; i < INIT_STACKSIZE + EXTRA_STACK; i++)
+    for (int32_t i = 0; i < INIT_STACKSIZE + EXTRA_STACK; i++)
         setnilval(s2v(T1->stack.p + i));
     T1->stackend.p = T1->stack.p + INIT_STACKSIZE;
     resetCF(T1);
@@ -186,7 +186,7 @@ static void initGCparams(GState *gs) {
 ** The returned thread state is mainthread.
 ** In case of errors NULL is returned.
 */
-TOKU_API toku_State *toku_newstate(toku_Alloc falloc, void *ud, unsigned seed) {
+TOKU_API toku_State *toku_newstate(toku_Alloc falloc, void *ud, uint32_t seed) {
     GState *gs;
     toku_State *T;
     XSG *xsg = cast(XSG *, falloc(NULL, ud, 0, sizeof(XSG)));
@@ -268,7 +268,7 @@ TOKU_API toku_State *toku_newthread(toku_State *T) {
 }
 
 
-int tokuT_resetthread(toku_State *T, int status) {
+int32_t tokuT_resetthread(toku_State *T, int32_t status) {
     CallFrame *cf = T->cf = &T->basecf;
     setnilval(s2v(T->stack.p)); /* 'basecf' func */
     cf->func.p = T->stack.p;
@@ -280,7 +280,7 @@ int tokuT_resetthread(toku_State *T, int status) {
     else
         T->sp.p = T->stack.p + 1;
     cf->top.p = T->sp.p + TOKU_MINSTACK;
-    tokuT_reallocstack(T, cast_int(cf->top.p - T->sp.p), 0);
+    tokuT_reallocstack(T, cast_i32(cf->top.p - T->sp.p), 0);
     return status;
 }
 
@@ -293,8 +293,8 @@ int tokuT_resetthread(toku_State *T, int status) {
 ** stack and the function returns relevant status code.
 ** If no errors occured `TOKU_STATUS_OK` status is returned.
 */
-TOKU_API int toku_resetthread(toku_State *T) {
-    int status;
+TOKU_API int32_t toku_resetthread(toku_State *T) {
+    int32_t status;
     toku_lock(T);
     status = tokuT_resetthread(T, T->status);
     toku_unlock(T);
@@ -349,16 +349,16 @@ static void correctstack(toku_State *T) {
 
 
 /* reallocate stack to new size */
-int tokuT_reallocstack(toku_State *T, int newsize, int raiseerr) {
-    int osz = stacksize(T);
-    int old_stopem = G(T)->gcstopem;
+int32_t tokuT_reallocstack(toku_State *T, int32_t newsize, int32_t raiseerr) {
+    int32_t osz = stacksize(T);
+    int32_t old_stopem = G(T)->gcstopem;
     SPtr newstack;
     toku_assert(newsize <= TOKUI_MAXSTACK || newsize == ERRORSTACKSIZE);
     relstack(T); /* change pointers to offsets */
     G(T)->gcstopem = 1; /* no emergency collection when reallocating stack */
     newstack = tokuM_reallocarray(T, T->stack.p, osz + EXTRA_STACK,
                                                newsize + EXTRA_STACK, SValue);
-    G(T)->gcstopem = cast_ubyte(old_stopem);
+    G(T)->gcstopem = cast_u8(old_stopem);
     if (t_unlikely(newstack == NULL)) {
         correctstack(T); /* change offsets back to pointers */
         if (raiseerr)
@@ -368,7 +368,7 @@ int tokuT_reallocstack(toku_State *T, int newsize, int raiseerr) {
     T->stack.p = newstack;
     correctstack(T); /* change offsets back to pointers */
     T->stackend.p = T->stack.p + newsize;
-    for (int i = osz + EXTRA_STACK; i < newsize + EXTRA_STACK; i++)
+    for (int32_t i = osz + EXTRA_STACK; i < newsize + EXTRA_STACK; i++)
         setnilval(s2v(newstack + i)); /* erase new segment */
     return 1;
 }
@@ -378,8 +378,8 @@ int tokuT_reallocstack(toku_State *T, int newsize, int raiseerr) {
 ** Grow stack to accommodate 'n' values. When 'raiseerr' is true,
 ** raises any error; otherwise, return 0 in case of errors.
 */
-int tokuT_growstack(toku_State *T, int n, int raiseerr) {
-    int size = stacksize(T);
+int32_t tokuT_growstack(toku_State *T, int32_t n, int32_t raiseerr) {
+    int32_t size = stacksize(T);
     if (t_unlikely(size > TOKUI_MAXSTACK)) { /* overflowed already ? */
         /* if stack is larger than maximum, thread is already using the
         ** extra space reserved for errors, that is, thread is handling
@@ -389,8 +389,8 @@ int tokuT_growstack(toku_State *T, int n, int raiseerr) {
             tokuPR_throw(T, TOKU_STATUS_EERROR);
         return 0;
     } else if (n < TOKUI_MAXSTACK) { /* avoid arithmetic overflow */
-        int nsize = size * 2;
-        int needed = cast_int((T)->sp.p - (T)->stack.p) + n;
+        int32_t nsize = size * 2;
+        int32_t needed = cast_i32((T)->sp.p - (T)->stack.p) + n;
         if (nsize > TOKUI_MAXSTACK)
             nsize = TOKUI_MAXSTACK; /* clamp it */
         if (nsize < needed) /* size still too small? */
@@ -407,15 +407,15 @@ int tokuT_growstack(toku_State *T, int n, int raiseerr) {
 }
 
 
-static int stackinuse(toku_State *T) {
-    int res;
+static int32_t stackinuse(toku_State *T) {
+    int32_t res;
     SPtr lim = T->sp.p;
     for (CallFrame *cf = T->cf; cf != NULL; cf = cf->prev) {
         if (lim < cf->top.p)
             lim = cf->top.p;
     }
     toku_assert(lim <= T->stackend.p + EXTRA_STACK);
-    res = cast_int(lim - T->stack.p) + 1; /* part of stack in use */
+    res = cast_i32(lim - T->stack.p) + 1; /* part of stack in use */
     if (res < TOKU_MINSTACK)
         res = TOKU_MINSTACK; /* ensure a minimum size */
     return res;
@@ -429,10 +429,10 @@ static int stackinuse(toku_State *T) {
 ** overflow.
 */
 void tokuT_shrinkstack(toku_State *T) {
-    int inuse = stackinuse(T);
-    int limit = (inuse >= TOKUI_MAXSTACK / 3 ? TOKUI_MAXSTACK : inuse * 3);
+    int32_t inuse = stackinuse(T);
+    int32_t limit = (inuse >= TOKUI_MAXSTACK / 3 ? TOKUI_MAXSTACK : inuse * 3);
     if (inuse <= TOKUI_MAXSTACK && stacksize(T) > limit) {
-        int nsize = (inuse < (TOKUI_MAXSTACK / 2) ? (inuse * 2) : TOKUI_MAXSTACK);
+        int32_t nsize = (inuse < (TOKUI_MAXSTACK/2)) ?(inuse*2):TOKUI_MAXSTACK;
         tokuT_reallocstack(T, nsize, 0); /* this can fail */
     }
 }
@@ -468,7 +468,7 @@ void tokuT_incCstack(toku_State *T) {
 }
 
 
-void tokuT_warning(toku_State *T, const char *msg, int cont) {
+void tokuT_warning(toku_State *T, const char *msg, int32_t cont) {
     toku_WarnFunction fwarn = G(T)->fwarn;
     if (fwarn)
         fwarn(G(T)->ud_warn, msg, cont);

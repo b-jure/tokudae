@@ -18,43 +18,43 @@
 #define currPC      (fs->pc)
 
 
-/* get pointer to instruction from 'ExpInfo' */
+/* get pointer to opcode from 'ExpInfo' */
 #define getpi(fs,e)     (&(fs)->p->code[(e)->u.info])
 
 
 /* sizes in bytes */
-#define SIZE_INSTR          (sizeof(Instruction))
-#define SIZE_ARG_S          (sizeof(Instruction))
-#define SIZE_ARG_L          (sizeof(Instruction[3]))
+#define SIZE_OPCODE         (sizeof(uint8_t))
+#define SIZE_ARG_S          (sizeof(uint8_t))
+#define SIZE_ARG_L          (sizeof(uint8_t[3]))
 
 /* bit widths */
-#define WIDTH_INSTR         t_nbits(Instruction)
-#define WIDTH_ARG_S         WIDTH_INSTR
-#define WIDTH_ARG_L         t_nbits(Instruction[3])
+#define WIDTH_OPCODE        t_nbits(uint8_t)
+#define WIDTH_ARG_S         WIDTH_OPCODE
+#define WIDTH_ARG_L         t_nbits(uint8_t[3])
 
 /* limits */
-#define MAX_INSTR           ((1 << WIDTH_INSTR) - 1)
+#define MAX_OPCODE          ((1 << WIDTH_OPCODE) - 1)
 #define MAX_ARG_S           ((1 << WIDTH_ARG_S) - 1)
 #define MAX_ARG_L           ((1 << WIDTH_ARG_L) - 1)
 #define MAX_CODE            MAX_ARG_L
 
 
 /* gets first arg pc */
-#define GET_ARG(ip)             ((ip) + SIZE_INSTR)
+#define GET_ARG(ip)             ((ip) + SIZE_OPCODE)
 
 /* get short/long argument pc */
-#define GETPC_S(ip,o)           (GET_ARG(ip)+(cast_uint(o) * SIZE_ARG_S))
-#define GETPC_L(ip,o)           (GET_ARG(ip)+(cast_uint(o) * SIZE_ARG_L))
+#define GETPC_S(ip,o)           (GET_ARG(ip)+(cast_u32(o) * SIZE_ARG_S))
+#define GETPC_L(ip,o)           (GET_ARG(ip)+(cast_u32(o) * SIZE_ARG_L))
 
 
 /* get/set short parameter */
-#define GET_ARG_S(ip,o)         cast_ubyte(*GETPC_S(ip,o))
+#define GET_ARG_S(ip,o)         cast_u8(*GETPC_S(ip,o))
 #define SET_ARG_S(ip,o,v)       setbyte(GETPC_S(ip,0), o, v);
 #define SET_ARG_LLS(ip,v)       setbyte(GET_ARG(ip), 2u * SIZE_ARG_L, v)
 
 
 /* get/set long arg */
-#define GET_ARG_L(ip,o)     get3bytes(GET_ARG(ip)+(cast_uint(o) * SIZE_ARG_L))
+#define GET_ARG_L(ip,o)     get3bytes(GET_ARG(ip)+(cast_u32(o) * SIZE_ARG_L))
 #define SET_ARG_L(ip,o,v)   set3bytes(GETPC_L(ip,o), v)
 
 
@@ -70,16 +70,16 @@
 ** sign from 8th bit to the 32nd bit.
 */
 #define IMM(imm) \
-        (((imm) & 0x80) ? cast_int(~(cast_uint(imm) & 0x7f) + 1) \
-                        : cast_int(imm))
+        (((imm) & 0x80) ? cast_i32(~(cast_u32(imm) & 0x7f) + 1) \
+                        : cast_i32(imm))
 
 /*
 ** Decode long immediate operand by moving the immediate operand
 ** sign from 24th bit to the 32nd bit.
 */
 #define IMML(imm) \
-        (((imm) & 0x00800000) ? cast_int(~(cast_uint(imm) & 0xff7fffff) + 1) \
-                              : cast_int(imm))
+        (((imm) & 0x00800000) ? cast_i32(~(cast_u32(imm) & 0xff7fffff) + 1) \
+                              : cast_i32(imm))
 
 
 /* 
@@ -267,17 +267,17 @@ OP_RETURN,/*         L1 L2 S      'return V{L1}, ... ,V{L1+L2-2}'           */
 #define NUM_OPCODES     (OP_RETURN + 1)
 
 
-/* instruction format */
+/* opcode format */
 typedef enum { /* "ORDER OPFMT" */
-    FormatI,    /* instruction */
-    FormatIS,   /* instruction + short arg */
-    FormatISS,  /* instruction + 2x short arg */
-    FormatIL,   /* instruction + long arg */
-    FormatILS,  /* instruction + long arg + short arg */
-    FormatILL,  /* instruction + 2x long arg */
-    FormatILLS, /* instruction + 2x long arg + short arg */
-    FormatILLL, /* instruction + 3x long arg */
-    FormatN,    /* total number of instruction formats */
+    FormatI,    /* opcode */
+    FormatIS,   /* opcode + short arg */
+    FormatISS,  /* opcode + 2x short arg */
+    FormatIL,   /* opcode + long arg */
+    FormatILS,  /* opcode + long arg + short arg */
+    FormatILL,  /* opcode + 2x long arg */
+    FormatILLS, /* opcode + 2x long arg + short arg */
+    FormatILLL, /* opcode + 3x long arg */
+    FormatN,    /* total number of opcode formats */
 } OpFormat;
 
 
@@ -287,9 +287,9 @@ typedef enum { /* "ORDER OPFMT" */
 /* TODO: compress 'push','pop' and 'chgsp' into a single byte */
 typedef struct {
     OpFormat format; /* opcode format */
-    int push; /* how many values the opcode pushes */
-    int pop; /* how many values the opcode pops */
-    t_ubyte chgsp; /* true if opcode changes value at current stack pointer */
+    int32_t push; /* how many values the opcode pushes */
+    int32_t pop; /* how many values the opcode pops */
+    uint8_t chgsp; /* true if opcode changes value at current stack pointer */
 } OpProperties; 
 
 
@@ -300,13 +300,19 @@ TOKUI_DEC(const OpProperties tokuC_opproperties[NUM_OPCODES];)
         (tokuC_opproperties[i].push - tokuC_opproperties[i].pop)
 
 
-/* Instruction format sizes in bytes (or in units of 'Instruction's) */
-TOKUI_DEC(const t_ubyte tokuC_opsize[FormatN];)
+/* uint8_t format sizes in bytes (or in units of 'uint8_t's) */
+TOKUI_DEC(const uint8_t tokuC_opsize[FormatN];)
 #define getopSize(i)    (tokuC_opsize[getopFormat(i)])
 
 
+/*
+** All chunks and functions end with OP_RETURN instruction.
+*/
+#define lastpc(f)   cast_u32((f)->sizecode - getopSize(OP_RETURN))
+
+
 /* 
-** Number of list items to accumulate before a SETLIST instruction.
+** Number of list items to accumulate before a SETLIST opcode.
 ** Keep this value under MAX_ARG_S.
 */
 #define LISTFIELDS_PER_FLUSH     50
@@ -318,62 +324,70 @@ TOKUI_DEC(const t_ubyte tokuC_opsize[FormatN];)
 #define tokuC_store(fs,v)    tokuC_storevar(fs, v, 0)
 
 #define tokuC_storepop(fs,v,ln) { \
-    int left_ = tokuC_storevar(fs, v, 0); tokuC_fixline(fs, ln); \
+    int32_t left_ = tokuC_storevar(fs, v, 0); tokuC_fixline(fs, ln); \
     tokuC_pop(fs, left_); }
 
-TOKUI_FUNC int tokuC_emitI(FunctionState *fs, Instruction i);
-TOKUI_FUNC int tokuC_emitIS(FunctionState *fs, Instruction i, int a);
-TOKUI_FUNC int tokuC_emitIL(FunctionState *fs, Instruction i, int a);
-TOKUI_FUNC int tokuC_emitILS(FunctionState *fs, Instruction op, int a, int b);
-TOKUI_FUNC int tokuC_emitILL(FunctionState *fs, Instruction i, int a, int b);
-TOKUI_FUNC int tokuC_emitILLL(FunctionState *fs, Instruction i, int a, int b,
-                                                                       int c);
-TOKUI_FUNC int tokuC_call(FunctionState *fs, int base, int nres);
-TOKUI_FUNC int tokuC_vararg(FunctionState *fs, int nreturns);
-TOKUI_FUNC void tokuC_fixline(FunctionState *fs, int line);
+TOKUI_FUNC int32_t tokuC_emitI(FunctionState *fs, uint8_t i);
+TOKUI_FUNC int32_t tokuC_emitIS(FunctionState *fs, uint8_t i, int32_t a);
+TOKUI_FUNC int32_t tokuC_emitIL(FunctionState *fs, uint8_t i, int32_t a);
+TOKUI_FUNC int32_t tokuC_emitILS(FunctionState *fs, uint8_t op, int32_t a,
+                                                                int32_t b);
+TOKUI_FUNC int32_t tokuC_emitILL(FunctionState *fs, uint8_t i, int32_t a,
+                                                               int32_t b);
+TOKUI_FUNC int32_t tokuC_emitILLL(FunctionState *fs, uint8_t i, int32_t a,
+                                                     int32_t b, int32_t c);
+TOKUI_FUNC int32_t tokuC_call(FunctionState *fs, int32_t base, int32_t nres);
+TOKUI_FUNC int32_t tokuC_vararg(FunctionState *fs, int32_t nres);
+TOKUI_FUNC void tokuC_fixline(FunctionState *fs, int32_t line);
 TOKUI_FUNC void tokuC_removelastjump(FunctionState *fs);
-TOKUI_FUNC void tokuC_checkstack(FunctionState *fs, int n);
-TOKUI_FUNC void tokuC_reserveslots(FunctionState *fs, int n);
-TOKUI_FUNC void tokuC_setreturns(FunctionState *fs, ExpInfo *e, int nreturns);
+TOKUI_FUNC void tokuC_checkstack(FunctionState *fs, int32_t n);
+TOKUI_FUNC void tokuC_reserveslots(FunctionState *fs, int32_t n);
+TOKUI_FUNC void tokuC_setreturns(FunctionState *fs, ExpInfo *e, int32_t nret);
 TOKUI_FUNC void tokuC_setmulret(FunctionState *fs, ExpInfo *e);
-TOKUI_FUNC int tokuC_nil(FunctionState *fs, int n);
-TOKUI_FUNC void tokuC_load(FunctionState *fs, int stk);
-TOKUI_FUNC int tokuC_remove(FunctionState *fs, int n);
-TOKUI_FUNC int tokuC_pop(FunctionState *fs, int n);
-TOKUI_FUNC void tokuC_adjuststack(FunctionState *fs, int left);
-TOKUI_FUNC int tokuC_return(FunctionState *fs, int first, int nreturns);
-TOKUI_FUNC void tokuC_callcheck(FunctionState *fs, int base, int linenum);
+TOKUI_FUNC int32_t tokuC_nil(FunctionState *fs, int32_t n);
+TOKUI_FUNC void tokuC_load(FunctionState *fs, int32_t stk);
+TOKUI_FUNC int32_t tokuC_remove(FunctionState *fs, int32_t n);
+TOKUI_FUNC int32_t tokuC_pop(FunctionState *fs, int32_t n);
+TOKUI_FUNC void tokuC_adjuststack(FunctionState *fs, int32_t left);
+TOKUI_FUNC int32_t tokuC_return(FunctionState *fs, int32_t first,
+                                int32_t nret);
+TOKUI_FUNC void tokuC_callcheck(FunctionState *fs, int32_t base,
+                                int32_t linenum);
 TOKUI_FUNC void tokuC_methodset(FunctionState *fs, ExpInfo *e);
-TOKUI_FUNC void tokuC_tmset(FunctionState *fs, int mt, int linenum);
-TOKUI_FUNC void tokuC_mtset(FunctionState *fs, OString *field, int linenum);
-TOKUI_FUNC void tokuC_classadjust(FunctionState *fs, int pc, int nmethods,
-                                                             int havemt);
-TOKUI_FUNC int tokuC_storevar(FunctionState *fs, ExpInfo *var, int left);
-TOKUI_FUNC void tokuC_setlistsize(FunctionState *fs, int pc, int lsz);
-TOKUI_FUNC void tokuC_setlist(FunctionState *fs, int base, int nelems,
-                                                           int tostore);
-TOKUI_FUNC void tokuC_settablesize(FunctionState *fs, int pc, int hsize);
+TOKUI_FUNC void tokuC_tmset(FunctionState *fs, int32_t mt, int32_t linenum);
+TOKUI_FUNC void tokuC_mtset(FunctionState *fs, OString *field,
+                            int32_t linenum);
+TOKUI_FUNC void tokuC_classadjust(FunctionState *fs, int32_t pc,
+                                  int32_t nmethods, int32_t havemt);
+TOKUI_FUNC int32_t tokuC_storevar(FunctionState *fs, ExpInfo *var,
+                                  int32_t left);
+TOKUI_FUNC void tokuC_setlistsize(FunctionState *fs, int32_t pc, int32_t lsz);
+TOKUI_FUNC void tokuC_setlist(FunctionState *fs, int32_t base,
+                              int32_t nelems, int32_t tostore);
+TOKUI_FUNC void tokuC_settablesize(FunctionState *fs, int32_t pc, int32_t hsz);
 TOKUI_FUNC void tokuC_const2v(FunctionState *fs, ExpInfo *e, TValue *v);
 TOKUI_FUNC TValue *tokuC_getconstant(FunctionState *fs, ExpInfo *v);
-TOKUI_FUNC int tokuC_dischargevars(FunctionState *fs, ExpInfo *e);
+TOKUI_FUNC int32_t tokuC_dischargevars(FunctionState *fs, ExpInfo *e);
 TOKUI_FUNC void tokuC_exp2stack(FunctionState *fs, ExpInfo *e);
 TOKUI_FUNC void tokuC_exp2val(FunctionState *fs, ExpInfo *e);
 TOKUI_FUNC void tokuC_getdotted(FunctionState *fs, ExpInfo *var, ExpInfo *key,
-                                                                 int super);
+                                int32_t issuper);
 TOKUI_FUNC void tokuC_indexed(FunctionState *fs, ExpInfo *var, ExpInfo *key,
-                                                               int super);
-TOKUI_FUNC void tokuC_unary(FunctionState *fs, ExpInfo *e, Unopr op, int line);
-TOKUI_FUNC int tokuC_jmp(FunctionState *fs, OpCode opJ);
-TOKUI_FUNC int tokuC_test(FunctionState *fs, OpCode opT, int cond, int line);
-TOKUI_FUNC void tokuC_concatjl(FunctionState *fs, int *l1, int l2);
-TOKUI_FUNC void tokuC_patch(FunctionState *fs, int pc, int target);
-TOKUI_FUNC void tokuC_patchtohere(FunctionState *fs, int pc);
+                              int32_t issuper);
+TOKUI_FUNC void tokuC_unary(FunctionState *fs, ExpInfo *e, Unopr op,
+                            int32_t linenum);
+TOKUI_FUNC int32_t tokuC_jmp(FunctionState *fs, OpCode opJ);
+TOKUI_FUNC int32_t tokuC_test(FunctionState *fs, OpCode opT, int32_t cond,
+                              int32_t linenum);
+TOKUI_FUNC void tokuC_concatjl(FunctionState *fs, int32_t *l1, int32_t l2);
+TOKUI_FUNC void tokuC_patch(FunctionState *fs, int32_t pc, int32_t target);
+TOKUI_FUNC void tokuC_patchtohere(FunctionState *fs, int32_t pc);
 TOKUI_FUNC void tokuC_prebinary(FunctionState *fs, ExpInfo *e, Binopr op,
-                                int line);
+                                int32_t linenum);
 TOKUI_FUNC void tokuC_binary(FunctionState *fs, ExpInfo *e1, ExpInfo *e2,
-                             Binopr op, int line);
-TOKUI_FUNC void tokuC_binimmediate(FunctionState *fs, ExpInfo *e1, int imm,
-                                   Binopr op, int line);
+                             Binopr op, int32_t linenum);
+TOKUI_FUNC void tokuC_binimmediate(FunctionState *fs, ExpInfo *e1, int32_t imm,
+                                   Binopr op, int32_t linenum);
 TOKUI_FUNC void tokuC_finish(FunctionState *fs);
 
 #endif

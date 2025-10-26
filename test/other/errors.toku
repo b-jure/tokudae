@@ -382,9 +382,9 @@ lineerror([=[
 ]=], 3);
 
 {
-    /// Force a negative estimate for base line. Error in instruction 3
+    /// Force a negative estimate for base line. Error in opcode 3
     /// (after VARARGPREP, GETUVAL, GETINDEXSTR), with first absolute
-    /// line information (forced by too many lines) in instruction 0.
+    /// line information (forced by too many lines) in opcode 0.
     local s = string.fmt("%s return __A.x;", string.repeat("\n", 300));
     lineerror(s, 301);
 }

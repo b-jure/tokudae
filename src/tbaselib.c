@@ -43,7 +43,7 @@ static const char *errclone = "too many values to clone";
 ** cloned object of the original one. This way we just re-use the cloned
 ** object, mimicking the way original objects were stored.
 */
-static void cacheobject(toku_State *T, int index) {
+static void cacheobject(toku_State *T, int32_t index) {
     toku_push(T, index); /* key */
     toku_push(T, -2); /* value */
     toku_set_field(T, CACHEINDEX);
@@ -54,8 +54,8 @@ static void cacheobject(toku_State *T, int index) {
 ** Check if the original value at index has the mapping in the cache table.
 ** If so, re-use the already existing clone.
 */
-static int checkcache(toku_State *T, int index) {
-    int res = 1;
+static int32_t checkcache(toku_State *T, int32_t index) {
+    int32_t res = 1;
     toku_assert(index == -1 || CACHEINDEX < index);
     toku_push(T, index); /* copy of original value */
     if (toku_get_field(T, CACHEINDEX) == TOKU_T_NIL) { /* no cache hit? */
@@ -74,19 +74,19 @@ static int checkcache(toku_State *T, int index) {
 
 
 /* recursive clone functions */
-static void cloneclass(toku_State *T, int index);
-static void auxclone(toku_State *T, int t, int index);
+static void cloneclass(toku_State *T, int32_t index);
+static void auxclone(toku_State *T, int32_t t, int32_t index);
 
 
-static void clonelist(toku_State *T, int index) {
-    int absi; /* absolute index of list value */
+static void clonelist(toku_State *T, int32_t index) {
+    int32_t absi; /* absolute index of list value */
     toku_Integer len;
     toku_assert(CACHEINDEX < index);
     tokuL_check_stack(T, 4, errclone); /* list+value+cache */
     len = t_castU2S(toku_len(T, index));
-    toku_push_list(T, cast_int(len));
+    toku_push_list(T, cast_i32(len));
     absi = toku_getntop(T);
-    for (int i = 0; i < len; i++) {
+    for (int32_t i = 0; i < len; i++) {
         auxclone(T, toku_get_index(T, index, i), absi);
         toku_set_index(T, -2, i);
     }
@@ -94,11 +94,11 @@ static void clonelist(toku_State *T, int index) {
 }
 
 
-static void clonetable(toku_State *T, int index) {
-    int absi; /* absolute index for table key */
+static void clonetable(toku_State *T, int32_t index) {
+    int32_t absi; /* absolute index for table key */
     toku_assert(CACHEINDEX < index);
     tokuL_check_stack(T, 6, errclone); /* table+2xkey+value+cache */
-    toku_push_table(T, cast_int(t_castU2S(toku_len(T, index))));
+    toku_push_table(T, cast_i32(t_castU2S(toku_len(T, index))));
     toku_push_nil(T); /* initial key for 'toku_nextfield' */
     absi = toku_gettop(T);
     while (toku_nextfield(T, index)) {
@@ -115,7 +115,7 @@ static void clonetable(toku_State *T, int index) {
 }
 
 
-static void clonemetatable(toku_State *T, int index) {
+static void clonemetatable(toku_State *T, int32_t index) {
     toku_assert(CACHEINDEX < index);
     if (toku_get_metatable(T, index)) {
         if (!checkcachetop(T))
@@ -126,7 +126,7 @@ static void clonemetatable(toku_State *T, int index) {
 }
 
 
-static void clonemethods(toku_State *T, int index) {
+static void clonemethods(toku_State *T, int32_t index) {
     toku_assert(CACHEINDEX < index);
     if (toku_get_methodtable(T, index)) {
         if (!checkcachetop(T))
@@ -137,7 +137,7 @@ static void clonemethods(toku_State *T, int index) {
 }
 
 
-static void clonesuperclass(toku_State *T, int index) {
+static void clonesuperclass(toku_State *T, int32_t index) {
     toku_assert(CACHEINDEX < index);
     if (toku_get_superclass(T, index)) {
         if (!checkcachetop(T))
@@ -148,7 +148,7 @@ static void clonesuperclass(toku_State *T, int index) {
 }
 
 
-static void cloneclass(toku_State *T, int index) {
+static void cloneclass(toku_State *T, int32_t index) {
     toku_assert(CACHEINDEX < index);
     tokuL_check_stack(T, 4, errclone); /* class+(mt/table/superclass)+cache */
     toku_push_class(T);
@@ -159,10 +159,10 @@ static void cloneclass(toku_State *T, int index) {
 }
 
 
-static void cloneuservalues(toku_State *T, int index, t_ushort nuv) {
-    int absi = toku_getntop(T);
+static void cloneuservalues(toku_State *T, int32_t index, uint16_t nuv) {
+    int32_t absi = toku_getntop(T);
     toku_assert(CACHEINDEX < index);
-    for (t_ushort i = 0; i < nuv; i++) {
+    for (uint16_t i = 0; i < nuv; i++) {
         toku_get_uservalue(T, index, i);
         auxclone(T, toku_type(T, absi), absi);
         toku_set_uservalue(T, absi - 1, i);
@@ -171,9 +171,9 @@ static void cloneuservalues(toku_State *T, int index, t_ushort nuv) {
 }
 
 
-static void cloneuserdata(toku_State *T, int index) {
+static void cloneuserdata(toku_State *T, int32_t index) {
     void *p;
-    t_ushort nuv = toku_numuservalues(T, check_exp(CACHEINDEX < index, index));
+    uint16_t nuv = toku_numuservalues(T, check_exp(CACHEINDEX < index, index));
     size_t size = toku_lenudata(T, index);
     tokuL_check_stack(T, 5, errclone); /* udata+(mt/methods/2xudval)+cache */
     p = toku_push_userdata(T, size, nuv);
@@ -185,7 +185,7 @@ static void cloneuserdata(toku_State *T, int index) {
 }
 
 
-static void cloneinstance(toku_State *T, int index) {
+static void cloneinstance(toku_State *T, int32_t index) {
     toku_assert(CACHEINDEX < index);
     tokuL_check_stack(T, 4, errclone); /* ins+class+cache */
     toku_get_class(T, index);
@@ -203,8 +203,8 @@ static void cloneinstance(toku_State *T, int index) {
 }
 
 
-static void clonebmethod(toku_State *T, int index) {
-    int type;
+static void clonebmethod(toku_State *T, int32_t index) {
+    int32_t type;
     toku_assert(CACHEINDEX < index);
     tokuL_check_stack(T, 5, errclone); /* bmethod+self+method+cache */
     type = toku_get_self(T, index);
@@ -226,7 +226,7 @@ static void clonebmethod(toku_State *T, int index) {
 }
 
 
-static int trycopy(toku_State *T, int t, int index) {
+static int32_t trycopy(toku_State *T, int32_t t, int32_t index) {
     switch (t) {
         case TOKU_T_NIL: case TOKU_T_BOOL: case TOKU_T_NUMBER:
         case TOKU_T_LIGHTUSERDATA: case TOKU_T_FUNCTION:
@@ -239,7 +239,7 @@ static int trycopy(toku_State *T, int t, int index) {
 }
 
 
-static void auxclone(toku_State *T, int t, int index) {
+static void auxclone(toku_State *T, int32_t t, int32_t index) {
     toku_assert(CACHEINDEX < index); /* index is absolute */
     if (!trycopy(T, t, index) && !checkcache(T, index)) {
         /* value is object not in cache */
@@ -257,7 +257,7 @@ static void auxclone(toku_State *T, int t, int index) {
 }
 
 
-static int b_clone(toku_State *T) {
+static int32_t b_clone(toku_State *T) {
     tokuL_check_any(T, 0);
     toku_setntop(T, 1); /* leave only object to copy on top */
     toku_push_table(T, 0); /* push cache table */
@@ -269,8 +269,8 @@ static int b_clone(toku_State *T) {
 /* }===================================================================== */
 
 
-static int b_error(toku_State *T) {
-    int level = cast_int(tokuL_opt_integer(T, 1, 1));
+static int32_t b_error(toku_State *T) {
+    int32_t level = cast_i32(tokuL_opt_integer(T, 1, 1));
     toku_setntop(T, 1); /* leave only message on top */
     if (toku_type(T, 0) == TOKU_T_STRING && level >= 0) {
         tokuL_where(T, level); /* push extra information */
@@ -282,7 +282,7 @@ static int b_error(toku_State *T) {
 }
 
 
-static int b_assert(toku_State *T) {
+static int32_t b_assert(toku_State *T) {
     if (t_likely(toku_to_bool(T, 0))) { /* true? */
         return toku_getntop(T); /* get all arguments */
     } else { /* failed assert (error) */
@@ -301,30 +301,30 @@ static int b_assert(toku_State *T) {
 #define checkres(v)   { if (v == -1) break; }
 
 
-static int b_gc(toku_State *T) {
+static int32_t b_gc(toku_State *T) {
     static const char *const opts[] = {"stop", "restart", "collect",
         "check", "count", "step", "param", "isrunning", NULL};
-    static const int numopts[] = {TOKU_GC_STOP, TOKU_GC_RESTART,
+    static const int32_t numopts[] = {TOKU_GC_STOP, TOKU_GC_RESTART,
         TOKU_GC_COLLECT, TOKU_GC_CHECK, TOKU_GC_COUNT,  TOKU_GC_STEP,
         TOKU_GC_PARAM, TOKU_GC_ISRUNNING};
-    int opt = numopts[tokuL_check_option(T, 0, "collect", opts)];
+    int32_t opt = numopts[tokuL_check_option(T, 0, "collect", opts)];
     switch (opt) {
         case TOKU_GC_CHECK: {
-            int hadcollection = toku_gc(T, opt);
+            int32_t hadcollection = toku_gc(T, opt);
             checkres(hadcollection);
             toku_push_bool(T, hadcollection);
             return 1;
         }
         case TOKU_GC_COUNT: {
-            int kb = toku_gc(T, opt); /* Kbytes */
-            int b = toku_gc(T, TOKU_GC_COUNTBYTES); /* leftover bytes */
+            int32_t kb = toku_gc(T, opt); /* Kbytes */
+            int32_t b = toku_gc(T, TOKU_GC_COUNTBYTES); /* leftover bytes */
             checkres(kb);
             toku_push_number(T, cast_num(kb) + (cast_num(b)/1024));
             return 1;
         }
         case TOKU_GC_STEP: {
-            int nstep = cast_int(tokuL_opt_integer(T, 1, 0));
-            int completecycle = toku_gc(T, opt, nstep);
+            int32_t nstep = cast_i32(tokuL_opt_integer(T, 1, 0));
+            int32_t completecycle = toku_gc(T, opt, nstep);
             checkres(completecycle);
             toku_push_bool(T, completecycle);
             return 1;
@@ -332,19 +332,19 @@ static int b_gc(toku_State *T) {
         case TOKU_GC_PARAM: {
             static const char *const params[] = {
                 "pause", "stepmul", "stepsize", NULL};
-            int param = tokuL_check_option(T, 1, NULL, params);
-            int value = cast_int(tokuL_opt_integer(T, 2, -1));
+            int32_t param = tokuL_check_option(T, 1, NULL, params);
+            int32_t value = cast_i32(tokuL_opt_integer(T, 2, -1));
             toku_push_integer(T, toku_gc(T, opt, param, value));
             return 1;
         }
         case TOKU_GC_ISRUNNING: {
-            int running = toku_gc(T, opt);
+            int32_t running = toku_gc(T, opt);
             checkres(running);
             toku_push_bool(T, running);
             return 1;
         }
         default: {
-            int res = toku_gc(T, opt);
+            int32_t res = toku_gc(T, opt);
             checkres(res);
             toku_push_integer(T, res);
             return 1;
@@ -383,7 +383,7 @@ static const char *genericreader(toku_State *T, void *ud, size_t *sz) {
 }
 
 
-static int auxload(toku_State *T, int status, int envidx) {
+static int32_t auxload(toku_State *T, int32_t status, int32_t envidx) {
     if (t_likely(status == TOKU_STATUS_OK)) {
         if (envidx != 0) { /* 'env' parameter? */
             toku_push(T, envidx); /* environment for loaded function */
@@ -399,18 +399,18 @@ static int auxload(toku_State *T, int status, int envidx) {
 }
 
 
-static int b_load(toku_State *T) {
-    int status;
+static int32_t b_load(toku_State *T) {
+    int32_t status;
     size_t l;
     const char *s = toku_to_lstring(T, 0, &l);
     const char *mode = getmode(T, 2);
-    int env = (!toku_is_none(T, 3) ? 3 : 0);
+    int32_t env = (!toku_is_none(T, 3) ? 3 : 0);
     if (s != NULL) { /* loading a string? */
         const char *chunkname = tokuL_opt_string(T, 1, s);
         status = tokuL_loadbufferx(T, s, l, chunkname, mode);
     } else { /* loading from a reader function */
         const char *chunkname = tokuL_opt_string(T, 1, "=(load)");
-        tokuL_check_type(T, 0, TOKU_T_FUNCTION); /* 'chunk' must be a function */
+        tokuL_check_type(T, 0, TOKU_T_FUNCTION); /* 'chunk' must be function */
         toku_setntop(T, RESERVEDSLOT+1); /* create reserved slot */
         status = toku_load(T, genericreader, NULL, chunkname, mode);
     }
@@ -418,16 +418,16 @@ static int b_load(toku_State *T) {
 }
 
 
-static int b_loadfile(toku_State *T) {
+static int32_t b_loadfile(toku_State *T) {
     const char *filename = tokuL_opt_string(T, 0, NULL);
     const char *mode = getmode(T, 1);
-    int env = (!toku_is_none(T, 2) ? 2 : 0);
-    int status = tokuL_loadfilex(T, filename, mode);
+    int32_t env = (!toku_is_none(T, 2) ? 2 : 0);
+    int32_t status = tokuL_loadfilex(T, filename, mode);
     return auxload(T, status, env);
 }
 
 
-static int b_runfile(toku_State *T) {
+static int32_t b_runfile(toku_State *T) {
     const char *filename = tokuL_opt_string(T, 0, NULL);
     toku_setntop(T, 1);
     if (t_unlikely(tokuL_loadfile(T, filename) != TOKU_STATUS_OK))
@@ -437,7 +437,7 @@ static int b_runfile(toku_State *T) {
 }
 
 
-static int b_getmetatable(toku_State *T) {
+static int32_t b_getmetatable(toku_State *T) {
     tokuL_check_any(T, 0);
     if (!toku_get_metatable(T, 0)) {
         toku_push_nil(T);
@@ -448,8 +448,8 @@ static int b_getmetatable(toku_State *T) {
 }
 
 
-static int b_setmetatable(toku_State *T) {
-    int t;
+static int32_t b_setmetatable(toku_State *T) {
+    int32_t t;
     tokuL_check_type(T, 0, TOKU_T_CLASS);
     t = toku_type(T, 1);
     tokuL_expect_arg(T, t == TOKU_T_NIL || t == TOKU_T_TABLE, 1, "nil/table");
@@ -461,7 +461,7 @@ static int b_setmetatable(toku_State *T) {
 }
 
 
-static int b_unwrapmethod(toku_State *T) {
+static int32_t b_unwrapmethod(toku_State *T) {
     tokuL_check_type(T, 0, TOKU_T_BMETHOD);
     toku_get_self(T, 0);
     toku_get_method(T, 0);
@@ -469,14 +469,14 @@ static int b_unwrapmethod(toku_State *T) {
 }
 
 
-static int auxgetmethods(toku_State *T, int idx, int chkfields) {
+static int32_t auxgetmethods(toku_State *T, int32_t idx, int32_t chkfields) {
     if (tokuL_get_metafield(T, idx, "__methodtable") == TOKU_T_NIL) {
         if (!toku_get_methodtable(T, idx)) { /* no method table? */
             toku_push_nil(T);
             return 0;
         }
     } else if (chkfields) { /* __methodtable value must have fields? */
-        int t = toku_type(T, -1);
+        int32_t t = toku_type(T, -1);
         if (t != TOKU_T_TABLE && t != TOKU_T_INSTANCE) {
             toku_push_nil(T);
             return 0;
@@ -486,7 +486,7 @@ static int auxgetmethods(toku_State *T, int idx, int chkfields) {
 }
 
 
-static int b_getmethods(toku_State *T) {
+static int32_t b_getmethods(toku_State *T) {
     tokuL_check_type(T, 0, TOKU_T_CLASS);
     toku_setntop(T, 1);
     auxgetmethods(T, 0, 0);
@@ -494,7 +494,7 @@ static int b_getmethods(toku_State *T) {
 }
 
 
-static int b_setmethods(toku_State *T) {
+static int32_t b_setmethods(toku_State *T) {
     tokuL_check_type(T, 0, TOKU_T_CLASS);
     toku_setntop(T, 2);
     if (t_unlikely(tokuL_get_metafield(T, 0, "__methodtable") != TOKU_T_NIL))
@@ -506,8 +506,8 @@ static int b_setmethods(toku_State *T) {
 }
 
 
-static int b_nextfield(toku_State *T) {
-    int t = toku_type(T, 0);
+static int32_t b_nextfield(toku_State *T) {
+    int32_t t = toku_type(T, 0);
     tokuL_expect_arg(T, t == TOKU_T_INSTANCE || t == TOKU_T_TABLE, 0,
                         "instance/table");
     toku_setntop(T, 2); /* if 2nd argument is missing create it */
@@ -526,7 +526,7 @@ static void metamethoditer(toku_State *T) {
 }
 
 
-static int b_fields(toku_State *T) {
+static int32_t b_fields(toku_State *T) {
     tokuL_check_any(T, 0);
     if (tokuL_get_metafield(T, 0, "__fields") == TOKU_T_NIL) {
         toku_push_cfunction(T, b_nextfield);  /* will return generator, */
@@ -538,7 +538,7 @@ static int b_fields(toku_State *T) {
 }
 
 
-static int auxindices(toku_State *T) {
+static int32_t auxindices(toku_State *T) {
     toku_Integer i;
     tokuL_check_type(T, 0, TOKU_T_LIST);
     i = tokuL_check_integer(T, 1);
@@ -548,7 +548,7 @@ static int auxindices(toku_State *T) {
 }
 
 
-static int b_indices(toku_State *T) {
+static int32_t b_indices(toku_State *T) {
     tokuL_check_any(T, 0);
     if (tokuL_get_metafield(T, 0, "__indices") == TOKU_T_NIL) {
         tokuL_check_type(T, 0, TOKU_T_LIST); /* must be a list */
@@ -561,7 +561,7 @@ static int b_indices(toku_State *T) {
 }
 
 
-static int finishpcall(toku_State *T, int status, int extra) {
+static int32_t finishpcall(toku_State *T, int32_t status, int32_t extra) {
     if (t_unlikely(status != TOKU_STATUS_OK)) {
         toku_push_bool(T, 0);     /* false */
         toku_push(T, -2);         /* error message */
@@ -571,8 +571,8 @@ static int finishpcall(toku_State *T, int status, int extra) {
 }
 
 
-static int b_pcall(toku_State *T) {
-    int status;
+static int32_t b_pcall(toku_State *T) {
+    int32_t status;
     tokuL_check_any(T, 0);
     toku_push_bool(T, 1); /* first result if no errors */
     toku_insert(T, 0); /* insert it before the object being called */
@@ -581,9 +581,9 @@ static int b_pcall(toku_State *T) {
 }
 
 
-static int b_xpcall(toku_State *T) {
-    int status;
-    int nargs = toku_getntop(T) - 2;
+static int32_t b_xpcall(toku_State *T) {
+    int32_t status;
+    int32_t nargs = toku_getntop(T) - 2;
     tokuL_check_type(T, 1, TOKU_T_FUNCTION); /* check error function */
     toku_push_bool(T, 1); /* first result */
     toku_push(T, 0); /* function */
@@ -593,27 +593,27 @@ static int b_xpcall(toku_State *T) {
 }
 
 
-static int b_print(toku_State *T) {
-    int n = toku_getntop(T);
-    for (int i = 0; i < n; i++) {
+static int32_t b_print(toku_State *T) {
+    int32_t n = toku_getntop(T);
+    for (int32_t i = 0; i < n; i++) {
         size_t len;
         const char *str = tokuL_to_lstring(T, i, &len);
         if (i > 0)
-            toku_writelen(stdout, "\t", 1);
-        toku_writelen(stdout, str, len);
+            t_writestring("\t", 1);
+        t_writestring(str, len);
         toku_pop(T, 1); /* pop result from 'tokuL_to_string' */
     }
-    toku_writeline(stdout);
+    t_writeline();
     return 0;
 }
 
 
-static int b_printf(toku_State *T) {
+static int32_t b_printf(toku_State *T) {
     size_t lfmt;
     const char *fmt = tokuL_check_lstring(T, 0, &lfmt);
     if (0 < lfmt) { /* format string is not empty? */
-        int arg = 0;
-        int top = toku_gettop(T);
+        int32_t arg = 0;
+        int32_t top = toku_gettop(T);
         const char *efmt = fmt + lfmt;
         tokuL_Buffer b;
         tokuL_buff_initsz(T, &b, lfmt);
@@ -624,23 +624,23 @@ static int b_printf(toku_State *T) {
                 tokuL_buff_push(&b, *fmt++);
             else { /* otherwise '%' */
                 if (t_unlikely(++arg > top)) /* too many format specifiers? */
-                    return tokuL_error(T, "unmatched '%%' at position #%d", arg);
+                    return tokuL_error(T,"unmatched '%%' at position #%d",arg);
                 tokuL_to_lstring(T, arg, NULL);
                 tokuL_buff_push_stack(&b);
             }
         }
         tokuL_buff_end(&b);
         fmt = toku_to_lstring(T, -1, &lfmt);
-        toku_writelen(stdout, fmt, lfmt);
+        t_writestring(fmt, lfmt);
     }
-    toku_writeline(stdout);
+    t_writeline();
     return 0;
 }
 
 
-static int b_warn(toku_State *T) {
-    int n = toku_getntop(T);
-    int i;
+static int32_t b_warn(toku_State *T) {
+    int32_t n = toku_getntop(T);
+    int32_t i;
     tokuL_check_string(T, 0); /* at least one string */
     for (i = 1; i < n; i++)
         tokuL_check_string(T, i);
@@ -651,8 +651,8 @@ static int b_warn(toku_State *T) {
 }
 
 
-static int b_len(toku_State *T) {
-    int t = toku_type(T, 0);
+static int32_t b_len(toku_State *T) {
+    int32_t t = toku_type(T, 0);
     tokuL_expect_arg(T, t == TOKU_T_LIST || t == TOKU_T_TABLE ||
                         t == TOKU_T_INSTANCE || t == TOKU_T_CLASS ||
                         t == TOKU_T_STRING, 0,
@@ -662,7 +662,7 @@ static int b_len(toku_State *T) {
 }
 
 
-static int b_rawequal(toku_State *T) {
+static int32_t b_rawequal(toku_State *T) {
     tokuL_check_any(T, 0); /* lhs */
     tokuL_check_any(T, 1); /* rhs */
     toku_push_bool(T, toku_rawequal(T, 0, 1));
@@ -670,9 +670,9 @@ static int b_rawequal(toku_State *T) {
 }
 
 
-static int b_rawget(toku_State *T) {
-    int t = toku_type(T, 0);
-    int field = !toku_to_bool(T, 2);
+static int32_t b_rawget(toku_State *T) {
+    int32_t t = toku_type(T, 0);
+    int32_t field = !toku_to_bool(T, 2);
     tokuL_check_arg(T, t == TOKU_T_INSTANCE || t == TOKU_T_TABLE, 0,
                        "table/instance");
     tokuL_check_any(T, 1); /* key */
@@ -685,8 +685,8 @@ static int b_rawget(toku_State *T) {
 }
 
 
-static int b_rawset(toku_State *T) {
-    int t = toku_type(T, 0);
+static int32_t b_rawset(toku_State *T) {
+    int32_t t = toku_type(T, 0);
     tokuL_expect_arg(T, t == TOKU_T_INSTANCE || t == TOKU_T_TABLE, 0,
                         "table/instance");
     tokuL_check_any(T, 1); /* key */
@@ -697,15 +697,15 @@ static int b_rawset(toku_State *T) {
 }
 
 
-static int b_getargs(toku_State *T) {
+static int32_t b_getargs(toku_State *T) {
     toku_Integer i;
-    int nres = toku_getntop(T) - 1;
+    int32_t nres = toku_getntop(T) - 1;
     if (toku_type(T, 0) == TOKU_T_STRING) {
         const char *what = toku_to_string(T, 0);
         if (strcmp(what, "list") == 0) { /* list? */
             toku_push_list(T, nres); /* push the list */
             toku_replace(T, 0); /* move in place of string */
-            for (int i = 0; i < nres; i++) { /* set the list indices */
+            for (int32_t i = 0; i < nres; i++) { /* set the list indices */
                 toku_push(T, 1 + i);
                 toku_set_index(T, 0, i);
             }
@@ -732,7 +732,7 @@ static int b_getargs(toku_State *T) {
         if (i < 0) i = nres + i;
         else if (i > nres) i = nres - 1;
         tokuL_check_arg(T, 0 <= i, 0, "index out of range");
-        return nres - cast_int(i); /* return 'nres-i' results */
+        return nres - cast_i32(i); /* return 'nres-i' results */
     }
 }
 
@@ -741,7 +741,7 @@ static int b_getargs(toku_State *T) {
 #define SPACECHARS      " \f\n\r\t\v"
 
 /* Lookup table for digit values. -1==255>=36 -> invalid */
-static const t_ubyte table[] = { 255,
+static const uint8_t table[] = { 255,
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
@@ -767,12 +767,12 @@ static const t_ubyte table[] = { 255,
 ** literal strings.
 */
 static const char *strtoint(const char *s, toku_Unsigned base,
-                                           toku_Integer *pn, int *of) {
-    const t_ubyte *val = table+1;
+                                           toku_Integer *pn, int32_t *of) {
+    const uint8_t *val = table+1;
     toku_Unsigned lim = t_castS2U(TOKU_INTEGER_MIN);
     toku_Unsigned n = 0;
-    int sign = 1;
-    int c;
+    int32_t sign = 1;
+    int32_t c;
     s += strspn(s, SPACECHARS); /* skip leading spaces */
     c = *s++;
     if (c == '-' || c == '+') { /* handle sign */
@@ -790,7 +790,7 @@ static const char *strtoint(const char *s, toku_Unsigned base,
             c = *s++; /* skip x|X */
         }
     }
-    if (!isalnum(cast_ubyte(c))) /* no digit? */
+    if (!isalnum(cast_u8(c))) /* no digit? */
         return NULL;
     do {
         if (base <= val[c]) return NULL; /* invalid numeral */
@@ -798,10 +798,10 @@ static const char *strtoint(const char *s, toku_Unsigned base,
             break; /* (under)overflow */
         n = n * base + val[c];
         c = *s++;
-    } while (isalnum(cast_ubyte(c)));
-    if (isalnum(cast_ubyte(c))) { /* (under)overflow? */
+    } while (isalnum(cast_u8(c)));
+    if (isalnum(cast_u8(c))) { /* (under)overflow? */
         while (val[c] < base) c = *s++; /* skip rest of valid digits */
-        if (isalnum(cast_ubyte(c))) return NULL; /* invalid numeral */
+        if (isalnum(cast_u8(c))) return NULL; /* invalid numeral */
         n = lim - (sign > 0); /* if positive, upper limit is one less */
         *of = sign;
     } else if (lim <= n) { /* greater or touching the signed limit? */
@@ -820,8 +820,8 @@ static const char *strtoint(const char *s, toku_Unsigned base,
 }
 
 
-static int b_tonum(toku_State *T) {
-    int of = 0; /* overflow flag */
+static int32_t b_tonum(toku_State *T) {
+    int32_t of = 0; /* overflow flag */
     if (toku_is_noneornil(T, 1)) { /* no base? */
         if (toku_type(T, 0) == TOKU_T_NUMBER) { /* number ? */
             toku_setntop(T, 1); /* set it as top */
@@ -856,21 +856,21 @@ done:
 }
 
 
-static int b_tostr(toku_State *T) {
+static int32_t b_tostr(toku_State *T) {
     tokuL_check_any(T, 0);
     tokuL_to_lstring(T, 0, NULL);
     return 1;
 }
 
 
-static int b_typeof(toku_State *T) {
+static int32_t b_typeof(toku_State *T) {
     tokuL_check_any(T, 0);
     toku_push_string(T, tokuL_typename(T, 0));
     return 1;
 }
 
 
-static void getclassfield(toku_State *T, int t) {
+static void getclassfield(toku_State *T, int32_t t) {
     if (auxgetmethods(T, 2, 1)) { /* __methodtable or method table? */
         toku_push(T, 1); /* key copy */
         if (toku_get_field(T, -2) != TOKU_T_NIL && t == TOKU_T_INSTANCE)
@@ -879,8 +879,8 @@ static void getclassfield(toku_State *T, int t) {
 }
 
 
-static int b_getclass(toku_State *T) {
-    int t = toku_type(T, 0);
+static int32_t b_getclass(toku_State *T) {
+    int32_t t = toku_type(T, 0);
     tokuL_expect_arg(T, t == TOKU_T_CLASS || t == TOKU_T_INSTANCE, 0,
                         "class/instance");
     toku_setntop(T, 2);
@@ -894,8 +894,8 @@ static int b_getclass(toku_State *T) {
 }
 
 
-static int b_getsuper(toku_State *T) {
-    int t = toku_type(T, 0);
+static int32_t b_getsuper(toku_State *T) {
+    int32_t t = toku_type(T, 0);
     tokuL_expect_arg(T, t == TOKU_T_CLASS || t == TOKU_T_INSTANCE, 0,
                         "class/instance");
     toku_setntop(T, 2);
@@ -929,7 +929,7 @@ static void pushrangeres(toku_State *T, toku_Integer start, toku_Integer next) {
         (((start) op (lim)-(step)) ? (start)+(step) : (stop))
 
 
-static int aux_revrange(toku_State *T) {
+static int32_t aux_revrange(toku_State *T) {
     RANGE_VALUES(T);
     toku_assert(step < 0);
     if (start > stop) {
@@ -941,7 +941,7 @@ static int aux_revrange(toku_State *T) {
 }
 
 
-static int aux_range(toku_State *T) {
+static int32_t aux_range(toku_State *T) {
     RANGE_VALUES(T);
     toku_assert(step > 0);
     if (start < stop) {
@@ -953,7 +953,7 @@ static int aux_range(toku_State *T) {
 }
 
 
-static int b_range(toku_State *T) {
+static int32_t b_range(toku_State *T) {
     toku_Integer stop, step;
     toku_Integer start = tokuL_check_integer(T, 0);
     if (toku_is_noneornil(T, 1)) { /* no stop? */
@@ -1064,7 +1064,7 @@ static void set_internal_test_flags(toku_State *T) {
 }
 
 
-int tokuopen_basic(toku_State *T) {
+int32_t tokuopen_basic(toku_State *T) {
     /* open lib into global instance */
     toku_push_globaltable(T);
     tokuL_set_funcs(T, basic_funcs, 0);

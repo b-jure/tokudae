@@ -63,19 +63,19 @@
 /* lexical scope information */
 typedef struct Scope {
     struct Scope *prev; /* implicit linked-list */
-    int nactlocals; /* number of locals outside of this scope */
-    int depth; /* scope depth (number of nested scopes) */
-    int firstgoto; /* index of first pending goto jump in this block */
-    t_ubyte cf; /* control flow */
-    t_ubyte haveupval; /* set if scope contains upvalue variable */
-    t_ubyte havetbcvar; /* set if scope contains to-be-closed variable */
+    int32_t nactlocals; /* number of locals outside of this scope */
+    int32_t depth; /* scope depth (number of nested scopes) */
+    int32_t firstgoto; /* index of first pending goto jump in this block */
+    uint8_t cf; /* control flow */
+    uint8_t haveupval; /* set if scope contains upvalue variable */
+    uint8_t havetbcvar; /* set if scope contains to-be-closed variable */
 } Scope;
 
 
 /* class declaration state */
 typedef struct ClassState {
     struct ClassState *prev; /* chain of nested declarations */
-    int pc; /* pc of the NEWCLASS instruction (for private upvalues) */
+    int32_t pc; /* pc of the NEWCLASS opcode (for private upvalues) */
 } ClassState;
 
 
@@ -83,7 +83,7 @@ typedef struct ClassState {
 typedef struct LoopState {
     struct LoopState *prev; /* chain */
     Scope s; /* loop scope */
-    int pcloop; /* pc where loop starts */
+    int32_t pcloop; /* pc where loop starts */
 } LoopState;
 
 
@@ -94,31 +94,31 @@ typedef struct LoopState {
 ** the 'kcache'.
 */
 typedef struct FuncContext {
-    int ps_actlocals;
-    int ninstpc;
-    int prevpc;
-    int prevline;
-    int sp;
-    int nactlocals;
-    int np;
-    int pc;
-    int nabslineinfo;
-    int nlocals;
-    int nupvals;
-    int lasttarget;
-    int lastgoto; /* last pending goto in 'gt' */
-    t_ubyte ismethod;
-    t_ubyte nonilmerge;
-    t_ubyte iwthabs;
-    t_ubyte needclose;
-    t_ubyte callcheck;
-    t_ubyte lastisend;
+    int32_t ps_actlocals;
+    int32_t nopcodepc;
+    int32_t prevpc;
+    int32_t prevline;
+    int32_t sp;
+    int32_t nactlocals;
+    int32_t np;
+    int32_t pc;
+    int32_t nabslineinfo;
+    int32_t nlocals;
+    int32_t nupvals;
+    int32_t lasttarget;
+    int32_t lastgoto; /* last pending goto in 'gt' */
+    uint8_t ismethod;
+    uint8_t nonilmerge;
+    uint8_t iwthabs;
+    uint8_t needclose;
+    uint8_t callcheck;
+    uint8_t lastisend;
 } FuncContext;
 
 
 static void storecontext(FunctionState *fs, FuncContext *ctx) {
     ctx->ps_actlocals = fs->lx->dyd->actlocals.len;
-    ctx->ninstpc = fs->ninstpc;
+    ctx->nopcodepc = fs->nopcodepc;
     ctx->prevpc = fs->prevpc;
     ctx->prevline = fs->prevline;
     ctx->sp = fs->sp;
@@ -141,7 +141,7 @@ static void storecontext(FunctionState *fs, FuncContext *ctx) {
 
 static void loadcontext(FunctionState *fs, FuncContext *ctx) {
     fs->lx->dyd->actlocals.len = ctx->ps_actlocals;
-    fs->ninstpc = ctx->ninstpc;
+    fs->nopcodepc = ctx->nopcodepc;
     fs->prevpc = ctx->prevpc;
     fs->prevline = ctx->prevline;
     fs->sp = ctx->sp;
@@ -166,16 +166,16 @@ static void loadcontext(FunctionState *fs, FuncContext *ctx) {
 ** token are not on the same line. */
 /* XXX: also maybe use 'after' instead of 'near' if we are using the
 ** previous token. */
-static t_noret expecterror(Lexer *lx, int tk) {
+static t_noret expecterror(Lexer *lx, int32_t tk) {
     const char *err = tokuS_pushfstring(lx->T, "expected %s",
                                                 tokuY_tok2str(lx, tk));
     tokuY_syntaxerror(lx, err);
 }
 
 
-static t_noret limiterror(FunctionState *fs, const char *what, int limit) {
+static t_noret limiterror(FunctionState *fs, const char *what, int32_t limit) {
     toku_State *T = fs->lx->T;
-    int linenum = fs->p->defline;
+    int32_t linenum = fs->p->defline;
     const char *where = (linenum == 0 ? "main function" :
                          tokuS_pushfstring(T, "function at line %d", linenum));
     const char *err = tokuS_pushfstring(T, "too many %s (limit is %d) in %s",
@@ -188,7 +188,7 @@ static t_noret limiterror(FunctionState *fs, const char *what, int limit) {
 ** Advance scanner if 'tk' matches the current token,
 ** otherwise return 0. 
 */
-static int match(Lexer *lx, int tk) {
+static int32_t match(Lexer *lx, int32_t tk) {
     if (check(lx, tk)) {
         tokuY_scan(lx);
         return 1;
@@ -198,14 +198,14 @@ static int match(Lexer *lx, int tk) {
 
 
 /* check if 'tk' matches the current token if not invoke error */
-static void expect(Lexer *lx, int tk) {
+static void expect(Lexer *lx, int32_t tk) {
     if (t_unlikely(!check(lx, tk)))
         expecterror(lx, tk);
 }
 
 
 /* same as 'expect' but this also advances the scanner */
-static void expectnext(Lexer *lx, int tk) {
+static void expectnext(Lexer *lx, int32_t tk) {
     expect(lx, tk);
     tokuY_scan(lx);
 }
@@ -216,7 +216,8 @@ static void expectnext(Lexer *lx, int tk) {
 ** Otherwise raise an error that the expected 'what' should 
 ** match a 'who' in line 'linenum'.
 */
-static void expectmatch(Lexer *lx, int what, int who, int linenum) {
+static void expectmatch(Lexer *lx, int32_t what, int32_t who,
+                                                 int32_t linenum) {
     if (t_unlikely(!match(lx, what))) {
         if (lx->line == linenum) /* same line? */
             expecterror(lx, what); /* emit usual error message */
@@ -253,7 +254,7 @@ static t_noret expecterrorblk(Lexer *lx) {
 ** Similar to 'expectmatch' but this is invoked only
 ** when 'blockstm' expects delimiter '}' which is missing.
 */
-static void expectmatchblk(Lexer *lx, int linenum) {
+static void expectmatchblk(Lexer *lx, int32_t linenum) {
     if (t_unlikely(!match(lx, '}'))) {
         if (lx->line == linenum)
             expecterrorblk(lx);
@@ -283,20 +284,21 @@ t_noret tokuP_semerror(Lexer *lx, const char *err) {
 }
 
 
-void tokuP_checklimit(FunctionState *fs, int n, int limit, const char *what) {
+void tokuP_checklimit(FunctionState *fs, int32_t n, int32_t limit,
+                                                    const char *what) {
     if (t_unlikely(n >= limit))
         limiterror(fs, what, limit);
 }
 
 
 /* get local variable, 'vidx' is compiler index */
-static LVar *getlocalvar(FunctionState *fs, int vidx) {
+static LVar *getlocalvar(FunctionState *fs, int32_t vidx) {
     return &fs->lx->dyd->actlocals.arr[fs->firstlocal + vidx];
 }
 
 
 /* get local variable debug information, 'vidx' is compiler index */
-static LVarInfo *getlocalinfo(FunctionState *fs, int vidx) {
+static LVarInfo *getlocalinfo(FunctionState *fs, int32_t vidx) {
     LVar *lv = check_exp(vidx <= fs->nactlocals, getlocalvar(fs, vidx));
     toku_assert(lv->s.pidx >= 0 && lv->s.pidx < fs->nlocals);
     return &fs->p->locals[lv->s.pidx];
@@ -307,7 +309,7 @@ static LVarInfo *getlocalinfo(FunctionState *fs, int vidx) {
 ** Convert 'nvar', a compiler index level, to its corresponding
 ** stack level.
 */
-static int stacklevel(FunctionState *fs, int nvar) {
+static int32_t stacklevel(FunctionState *fs, int32_t nvar) {
     if (nvar-- > 0) /* have at least one variable? */
         return getlocalvar(fs, nvar)->s.sidx + 1;
     return 0; /* no variables on stack */
@@ -318,14 +320,14 @@ static int stacklevel(FunctionState *fs, int nvar) {
 ** Return number of variables on the stack for the given
 ** function.
 */
-static int nvarstack(FunctionState *fs) {
+static int32_t nvarstack(FunctionState *fs) {
     return stacklevel(fs, fs->nactlocals);
 }
 
 
-static void contadjust(FunctionState *fs, int push) {
-    int ncntl = is_genloop(&fs->ls->s) * VAR_N;
-    int total = (fs->nactlocals - fs->ls->s.nactlocals - ncntl);
+static void contadjust(FunctionState *fs, int32_t push) {
+    int32_t ncntl = is_genloop(&fs->ls->s) * VAR_N;
+    int32_t total = (fs->nactlocals - fs->ls->s.nactlocals - ncntl);
     tokuC_adjuststack(fs, push ? -total : total);
 }
 
@@ -333,14 +335,15 @@ static void contadjust(FunctionState *fs, int push) {
 /*
 ** Adds a new 'break' jump into the goto list.
 */
-static int newbreakjump(Lexer *lx, int pc, int bk, int close) {
+static int32_t newbreakjump(Lexer *lx, int32_t pc, int32_t bk, int32_t close) {
     GotoList *gl = &lx->dyd->gt;
-    int n = gl->len;
-    tokuM_growarray(lx->T, gl->arr, gl->size, n, INT_MAX, "pending jumps", Goto);
+    int32_t n = gl->len;
+    tokuM_growarray(lx->T, gl->arr, gl->size, n, INT32_MAX, "pending jumps",
+                           Goto);
     gl->arr[n].pc = pc;
     gl->arr[n].nactlocals = lx->fs->nactlocals;
-    gl->arr[n].close = cast_ubyte(close);
-    gl->arr[n].bk = cast_ubyte(bk);
+    gl->arr[n].close = cast_u8(close);
+    gl->arr[n].bk = cast_u8(bk);
     gl->len = n + 1;
     return n;
 }
@@ -364,13 +367,14 @@ static const Scope *getcfscope(const FunctionState *fs) {
 /*
 ** Add new pending (break or continue in generic loop) jump to the goto list.
 ** This language construct is coded as POP followed by a JMP.
-** If close is needed, sequence of instructions is CLOSE->POP->JMP.
+** If close is needed, sequence of opcodes is CLOSE->POP->JMP.
 ** If the pending jump is continue inside of generic loop then only JMP
 ** is emitted as the popping and close is managed by 'continuestm'.
 */
-static int newpendingjump(Lexer *lx, int bk, int close, int adjust) {
+static int32_t newpendingjump(Lexer *lx, int32_t bk, int32_t close,
+                                                     int32_t adjust) {
     FunctionState *fs = lx->fs;
-    int pc;
+    int32_t pc;
     toku_assert(getopSize(OP_JMP) == getopSize(OP_POP));
     toku_assert(getopSize(OP_JMP) == getopSize(OP_CLOSE));
     if (close) { /* needs close? */
@@ -390,7 +394,7 @@ static int newpendingjump(Lexer *lx, int bk, int close, int adjust) {
 /* 
 ** Remove local variables up to specified level.
 */
-static void removelocals(FunctionState *fs, int tolevel) {
+static void removelocals(FunctionState *fs, int32_t tolevel) {
     fs->lx->dyd->actlocals.len -= fs->nactlocals - tolevel;
     toku_assert(fs->lx->dyd->actlocals.len >= 0);
     while (fs->nactlocals > tolevel) /* set debug information */
@@ -404,7 +408,7 @@ static void removelocals(FunctionState *fs, int tolevel) {
 static void patchpendingjumps(FunctionState *fs, Scope *s) {
     Lexer *lx = fs->lx;
     GotoList *gl = &lx->dyd->gt;
-    int igt = s->firstgoto; /* first goto in the finishing block */
+    int32_t igt = s->firstgoto; /* first goto in the finishing block */
     toku_assert(haspendingjumps(s));
     while (igt < gl->len) {
         Goto *gt = &gl->arr[igt];
@@ -423,7 +427,7 @@ static void patchpendingjumps(FunctionState *fs, Scope *s) {
 
 
 /* init expression with generic information */
-static void initexp(ExpInfo *e, expt et, int info) {
+static void initexp(ExpInfo *e, expt et, int32_t info) {
     e->t = e->f = NOJMP;
     e->et = et;
     e->u.info = info;
@@ -437,7 +441,7 @@ static void initexp(ExpInfo *e, expt et, int info) {
 #define INIT_EXP        { .et = EXP_VOID, .t = NOJMP, .f = NOJMP }
 
 
-static void initvar(FunctionState *fs, ExpInfo *e, int vidx) {
+static void initvar(FunctionState *fs, ExpInfo *e, int32_t vidx) {
     e->t = e->f = NOJMP;
     e->et = EXP_LOCAL;
     e->u.var.vidx = vidx;
@@ -453,9 +457,9 @@ static void initstring(ExpInfo *e, OString *s) {
 
 
 /* add local debug information into 'locals' */
-static int registerlocal(Lexer *lx, FunctionState *fs, OString *name) {
+static int32_t registerlocal(Lexer *lx, FunctionState *fs, OString *name) {
     Proto *p = fs->p;
-    int osz = p->sizelocals;
+    int32_t osz = p->sizelocals;
     tokuM_growarray(lx->T, p->locals, p->sizelocals, fs->nlocals, MAXVARS,
                     "locals", LVarInfo);
     while (osz < p->sizelocals)
@@ -471,11 +475,11 @@ static int registerlocal(Lexer *lx, FunctionState *fs, OString *name) {
 ** Adjust locals by increment 'nvars' and register them
 ** inside 'locals'.
 */
-static void adjustlocals(Lexer *lx, int nvars) {
+static void adjustlocals(Lexer *lx, int32_t nvars) {
     FunctionState *fs = lx->fs;
-    int stacklevel = nvarstack(fs);
-    for (int i = 0; i < nvars; nvars--) {
-        int vidx = fs->nactlocals++;
+    int32_t stacklevel = nvarstack(fs);
+    for (int32_t i = 0; i < nvars; nvars--) {
+        int32_t vidx = fs->nactlocals++;
         LVar *lvar = getlocalvar(fs, vidx);
         lvar->s.sidx = stacklevel++;
         lvar->s.pidx = registerlocal(lx, fs, lvar->s.name);
@@ -483,8 +487,8 @@ static void adjustlocals(Lexer *lx, int nvars) {
 }
 
 
-static void enterscope(FunctionState *fs, Scope *s, int cf) {
-    s->cf = cast_ubyte(cf);
+static void enterscope(FunctionState *fs, Scope *s, int32_t cf) {
+    s->cf = cast_u8(cf);
     if (fs->scope) { /* not a global scope? */
         s->depth = fs->scope->depth + 1;
         s->havetbcvar = fs->scope->havetbcvar;
@@ -502,8 +506,8 @@ static void enterscope(FunctionState *fs, Scope *s, int cf) {
 
 static void leavescope(FunctionState *fs) {
     Scope *s = fs->scope;
-    int stklevel = stacklevel(fs, s->nactlocals);
-    int nvalues = fs->nactlocals - s->nactlocals;
+    int32_t stklevel = stacklevel(fs, s->nactlocals);
+    int32_t nvalues = fs->nactlocals - s->nactlocals;
     if (s->prev && s->haveupval) /* need a 'close'? */
         tokuC_emitIL(fs, OP_CLOSE, stklevel);
     removelocals(fs, s->nactlocals); /* remove scope locals */
@@ -518,9 +522,9 @@ static void leavescope(FunctionState *fs) {
 
 /* 
 ** Mark scope where variable at compiler index 'level' was defined
-** in order to emit close instruction before the scope gets closed.
+** in order to emit close opcode before the scope gets closed.
 */
-static void scopemarkupval(FunctionState *fs, int level) {
+static void scopemarkupval(FunctionState *fs, int32_t level) {
     Scope *s = fs->scope;
     while (s->nactlocals > level)
         s = s->prev;
@@ -572,11 +576,11 @@ static void close_func(Lexer *lx) {
     /* shrink unused memory */
     tokuM_shrinkarray(T, p->p, p->sizep, fs->np, Proto *);
     tokuM_shrinkarray(T, p->k, p->sizek, fs->nk, TValue);
-    tokuM_shrinkarray(T, p->code, p->sizecode, currPC, Instruction);
-    tokuM_shrinkarray(T, p->lineinfo, p->sizelineinfo, currPC, t_byte);
+    tokuM_shrinkarray(T, p->code, p->sizecode, currPC, uint8_t);
+    tokuM_shrinkarray(T, p->lineinfo, p->sizelineinfo, currPC, int8_t);
     tokuM_shrinkarray(T, p->abslineinfo, p->sizeabslineinfo, fs->nabslineinfo,
                          AbsLineInfo);
-    tokuM_shrinkarray(T, p->instpc, p->sizeinstpc, fs->ninstpc, int);
+    tokuM_shrinkarray(T, p->opcodepc, p->sizeopcodepc, fs->nopcodepc, int32_t);
     tokuM_shrinkarray(T, p->locals, p->sizelocals, fs->nlocals, LVarInfo);
     tokuM_shrinkarray(T, p->upvals, p->sizeupvals, fs->nupvals, UpValInfo);
     lx->fs = fs->prev; /* go back to enclosing function (if any) */
@@ -592,9 +596,9 @@ static Proto *addproto(Lexer *lx) {
     Proto *p = fs->p;
     Proto *clp; /* closure prototype */
     if (fs->np >= p->sizep) {
-        int osz = p->sizep;
+        int32_t osz = p->sizep;
         tokuM_growarray(T, p->p, p->sizep, fs->np, MAX_ARG_L, "functions",
-                      Proto *);
+                           Proto *);
         while (osz < p->sizep)
             p->p[osz++] = NULL;
     }
@@ -605,15 +609,16 @@ static Proto *addproto(Lexer *lx) {
 
 
 /* set current function as vararg */
-static void setvararg(FunctionState *fs, int arity) {
+static void setvararg(FunctionState *fs, int32_t arity) {
     fs->p->isvararg = 1;
     tokuC_emitIL(fs, OP_VARARGPREP, arity);
 }
 
 
 /* forward declare (can be both part of statement and expression) */
-static void funcbody(Lexer *lx, ExpInfo *v, int linenum, int ismethod, int del);
 static void localstm(Lexer *lx);
+static void funcbody(Lexer *lx, ExpInfo *v, int32_t linenum, int32_t ismethod,
+                                                             int32_t del);
 
 
 /* forward declare recursive non-terminals */
@@ -623,14 +628,14 @@ static void expr(Lexer *lx, ExpInfo *e);
 
 
 /* adds local variable to the 'actlocals' */
-static int addlocal(Lexer *lx, OString *name, int linenum) {
+static int32_t addlocal(Lexer *lx, OString *name, int32_t linenum) {
     FunctionState *fs = lx->fs;
     DynData *dyd = lx->dyd;
     LVar *local;
     tokuP_checklimit(fs, dyd->actlocals.len + 1 - fs->firstlocal, MAXVARS,
                          "locals");
     tokuM_growarray(lx->T, dyd->actlocals.arr, dyd->actlocals.size,
-                           dyd->actlocals.len, INT_MAX, "locals", LVar);
+                           dyd->actlocals.len, INT32_MAX, "locals", LVar);
     local = &dyd->actlocals.arr[dyd->actlocals.len++];
     local->s.kind = VARREG;
     local->s.pidx = -1; /* mark uninitialized */
@@ -649,8 +654,9 @@ static int addlocal(Lexer *lx, OString *name, int linenum) {
 /*
 ** Searches for local variable 'name'.
 */
-static int searchlocal(FunctionState *fs, OString *name, ExpInfo *v, int lim) {
-    for (int i = fs->nactlocals - 1; 0 <= i && lim < i; i--) {
+static int32_t searchlocal(FunctionState *fs, OString *name, ExpInfo *v,
+                                                             int32_t lim) {
+    for (int32_t i = fs->nactlocals - 1; 0 <= i && lim < i; i--) {
         LVar *lvar = getlocalvar(fs, i);
         if (eqstr(name, lvar->s.name)) { /* found? */
             initvar(fs, v, i);
@@ -664,7 +670,7 @@ static int searchlocal(FunctionState *fs, OString *name, ExpInfo *v, int lim) {
 /* allocate space for new 'UpValInfo' */
 static UpValInfo *newupvalue(FunctionState *fs) {
     Proto *p = fs->p;
-    int osz = p->sizeupvals;
+    int32_t osz = p->sizeupvals;
     tokuP_checklimit(fs, fs->nupvals + 1, MAXUPVAL, "upvalues");
     tokuM_growarray(fs->lx->T, p->upvals, p->sizeupvals, fs->nupvals,
                     MAXUPVAL, "upvalues", UpValInfo);
@@ -675,7 +681,7 @@ static UpValInfo *newupvalue(FunctionState *fs) {
 
 
 /* add new upvalue 'name' into 'upvalues' */
-static int addupvalue(FunctionState *fs, OString *name, ExpInfo *v) {
+static int32_t addupvalue(FunctionState *fs, OString *name, ExpInfo *v) {
     UpValInfo *uv = newupvalue(fs);
     FunctionState *prev = fs->prev;
     if (v->et == EXP_LOCAL) { /* local? */
@@ -686,7 +692,7 @@ static int addupvalue(FunctionState *fs, OString *name, ExpInfo *v) {
     } else { /* must be upvalue */
         toku_assert(v->et == EXP_UVAL);
         uv->instack = 0;
-        uv->idx = cast_ubyte(v->u.info);
+        uv->idx = cast_u8(v->u.info);
         uv->kind = prev->p->upvals[v->u.info].kind;
         toku_assert(eqstr(name, prev->p->upvals[v->u.info].name));
     }
@@ -697,8 +703,8 @@ static int addupvalue(FunctionState *fs, OString *name, ExpInfo *v) {
 
 
 /* searches for upvalue 'name' */
-static int searchupvalue(FunctionState *fs, UpValInfo *up, OString *name) {
-    for (int i = 0; i < fs->nupvals; i++)
+static int32_t searchupvalue(FunctionState *fs, UpValInfo *up, OString *name) {
+    for (int32_t i = 0; i < fs->nupvals; i++)
         if (eqstr(up[i].name, name)) 
             return i;
     return -1; /* not found */
@@ -709,7 +715,8 @@ static int searchupvalue(FunctionState *fs, UpValInfo *up, OString *name) {
 ** Find a variable with the given name. If it is upvalue add this upvalue
 ** into all intermediate functions. If it is not found, set 'var' as EXP_VOID.
 */
-static void varaux(FunctionState *fs, OString *name, ExpInfo *var, int base) {
+static void varaux(FunctionState *fs, OString *name, ExpInfo *var,
+                                                     int32_t base) {
     if (fs == NULL) /* last scope? */
         voidexp(var); /* not found */
     else { /* otherwise search locals/upvalues */
@@ -717,7 +724,7 @@ static void varaux(FunctionState *fs, OString *name, ExpInfo *var, int base) {
             if (!base) /* in recursive call to 'varaux'? */
                 scopemarkupval(fs, var->u.var.vidx); /* use local as upvalue */
         } else { /* not found as local at current level; try upvalues */
-            int idx = searchupvalue(fs, fs->p->upvals, name);
+            int32_t idx = searchupvalue(fs, fs->p->upvals, name);
             if (idx < 0) { /* upvalue not found? */
                 varaux(fs->prev, name, var, 0); /* try upper levels */
                 if (var->et == EXP_LOCAL || var->et == EXP_UVAL) /* found? */
@@ -758,8 +765,8 @@ static void var(Lexer *lx, OString *varname, ExpInfo *var) {
 **                              EXPRESSIONS
 ** ======================================================================= */
 
-static int explist(Lexer *lx, ExpInfo *e) {
-    int n = 1;
+static int32_t explist(Lexer *lx, ExpInfo *e) {
+    int32_t n = 1;
     expr(lx, e);
     while (match(lx, ',')) {
         tokuC_exp2stack(lx->fs, e);
@@ -770,7 +777,7 @@ static int explist(Lexer *lx, ExpInfo *e) {
 }
 
 
-static void indexed(Lexer *lx, ExpInfo *var, int super) {
+static void indexed(Lexer *lx, ExpInfo *var, int32_t super) {
     ExpInfo key = INIT_EXP;
     tokuY_scan(lx); /* skip '[' */
     tokuC_exp2stack(lx->fs, var);
@@ -780,7 +787,7 @@ static void indexed(Lexer *lx, ExpInfo *var, int super) {
 }
 
 
-static void getdotted(Lexer *lx, ExpInfo *v, int super) {
+static void getdotted(Lexer *lx, ExpInfo *v, int32_t super) {
     ExpInfo key = INIT_EXP;
     tokuY_scan(lx); /* skip '.' */
     tokuC_exp2stack(lx->fs, v);
@@ -813,7 +820,7 @@ static void superkw(Lexer *lx, ExpInfo *e) {
 static void primaryexp(Lexer *lx, ExpInfo *e) {
     switch (lx->t.tk) {
         case '(': {
-            int linenum = lx->line;
+            int32_t linenum = lx->line;
             tokuY_scan(lx); /* skip '(' */
             expr(lx, e);
             expectmatch(lx, ')', '(', linenum);
@@ -833,8 +840,8 @@ static void primaryexp(Lexer *lx, ExpInfo *e) {
 
 static void call(Lexer *lx, ExpInfo *e) {
     FunctionState *fs = lx->fs;
-    int linenum = lx->line;
-    int base = fs->sp - 1;
+    int32_t linenum = lx->line;
+    int32_t base = fs->sp - 1;
     tokuY_scan(lx); /* skip '(' */
     if (!check(lx, ')')) { /* have arguments? */
         explist(lx, e);
@@ -880,8 +887,8 @@ static void suffixedexp(Lexer *lx, ExpInfo *e) {
 typedef struct LConstructor {
     ExpInfo *l; /* list descriptor */
     ExpInfo v; /* last list item descriptor */
-    int narray; /* number of list elements already stored */
-    int tostore; /* number of list elements pending to be stored */
+    int32_t narray; /* number of list elements already stored */
+    int32_t tostore; /* number of list elements pending to be stored */
 } LConstructor;
 
 
@@ -892,12 +899,12 @@ static void listfield(Lexer *lx, LConstructor *c) {
 
 
 static void checklistlimit(FunctionState *fs, LConstructor *c) {
-    int size;
-    if (c->narray <= INT_MAX - c->tostore)
+    int32_t size;
+    if (c->narray <= INT32_MAX - c->tostore)
        size = c->narray + c->tostore;
     else /* otherwise overflow */
-        size = INT_MAX; /* force error */
-    tokuP_checklimit(fs, size, INT_MAX, "elements in a list constructor");
+        size = INT32_MAX; /* force error */
+    tokuP_checklimit(fs, size, INT32_MAX, "elements in a list constructor");
 }
 
 
@@ -932,8 +939,8 @@ static void lastlistfield(FunctionState *fs, LConstructor *c) {
 
 static void listdef(Lexer *lx, ExpInfo *l) {
     FunctionState *fs = lx->fs;
-    int linenum = lx->line;
-    int pc = tokuC_emitIS(fs, OP_NEWLIST, 0);
+    int32_t linenum = lx->line;
+    int32_t pc = tokuC_emitIS(fs, OP_NEWLIST, 0);
     LConstructor c = { .l = l, .v = INIT_EXP };
     initexp(l, EXP_FINEXPR, fs->sp); /* finalize list expression */
     tokuC_reserveslots(fs, 1); /* space for list */
@@ -959,7 +966,7 @@ static void listdef(Lexer *lx, ExpInfo *l) {
 typedef struct TConstructor {
     ExpInfo *t; /* table descriptor */
     ExpInfo v; /* last table item descriptor */
-    int nhash; /* number of table elements */
+    int32_t nhash; /* number of table elements */
 } TConstructor;
 
 
@@ -975,7 +982,8 @@ static void tabfield(Lexer *lx, TConstructor *c) {
     FunctionState *fs = lx->fs;
     ExpInfo t, k, v;
     if (check(lx, TK_NAME)) {
-        tokuP_checklimit(fs, c->nhash, INT_MAX, "fields in a table constructor");
+        tokuP_checklimit(fs, c->nhash, INT32_MAX,
+                             "fields in a table constructor");
         expname(lx, &k);
     } else
         tabindex(lx, &k);
@@ -991,8 +999,8 @@ static void tabfield(Lexer *lx, TConstructor *c) {
 
 static void tabledef(Lexer *lx, ExpInfo *t) {
     FunctionState *fs = lx->fs;
-    int linenum = lx->line;
-    int pc = tokuC_emitIS(fs, OP_NEWTABLE, 0);
+    int32_t linenum = lx->line;
+    int32_t pc = tokuC_emitIS(fs, OP_NEWTABLE, 0);
     TConstructor c = { .t = t, .v = INIT_EXP };
     initexp(t, EXP_FINEXPR, fs->sp); /* finalize table expression */
     tokuC_reserveslots(fs, 1); /* space for table */
@@ -1008,8 +1016,8 @@ static void tabledef(Lexer *lx, ExpInfo *t) {
 /* }==================================================================== */
 
 
-static int codeclass(FunctionState *fs) {
-    int pc = tokuC_emitIS(fs, OP_NEWCLASS, 0);
+static int32_t codeclass(FunctionState *fs) {
+    int32_t pc = tokuC_emitIS(fs, OP_NEWCLASS, 0);
     tokuC_reserveslots(fs, 1); /* space for class */
     return pc;
 }
@@ -1017,7 +1025,7 @@ static int codeclass(FunctionState *fs) {
 
 static void method(Lexer *lx) {
     ExpInfo var, dummy;
-    int linenum = lx->line;
+    int32_t linenum = lx->line;
     tokuY_scan(lx); /* skip 'fn' */
     expname(lx, &var);
     funcbody(lx, &dummy, 1, linenum, '(');
@@ -1041,11 +1049,11 @@ static void checkmftable(Lexer *lx, Table *t, OString *metafield) {
 
 static void metafield(Lexer *lx, Table *t) {
     FunctionState *fs = lx->fs;
-    int linenum = lx->line;
-    int funcline;
+    int32_t linenum = lx->line;
+    int32_t funcline;
     OString *metafield;
     ExpInfo e;
-    int event = -1;
+    int32_t event = -1;
     expname(lx, &e);
     metafield = e.u.str;
     if (ismetatag(metafield)) /* is TM event? */
@@ -1054,7 +1062,7 @@ static void metafield(Lexer *lx, Table *t) {
     expectnext(lx, '=');
     funcline = lx->line;
     if (match(lx, TK_FN) || check(lx, '|')) {
-        int del = lx->t.tk;
+        int32_t del = lx->t.tk;
         if (del == '|') funcline = lx->line;
         funcbody(lx, &e, 1, funcline, del);
     } else
@@ -1068,14 +1076,14 @@ static void metafield(Lexer *lx, Table *t) {
 }
 
 
-static void classbody(Lexer *lx, int pc, int linenum, int exp) {
+static void classbody(Lexer *lx, int32_t pc, int32_t linenum, int32_t exp) {
     if (!(check(lx, '}') || check(lx, TK_EOS))) {
         FunctionState *fs = lx->fs;
         toku_State *T = lx->T;
         Table *t = tokuH_new(T); /* metafield table */
-        int loadsp = fs->sp - 1; /* class slot */
-        int nmethods = 0; /* no methods */
-        int havemt = 0; /* no metatable */
+        int32_t loadsp = fs->sp - 1; /* class slot */
+        int32_t nmethods = 0; /* no methods */
+        int32_t havemt = 0; /* no metatable */
         Scope s;
         settval2s(T, T->sp.p, t); /* anchor it */
         tokuT_incsp(T);
@@ -1120,7 +1128,7 @@ static void inherit(Lexer *lx) {
 static void classexp(Lexer *lx, ExpInfo *e) {
     FunctionState *fs = lx->fs;
     ClassState cs = { .prev = fs->cs, .pc = currPC };
-    int pc = codeclass(fs);
+    int32_t pc = codeclass(fs);
     if (match(lx, TK_INHERITS))
         inherit(lx);
     if (match(lx, '{')) {
@@ -1133,7 +1141,7 @@ static void classexp(Lexer *lx, ExpInfo *e) {
 
 
 static void simpleexp(Lexer *lx, ExpInfo *e) {
-    int linenum;
+    int32_t linenum;
     switch (lx->t.tk) {
         case TK_INT:
             initexp(e, EXP_INT, 0);
@@ -1183,7 +1191,7 @@ static void simpleexp(Lexer *lx, ExpInfo *e) {
 
 
 /* get unary operation matching 'token' */
-static Unopr getunopr(int token) {
+static Unopr getunopr(int32_t token) {
     switch (token) {
         case '-': return OPR_UNM;
         case '~': return OPR_BNOT;
@@ -1194,7 +1202,7 @@ static Unopr getunopr(int token) {
 
 
 /* get binary operation matching 'token' */
-static Binopr getbinopr(int token) {
+static Binopr getbinopr(int32_t token) {
     switch (token) {
         case '+': return OPR_ADD;
         case '-': return OPR_SUB;
@@ -1228,8 +1236,8 @@ static Binopr getbinopr(int token) {
 ** if 'left' > 'right' then operator is right associative.
 */
 static const struct {
-    t_ubyte left;
-    t_ubyte right;
+    uint8_t left;
+    uint8_t right;
 } priority[] = { /* "ORDER OP" */
     /* binary operators priority */
     {12, 12}, {12, 12},                         /* '+' '-' */
@@ -1248,13 +1256,13 @@ static const struct {
 #define UNARY_PRIORITY  14  /* priority for unary operators */
 
 
-static Binopr subexpr(Lexer *lx, ExpInfo *e, int limit) {
+static Binopr subexpr(Lexer *lx, ExpInfo *e, int32_t limit) {
     Binopr op;
     Unopr uop;
     enterCstack(lx);
     uop = getunopr(lx->t.tk);
     if (uop != OPR_NOUNOPR) {
-        int linenum = lx->line;
+        int32_t linenum = lx->line;
         tokuY_scan(lx); /* skip operator */
         subexpr(lx, e, UNARY_PRIORITY);
         tokuC_unary(lx->fs, e, uop, linenum);
@@ -1264,7 +1272,7 @@ static Binopr subexpr(Lexer *lx, ExpInfo *e, int limit) {
     while (op != OPR_NOBINOPR && priority[op].left > limit) {
         ExpInfo e2 = INIT_EXP;
         Binopr next;
-        int linenum = lx->line;
+        int32_t linenum = lx->line;
         tokuY_scan(lx); /* skip operator */
         tokuC_prebinary(lx->fs, e, op, linenum);
         next = subexpr(lx, &e2, priority[op].right);
@@ -1286,7 +1294,7 @@ static void expr(Lexer *lx, ExpInfo *e) {
 **                              STATEMENTS
 ** ====================================================================== */
 
-static void decl_list(Lexer *lx, int blocktk) {
+static void decl_list(Lexer *lx, int32_t blocktk) {
     while (!check(lx, TK_EOS) && !(blocktk && check(lx, blocktk))) {
         if (check(lx, TK_RETURN) || /* if return or... */
                 check(lx, TK_CONTINUE) || /* continue or... */
@@ -1327,9 +1335,9 @@ static void checkreadonly(Lexer *lx, ExpInfo *var) {
 
 
 /* adjust left and right side of an assignment */
-static void adjustassign(Lexer *lx, int nvars, int nexps, ExpInfo *e) {
+static void adjustassign(Lexer *lx, int32_t nvars, int32_t nexps, ExpInfo *e) {
     FunctionState *fs = lx->fs;
-    int need = nvars - nexps;
+    int32_t need = nvars - nexps;
     if (eismulret(e)) {
         need++; /* do not count '...' or the function being called */
         if (need > 0) { /* more variables than values? */
@@ -1362,7 +1370,8 @@ struct LHS_assign {
 };
 
 
-static int dostore(FunctionState *fs, ExpInfo *v, int nvars, int left) {
+static int32_t dostore(FunctionState *fs, ExpInfo *v, int32_t nvars,
+                                                      int32_t left) {
     if (eisindexed(v))
         return tokuC_storevar(fs, v, nvars+left-1);
     tokuC_store(fs, v);
@@ -1370,16 +1379,16 @@ static int dostore(FunctionState *fs, ExpInfo *v, int nvars, int left) {
 }
 
 
-static int compound_assign(Lexer *lx, struct LHS_assign *lhs, int nvars,
-                                      Binopr op) {
+static int32_t compound_assign(Lexer *lx, struct LHS_assign *lhs,
+                                          int32_t nvars, Binopr op) {
     FunctionState *fs = lx->fs;
-    int nexps = 0;
-    int linenum = lx->line;
-    int first = fs->sp;
-    int left = 0;
-    int temp = nvars;
+    int32_t nexps = 0;
+    int32_t linenum = lx->line;
+    int32_t first = fs->sp;
+    int32_t left = 0;
+    int32_t temp = nvars;
     ExpInfo e, e2;
-    toku_assert(cast_uint(op) <= OPR_CONCAT);
+    toku_assert(cast_u32(op) <= OPR_CONCAT);
     expectnext(lx, '=');
     nexps = explist(lx, &e);
     if (nvars != nexps)
@@ -1403,8 +1412,9 @@ static int compound_assign(Lexer *lx, struct LHS_assign *lhs, int nvars,
 }
 
 
-static int assign(Lexer *lx, struct LHS_assign *lhs, int nvars, int *comp) {
-    int left = 0; /* number of values left in the stack after assignment */
+static int32_t assign(Lexer *lx, struct LHS_assign *lhs, int32_t nvars,
+                                                         int32_t *comp) {
+    int32_t left = 0; /* number of values left in the stack after assignment */
     expect_cond(lx, eisvar(&lhs->v), "expect variable");
     checkreadonly(lx, &lhs->v);
     if (match(lx, ',')) { /* more vars? */
@@ -1416,7 +1426,7 @@ static int assign(Lexer *lx, struct LHS_assign *lhs, int nvars, int *comp) {
         left = assign(lx, &var, nvars + 1, comp);
         leaveCstack(lx);
     } else { /* right side of assignment */
-        int tk = lx->t.tk;
+        int32_t tk = lx->t.tk;
         switch (tk) {
             case '+': case '-': case '*': case '%':
             case '/': case '&': case '|': case TK_IDIV:
@@ -1428,7 +1438,7 @@ static int assign(Lexer *lx, struct LHS_assign *lhs, int nvars, int *comp) {
             }
             default: { /* regular assign */
                 ExpInfo e = INIT_EXP;
-                int nexps;
+                int32_t nexps;
                 expectnext(lx, '=');
                 nexps = explist(lx, &e);
                 if (nvars != nexps)
@@ -1443,10 +1453,10 @@ static int assign(Lexer *lx, struct LHS_assign *lhs, int nvars, int *comp) {
 
 
 /* '++' or '--' depending on 'op' */
-static int ppmm(Lexer *lx, ExpInfo *v, Binopr op) {
+static int32_t ppmm(Lexer *lx, ExpInfo *v, Binopr op) {
     FunctionState *fs = lx->fs;
     ExpInfo copy = *v; /* copy of variable we are assigning to */
-    int linenum = lx->line;
+    int32_t linenum = lx->line;
     tokuY_scan(lx); /* skip '+' */
     toku_assert(eisvar(v));
     if (eisindexed(v)) /* indexed? */
@@ -1465,13 +1475,13 @@ static void expstm(Lexer *lx) {
             tokuP_semerror(lx, "can't use '?' on calls with no results");
         tokuC_setreturns(lx->fs, &v.v, 0); /* call statement has no returns */
     } else { /* otherwise it must be assignment */
-        int left = 0;
+        int32_t left = 0;
         if (check(lx, '=') || check(lx, ',')) {
-            int comp = 0;
+            int32_t comp = 0;
             v.prev = NULL;
             left = assign(lx, &v, 1, &comp);
         } else { /* otherwise compound assignment to only one variable */
-            int tk = lx->t.tk;
+            int32_t tk = lx->t.tk;
             Binopr op = getbinopr(tk);
             expect_cond(lx, eisvar(&v.v), "expect variable");
             checkreadonly(lx, &v.v);
@@ -1504,7 +1514,7 @@ static void expstm(Lexer *lx) {
 }
 
 
-static int getlocalattribute(Lexer *lx) {
+static int32_t getlocalattribute(Lexer *lx) {
     if (match(lx, '<')) {
         const char *astr = getstr(str_expectname(lx));
         expectnext(lx, '>');
@@ -1522,7 +1532,7 @@ static int getlocalattribute(Lexer *lx) {
 
 static void checkcollision(Lexer *lx, OString *name) {
     FunctionState *fs = lx->fs;
-    int limit = fs->scope->nactlocals - 1;
+    int32_t limit = fs->scope->nactlocals - 1;
     ExpInfo var;
     if (t_unlikely(0 <= searchlocal(fs, name, &var, limit))) {
         LVar *lv = getlocalvar(fs, var.u.var.vidx);
@@ -1534,7 +1544,8 @@ static void checkcollision(Lexer *lx, OString *name) {
 }
 
 
-static int newlocalvarln(Lexer *lx, OString *name, int ign, int linenum) {
+static int32_t newlocalvarln(Lexer *lx, OString *name, int32_t ign,
+                                                       int32_t linenum) {
     if (!ign || !(getstrlen(name) == 1 && *getstr(name) == '_'))
         checkcollision(lx, name);
     return addlocal(lx, name, linenum);
@@ -1544,7 +1555,7 @@ static int newlocalvarln(Lexer *lx, OString *name, int ign, int linenum) {
 #define newlocalvar(lx,name,ign)    newlocalvarln(lx, name, ign, (lx)->line)
 
 
-static void checkclose(FunctionState *fs, int level) {
+static void checkclose(FunctionState *fs, int32_t level) {
     if (level != -1) {
         scopemarkclose(fs);
         tokuC_emitIL(fs, OP_TBC, level);
@@ -1554,15 +1565,15 @@ static void checkclose(FunctionState *fs, int level) {
 
 static void localstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
-    int toclose = -1;
-    int nvars = 0;
-    int kind, vidx;
-    int nexps;
+    int32_t toclose = -1;
+    int32_t nvars = 0;
+    int32_t kind, vidx;
+    int32_t nexps;
     ExpInfo e = INIT_EXP;
     do {
         vidx = newlocalvar(lx, str_expectname(lx), 1);
         kind = getlocalattribute(lx);
-        getlocalvar(fs, vidx)->s.kind = cast_ubyte(kind);
+        getlocalvar(fs, vidx)->s.kind = cast_u8(kind);
         if (kind & VARTBC) { /* to-be-closed? */
             if (toclose != -1) /* one already present? */
                 tokuP_semerror(fs->lx,
@@ -1585,7 +1596,7 @@ static void localstm(Lexer *lx) {
 static void localfn(Lexer *lx) {
     ExpInfo e;
     FunctionState *fs = lx->fs;
-    int fvar = fs->nactlocals; /* function's variable index */
+    int32_t fvar = fs->nactlocals; /* function's variable index */
     newlocalvar(lx, str_expectname(lx), 0);
     adjustlocals(lx, 1);
     funcbody(lx, &e, 0, lx->line, '(');
@@ -1602,7 +1613,7 @@ static void localclass(Lexer *lx) {
 
 
 static void blockstm(Lexer *lx) {
-    int linenum = lx->line;
+    int32_t linenum = lx->line;
     Scope s;
     tokuY_scan(lx); /* skip '{' */
     enterscope(lx->fs, &s, 0); /* explicit scope */
@@ -1612,11 +1623,11 @@ static void blockstm(Lexer *lx) {
 }
 
 
-static void paramlist(Lexer *lx, int del) {
+static void paramlist(Lexer *lx, int32_t del) {
     FunctionState *fs = lx->fs;
     Proto *fn = fs->p;
-    int nparams = 0;
-    int isvararg = 0;
+    int32_t nparams = 0;
+    int32_t isvararg = 0;
     if (!check(lx, del)) { /* have at least one arg? */
         do {
             switch (lx->t.tk) {
@@ -1639,8 +1650,8 @@ static void paramlist(Lexer *lx, int del) {
 }
 
 
-/* emit closure instruction */
-static void codeclosure(Lexer *lx, ExpInfo *e, int linenum) {
+/* emit closure opcode */
+static void codeclosure(Lexer *lx, ExpInfo *e, int32_t linenum) {
     FunctionState *fs = lx->fs->prev;
     initexp(e, EXP_FINEXPR, tokuC_emitIL(fs, OP_CLOSURE, fs->np - 1));
     tokuC_fixline(fs, linenum);
@@ -1648,12 +1659,13 @@ static void codeclosure(Lexer *lx, ExpInfo *e, int linenum) {
 }
 
 
-static void funcbody(Lexer *lx, ExpInfo *v, int ismethod, int linenum, int del) {
+static void funcbody(Lexer *lx, ExpInfo *v, int32_t ismethod, int32_t linenum,
+                                                              int32_t del) {
     FunctionState newfs = {
         .p = addproto(lx),
-        .ismethod = cast_ubyte(ismethod)
+        .ismethod = cast_u8(ismethod)
     };
-    int matchdel = (del == '(') ? ')' : '|';
+    int32_t matchdel = (del == '(') ? ')' : '|';
     Scope scope;
     newfs.p->defline = linenum;
     open_func(lx, &newfs, &scope);
@@ -1668,7 +1680,7 @@ static void funcbody(Lexer *lx, ExpInfo *v, int ismethod, int linenum, int del) 
     expectmatch(lx, matchdel, del, linenum);
     match(lx, TK_DBCOLON); /* skip optional separator (if any) */
     if (match(lx, '{')) {
-        int curly_linenum = lx->line;
+        int32_t curly_linenum = lx->line;
         decl_list(lx, '}');
         newfs.p->deflastline = lx->line;
         expectmatch(lx, '}', '{', curly_linenum);
@@ -1690,7 +1702,7 @@ static void dottedname(Lexer *lx, ExpInfo *v) {
 }
 
 
-static void fnstm(Lexer *lx, int linenum) {
+static void fnstm(Lexer *lx, int32_t linenum) {
     FunctionState *fs = lx->fs;
     ExpInfo var, e;
     tokuY_scan(lx); /* skip 'fn' */
@@ -1701,10 +1713,10 @@ static void fnstm(Lexer *lx, int linenum) {
 }
 
 
-static void classstm(Lexer *lx, int linenum) {
+static void classstm(Lexer *lx, int32_t linenum) {
     FunctionState *fs = lx->fs;
-    int level = fs->nactlocals;
-    int nvars = 1;
+    int32_t level = fs->nactlocals;
+    int32_t nvars = 1;
     ExpInfo var;
     tokuY_scan(lx); /* skip 'class' */
     dottedname(lx, &var);
@@ -1725,14 +1737,14 @@ typedef enum { CNONE, CDFLT, CASE, CMATCH, CMISMATCH } SwitchCase;
 /* 'switch' statement state. */
 typedef struct {
     TValue v; /* constant expression value */
-    t_ubyte isconst; /* true if 'e' is constant */
-    t_ubyte nomatch; /* true if switch has no compile-time match */
-    t_ubyte havedefault; /* if switch has 'default' case */
-    t_ubyte havenil; /* if switch has 'nil' case */
-    t_ubyte havetrue; /* if switch has 'true' case */
-    t_ubyte havefalse; /* if switch has 'false' case */
-    int firstli; /* first literal value in parser state 'literals' array */
-    int jmp; /* jump that needs patch if 'case' expression is not 'CMATCH' */
+    uint8_t isconst; /* true if 'e' is constant */
+    uint8_t nomatch; /* true if switch has no compile-time match */
+    uint8_t havedefault; /* if switch has 'default' case */
+    uint8_t havenil; /* if switch has 'nil' case */
+    uint8_t havetrue; /* if switch has 'true' case */
+    uint8_t havefalse; /* if switch has 'false' case */
+    int32_t firstli; /* first literal value in parser state 'literals' array */
+    int32_t jmp; /* jump that needs patch if 'case' expression is not 'CMATCH' */
     SwitchCase c; /* current case */
 } SwitchState;
 
@@ -1750,9 +1762,9 @@ static const char *literal2text(toku_State *T, LiteralInfo *li) {
 
 
 /* find literal info 'li' in 'literals' */
-static int findliteral(Lexer *lx, LiteralInfo *li, int first) {
+static int32_t findliteral(Lexer *lx, LiteralInfo *li, int32_t first) {
     DynData *dyd = lx->dyd;
-    for (int i = first; i < dyd->literals.len; i++) { /* O(n) */
+    for (int32_t i = first; i < dyd->literals.len; i++) { /* O(n) */
         LiteralInfo *curr = &dyd->literals.arr[i];
         if (li->tt != curr->tt) /* types don't match? */
             continue; /* skip */
@@ -1766,7 +1778,7 @@ static int findliteral(Lexer *lx, LiteralInfo *li, int first) {
                     return i; /* found */
                 break;
             case TOKU_VNUMFLT:
-                if (t_numeq(li->lit.n, curr->lit.n))
+                if (tokui_numeq(li->lit.n, curr->lit.n))
                     return i; /* found */
                 break;
             default: toku_assert(0); break; /* invalid literal */
@@ -1779,7 +1791,7 @@ static int findliteral(Lexer *lx, LiteralInfo *li, int first) {
 /*
 ** Checks if expression is a duplicate literal value.
 */
-static int checkliteral(SwitchState *ss, ExpInfo *e, const char **what) {
+static int32_t checkliteral(SwitchState *ss, ExpInfo *e, const char **what) {
     switch (e->et) {
         case EXP_FALSE:
             if (t_unlikely(ss->havefalse))
@@ -1806,8 +1818,8 @@ static int checkliteral(SwitchState *ss, ExpInfo *e, const char **what) {
 ** Checks if 'e' is a duplicate constant value and fills the relevant info.
 ** If 'li' is a duplicate, 'what' and 'extra' are filled accordingly.
 */
-static void checkK(Lexer *lx, ExpInfo *e, LiteralInfo *li, int first,
-                   int *extra, const char **what) {
+static void checkK(Lexer *lx, ExpInfo *e, LiteralInfo *li, int32_t first,
+                   int32_t *extra, const char **what) {
     switch (e->et) {
         case EXP_STRING:
             *what = "string";
@@ -1837,7 +1849,7 @@ static void checkK(Lexer *lx, ExpInfo *e, LiteralInfo *li, int first,
 /* check for duplicate literal otherwise fill the relevant info */
 static void checkduplicate(Lexer *lx, SwitchState *ss, ExpInfo *e,
                            LiteralInfo *li) {
-    int extra = 0;
+    int32_t extra = 0;
     const char *what = NULL;
     if (!checkliteral(ss, e, &what))
          checkK(lx, e, li, ss->firstli, &extra, &what);
@@ -1856,7 +1868,8 @@ static void addliteralinfo(Lexer *lx, SwitchState *ss, ExpInfo *e) {
     checkduplicate(lx, ss, e, &li);
     tokuP_checklimit(lx->fs, dyd->literals.len, MAX_CODE, "switch cases");
     tokuM_growarray(lx->T, dyd->literals.arr, dyd->literals.size,
-                    dyd->literals.len, MAX_CODE, "switch literals", LiteralInfo);
+                    dyd->literals.len, MAX_CODE, "switch literals",
+                    LiteralInfo);
     dyd->literals.arr[dyd->literals.len++] = li;
 }
 
@@ -1872,7 +1885,7 @@ static void addliteralinfo(Lexer *lx, SwitchState *ss, ExpInfo *e) {
 ** adds it to the list of literals; any duplicate literal value in switch
 ** is a compile-time error.
 */
-static int checkmatch(Lexer *lx, SwitchState *ss, ExpInfo *e) {
+static int32_t checkmatch(Lexer *lx, SwitchState *ss, ExpInfo *e) {
     if (eisconstant(e)) {
         addliteralinfo(lx, ss, e);
         if (ss->isconst) { /* both are constant values? */
@@ -1892,8 +1905,8 @@ static int checkmatch(Lexer *lx, SwitchState *ss, ExpInfo *e) {
 ** meaning if 'e' is nil, then it should not be merged with previous,
 ** as it might get optimized out.
 */
-static t_ubyte codeconstexp(FunctionState *fs, ExpInfo *e) {
-    t_ubyte res = 0;
+static uint8_t codeconstexp(FunctionState *fs, ExpInfo *e) {
+    uint8_t res = 0;
     fs->nonilmerge = 1;
     tokuC_exp2val(fs, e);
     if (eisconstant(e)) {
@@ -1907,7 +1920,7 @@ static t_ubyte codeconstexp(FunctionState *fs, ExpInfo *e) {
 }
 
 
-static void removeliterals(Lexer *lx, int nliterals) {
+static void removeliterals(Lexer *lx, int32_t nliterals) {
     DynData *dyd = lx->dyd;
     if (dyd->literals.len < dyd->literals.size / 3) /* too many literals? */
         tokuM_shrinkarray(lx->T, dyd->literals.arr, dyd->literals.size,
@@ -1918,7 +1931,7 @@ static void removeliterals(Lexer *lx, int nliterals) {
 
 static void switchbody(Lexer *lx, SwitchState *ss, FuncContext *ctxbefore) {
     FunctionState *fs = lx->fs;
-    int ftjmp = NOJMP; /* fall-through jump */
+    int32_t ftjmp = NOJMP; /* fall-through jump */
     FuncContext ctxdefault = {0};
     FuncContext ctxcase = {0};
     FuncContext ctxend = {0};
@@ -1933,7 +1946,7 @@ static void switchbody(Lexer *lx, SwitchState *ss, FuncContext *ctxbefore) {
             }
             if (match(lx, TK_CASE)) { /* 'case'? */
                 ExpInfo e = INIT_EXP; /* case expression */
-                int match, linenum;
+                int32_t match, linenum;
                 if (t_unlikely(ss->havedefault))
                     tokuP_semerror(lx, "'default' must be the last case");
                 storecontext(fs, &ctxcase); /* case might get optimized away */
@@ -1945,7 +1958,7 @@ static void switchbody(Lexer *lx, SwitchState *ss, FuncContext *ctxbefore) {
                 if (match == MATCH) { /* case is compile-time match? */
                     ss->nomatch = 0; /* case is the match */
                     ss->c = CMATCH;
-                    loadcontext(fs, ctxbefore); /* load context before switch */
+                    loadcontext(fs, ctxbefore);/* load context before switch */
                 } else if (match == NOMATCH || ss->c == CMATCH) {
                     /* compile-time mismatch or previous case is a match */
                     if (ss->c != CMATCH) ss->c = CMISMATCH;
@@ -1958,7 +1971,7 @@ static void switchbody(Lexer *lx, SwitchState *ss, FuncContext *ctxbefore) {
                 }
             } else if (!ss->havedefault) { /* don't have 'default'? */
                 expectnext(lx, ':');
-                toku_assert(ftjmp == NOJMP); /* 'default' does not have ftjmp */
+                toku_assert(ftjmp == NOJMP);/* 'default' does not have ftjmp */
                 if (ss->nomatch) { /* all cases are resolved without match? */
                     ss->nomatch = 0; /* default is the match */
                     loadcontext(fs, ctxbefore); /* remove them */
@@ -1982,7 +1995,7 @@ static void switchbody(Lexer *lx, SwitchState *ss, FuncContext *ctxbefore) {
             } else if (ss->c == CMISMATCH) /* case optimized away? */
                 loadcontext(fs, &ctxcase); /* remove statement */
         } else /* ...otherwise error */
-            tokuP_semerror(lx, "expect at least one 'case' or 'default' label");
+            tokuP_semerror(lx,"expect at least one 'case' or 'default' label");
     }
     toku_assert(ftjmp == NOJMP); /* no more fall-through jumps */
     if (ctxend.pc != -1) /* had a compile-time match and 'ctxend' is stored? */
@@ -1997,7 +2010,7 @@ static void switchbody(Lexer *lx, SwitchState *ss, FuncContext *ctxbefore) {
 
 static void switchstm(Lexer *lx) {
     Scope s;
-    int linenum;
+    int32_t linenum;
     ExpInfo e;
     FuncContext ctxbefore;
     FunctionState *fs = lx->fs;
@@ -2033,20 +2046,20 @@ typedef struct CondBodyState {
     ExpInfo e; /* condition expression */
     OpCode opT; /* test opcode */
     OpCode opJ; /* jump opcode */
-    int isif; /* true if this is 'if' statement body */
-    int pcCond; /* pc of condition */
-    int pcClause; /* pc of last 'for' loop clause */
-    int condline; /* condition line (for test instruction) */
+    int32_t isif; /* true if this is 'if' statement body */
+    int32_t pcCond; /* pc of condition */
+    int32_t pcClause; /* pc of last 'for' loop clause */
+    int32_t condline; /* condition line (for test opcode) */
 } CondBodyState;
 
 
 /* condition statement body; for 'forstm', 'whilestm' and 'ifstm' */
 static void condbody(Lexer *lx, CondBodyState *cb) {
     FunctionState *fs = lx->fs;
-    int optaway, target;
-    int bodypc = currPC;
-    int istrue = eistrue(&cb->e);
-    int test = NOJMP, jump = NOJMP;
+    int32_t optaway, target;
+    int32_t bodypc = currPC;
+    int32_t istrue = eistrue(&cb->e);
+    int32_t test = NOJMP, jump = NOJMP;
     cb->ctxend.pc = NOPC; /* no dead code to begin with */
     optaway = (eisconstant(&cb->e) && !istrue);
     if (!optaway) { /* statement will not be optimized away? */
@@ -2112,7 +2125,7 @@ static void ifstm(Lexer *lx) {
 }
 
 
-static void enterloop(FunctionState *fs, struct LoopState *ls, int isgen) {
+static void enterloop(FunctionState *fs, struct LoopState *ls, int32_t isgen) {
     enterscope(fs, &ls->s, isgen ? CFMGL : CFML);
     ls->pcloop = currPC;
     ls->prev = fs->ls; /* chain it */
@@ -2149,9 +2162,9 @@ static void dowhilestm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     FuncContext ctxbefore;
     ExpInfo e = INIT_EXP;
-    int isend;
+    int32_t isend;
     struct LoopState ls;
-    int condline;
+    int32_t condline;
     tokuY_scan(lx); /* skip 'do' */
     enterloop(fs, &ls, 0);
     stm(lx); /* body */
@@ -2167,7 +2180,7 @@ static void dowhilestm(Lexer *lx) {
             tokuC_patch(fs, tokuC_jmp(fs, OP_JMPS), fs->ls->pcloop);
         /* otherwise condition is false, nothing else to be done */
     } else { /* otherwise condition is a variable */
-        int test = tokuC_test(fs, OP_TESTPOP, 0, condline);
+        int32_t test = tokuC_test(fs, OP_TESTPOP, 0, condline);
         tokuC_patch(fs, tokuC_jmp(fs, OP_JMPS), fs->ls->pcloop);
         tokuC_patch(fs, test, currPC);
     }
@@ -2177,9 +2190,10 @@ static void dowhilestm(Lexer *lx) {
 
 
 /* patch for loop jump */
-static void patchforjmp(FunctionState *fs, int pc, int target, int back) {
-    Instruction *jmp = &fs->p->code[pc];
-    int offset = target - (pc + getopSize(*jmp));
+static void patchforjmp(FunctionState *fs, int32_t pc, int32_t target,
+                                                       int32_t back) {
+    uint8_t *jmp = &fs->p->code[pc];
+    int32_t offset = target - (pc + getopSize(*jmp));
     if (back) offset = -offset;
     toku_assert(offset >= 0);
     if (t_unlikely(offset > MAXJMP))
@@ -2189,8 +2203,8 @@ static void patchforjmp(FunctionState *fs, int pc, int target, int back) {
 
 
 /* generic for loop expressions */
-static int forexplist(Lexer *lx, ExpInfo *e, int limit) {
-    int nexpr = 1;
+static int32_t forexplist(Lexer *lx, ExpInfo *e, int32_t limit) {
+    int32_t nexpr = 1;
     expr(lx, e);
     while (match(lx, ',')) {
         tokuC_exp2stack(lx->fs, e);
@@ -2206,10 +2220,10 @@ static int forexplist(Lexer *lx, ExpInfo *e, int limit) {
 static void foreachstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     struct LoopState ls;
-    int forend, prep;
-    int nvars = 1; /* number of results for interator */
-    int base = fs->sp;
-    int linenum;
+    int32_t forend, prep;
+    int32_t nvars = 1; /* number of results for interator */
+    int32_t base = fs->sp;
+    int32_t linenum;
     ExpInfo e = INIT_EXP;
     Scope s;
     enterloop(fs, &ls, 1); /* enter loop (scope for control variables) */
@@ -2260,8 +2274,8 @@ void forinitializer(Lexer *lx) {
 
 
 /* 'for' loop condition */
-int forcondition(Lexer *lx, CondBodyState *cb) {
-    int linenum = lx->line;
+int32_t forcondition(Lexer *lx, CondBodyState *cb) {
+    int32_t linenum = lx->line;
     if (!match(lx, ';')) { /* have condition? */
         expr(lx, &cb->e);
         codeconstexp(lx->fs, &cb->e);
@@ -2274,22 +2288,22 @@ int forcondition(Lexer *lx, CondBodyState *cb) {
 
 
 /* 'for' loop last clause */
-void forlastclause(Lexer *lx, CondBodyState *cb, int initsp) {
+void forlastclause(Lexer *lx, CondBodyState *cb, int32_t initsp) {
     FunctionState *fs = lx->fs;
-    int inf = eistrue(&cb->e);
+    int32_t inf = eistrue(&cb->e);
     toku_assert(cb->pcClause == NOJMP);
     if (inf) /* infinite loop? */
         loadcontext(fs, &cb->ctxbefore); /* remove condition */
     if (!(check(lx, ')') || check(lx, ';'))) { /* have end clause? */
-        int bodyjmp = tokuC_jmp(fs, OP_JMP); /* insert jump in-between */
-        int oldsp = fs->sp;
+        int32_t bodyjmp = tokuC_jmp(fs, OP_JMP); /* insert jump in-between */
+        int32_t oldsp = fs->sp;
         tokuC_fixline(fs, cb->condline); /* this is condition jump */
         cb->pcClause = currPC; /* set end clause pc */
         fs->sp = initsp; /* set stack index to value at 'for initializer' */
         expstm(lx); /* get the end clause expression statement */
         if (!inf) { /* loop is not infinite? */
-            int loopjmp = tokuC_jmp(fs, OP_JMPS); /* emit jump to cond... */
-            tokuC_patch(fs, loopjmp, fs->ls->pcloop); /* ...and patch it */
+            int32_t loopjmp = tokuC_jmp(fs, OP_JMPS);/* emit jump to cond... */
+            tokuC_patch(fs, loopjmp, fs->ls->pcloop);/* ...and patch it */
         }
         tokuC_patchtohere(fs, bodyjmp); /* patch jump from condition to body */
         fs->ls->pcloop = cb->pcClause; /* loop starts at end clause pc */
@@ -2307,7 +2321,7 @@ static void forstm(Lexer *lx) {
         .isif = 0, .pcClause = NOJMP
     };
     Scope s;
-    int linenum, opt, oldsp;
+    int32_t linenum, opt, oldsp;
     tokuY_scan(lx); /* skip 'for' */
     enterscope(fs, &s, 0); /* enter initializer scope */
     linenum = lx->line;
@@ -2335,7 +2349,7 @@ static void forstm(Lexer *lx) {
 static void loopstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     struct LoopState ls;
-    int jmp, lstart;
+    int32_t jmp, lstart;
     tokuY_scan(lx); /* skip 'loop' */
     lstart = currPC; /* store the pc where the loop starts */
     enterloop(fs, &ls, 0);
@@ -2352,7 +2366,7 @@ static void loopstm(Lexer *lx) {
 ** Return true if jump from current scope to 'limit' scope needs a close.
 ** If 'limit' is NULL, then 'limit' is considered to be the outermost scope.
 */
-static int needtoclose(Lexer *lx, const Scope *limit) {
+static int32_t needtoclose(Lexer *lx, const Scope *limit) {
     Scope *s = lx->fs->scope;
     toku_assert(!limit || limit->depth <= s->depth);
     while (s != limit) {
@@ -2386,7 +2400,7 @@ static void continuestm(Lexer *lx) {
 static void breakstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     const Scope *cfs = getcfscope(fs); /* control flow scope */
-    int adjust;
+    int32_t adjust;
     tokuY_scan(lx); /* skip 'break' */
     if (t_unlikely(cfs == NULL)) /* no control flow scope? */
         tokuP_semerror(lx, "'break' outside of a loop or switch statement");
@@ -2405,7 +2419,7 @@ static void breakstm(Lexer *lx) {
 ** function argument list (')'), file/stream (TK_EOS) or the token
 ** is expression list separator (',').
 */
-static int boundary(Lexer *lx) {
+static int32_t boundary(Lexer *lx) {
     switch (lx->t.tk) {
         case TK_BREAK: case TK_CONTINUE: case TK_CASE: case TK_DEFAULT:
         case TK_FOR: case TK_FOREACH: case TK_IF: case TK_ELSE:
@@ -2419,8 +2433,8 @@ static int boundary(Lexer *lx) {
 
 static void returnstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
-    int first = fs->sp;
-    int nret = 0;
+    int32_t first = fs->sp;
+    int32_t nret = 0;
     ExpInfo e = INIT_EXP;
     tokuY_scan(lx); /* skip 'return' */
     if (!boundary(lx) && !check(lx, ';')) { /* have return values ? */
@@ -2439,7 +2453,7 @@ static void returnstm(Lexer *lx) {
 
 
 static void stm_(Lexer *lx) {
-    int tk = lx->t.tk;
+    int32_t tk = lx->t.tk;
     switch (tk) {
         case TK_FN: fnstm(lx, lx->line); break;
         case TK_CLASS: classstm(lx, lx->line); break;
@@ -2516,7 +2530,7 @@ static void mainfunc(FunctionState *fs, Lexer *lx) {
 
 
 TClosure *tokuP_parse(toku_State *T, BuffReader *Z, Buffer *buff,
-                      DynData *dyd, const char *name, int firstchar) {
+                      DynData *dyd, const char *name, int32_t firstchar) {
     Lexer lx = {0};
     FunctionState fs = {0};
     TClosure *cl = tokuF_newTclosure(T, 1);

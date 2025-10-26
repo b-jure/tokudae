@@ -33,8 +33,8 @@ TOKUMOD_API int onefunction(toku_State *T) {
 
 TOKUMOD_API int anotherfunc(toku_State *T) {
     tokuL_check_version(T);
-    toku_push_fstring(T, "%d%%%d\n", cast_int(toku_to_integer(T, 0)),
-                                     cast_int(toku_to_integer(T, 1)));
+    toku_push_fstring(T, "%d%%%d\n", cast_i32(toku_to_integer(T, 0)),
+                                     cast_i32(toku_to_integer(T, 1)));
     return 1;
 } 
 

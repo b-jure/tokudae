@@ -26,9 +26,9 @@
 
 /*
 ** MAXHBITS is the largest integer such that 2^MAXHBITS fits in a
-** signed int.
+** signed int32_t.
 */
-#define MAXHBITS        cast_int(sizeof(int) * CHAR_BIT - 2)
+#define MAXHBITS        cast_i32(sizeof(int32_t) * CHAR_BIT - 2)
 
 
 /*
@@ -63,7 +63,7 @@
 #define hashboolean(t,b)   hashpow2(t, b)
 
 
-#define hashpointer(t,p)   hashmod(t, pointer2uint(p))
+#define hashpointer(t,p)   hashmod(t, pointer2u32(p))
 
 
 /*
@@ -93,14 +93,14 @@ static const TValue absentkey = {ABSTKEYCONSTANT};
 
 /*
 ** Hash for integers. To allow a good hash, use the remainder operator
-** ('%'). If integer fits as a non-negative int, compute an int
+** ('%'). If integer fits as a non-negative int32_t, compute an int32_t
 ** remainder, which is faster. Otherwise, use an unsigned-integer
 ** remainder, which uses all bits and ensures a non-negative result.
 */
 static Node *hashint(const Table *t, toku_Integer i) {
     toku_Unsigned ui = t_castS2U(i);
-    if (ui <= cast_uint(INT_MAX))
-        return htnode(t, cast_int(ui) % cast_int((htsize(t)-1) | 1));
+    if (ui <= cast_Unsigned(INT_MAX))
+        return htnode(t, cast_i32(ui) % cast_i32((htsize(t)-1) | 1));
     else
         return hashmod(t, ui);
 }
@@ -115,20 +115,20 @@ static Node *hashint(const Table *t, toku_Integer i) {
 ** representation as a float, but INT_MIN does; because the absolute
 ** value of 'frexp' is smaller than 1 (unless 'n' is inf/NaN), the
 ** absolute value of the product 'frexp * -INT_MIN' is smaller or equal
-** to INT_MAX. Next, the use of 't_uint' avoids overflows when ** adding 'i';
+** to INT_MAX. Next, the use of 'uint32_t' avoids overflows when ** adding 'i';
 ** the use of '~u' (instead of '-u') avoids problems with INT_MIN.
 */
 #if !defined(t_hashfloat)
-static t_uint t_hashfloat(toku_Number n) {
-    int i;
+static uint32_t t_hashfloat(toku_Number n) {
+    int32_t i;
     toku_Integer ni;
     n = t_mathop(frexp)(n, &i) * -cast_num(INT_MIN);
     if (!toku_number2integer(n, &ni)) { /* is 'n' inf/-inf/NaN? */
-        toku_assert(t_numisnan(n) || t_mathop(fabs)(n) == cast_num(HUGE_VAL));
+        toku_assert(tokui_numisnan(n)||t_mathop(fabs)(n)==cast_num(HUGE_VAL));
         return 0;
     } else { /* normal case */
-        t_uint u = cast_uint(i) + cast_uint(ni);
-        return (u <= cast_uint(INT_MAX) ? u : ~u);
+        uint32_t u = cast_u32(i) + cast_u32(ni);
+        return (u <= cast_u32(INT_MAX) ? u : ~u);
     }
 }
 #endif
@@ -211,7 +211,7 @@ static Node *getfreepos(Table *t) {
 ** positive does not break anything. (In particular, 'next' will return
 ** some other valid item on the table or nil.)
 */
-static int eqkey(const TValue *k, const Node *n, int deadok) {
+static int32_t eqkey(const TValue *k, const Node *n, int32_t deadok) {
     if ((rawtt(k) != keytt(n)) && /* not the same variant? */
             !(deadok && keyisdead(n) && iscollectable(k)))
         return 0;
@@ -221,7 +221,7 @@ static int eqkey(const TValue *k, const Node *n, int deadok) {
         case TOKU_VNUMINT:
             return (ival(k) == keyival(n));
         case TOKU_VNUMFLT:
-            return t_numeq(fval(k), keyfval(n));
+            return tokui_numeq(fval(k), keyfval(n));
         case TOKU_VLIGHTUSERDATA:
             return (pval(k) == keypval(n));
         case TOKU_VLCF:
@@ -237,13 +237,13 @@ static int eqkey(const TValue *k, const Node *n, int deadok) {
 }
 
 
-static const TValue *getgeneric(Table *t, const TValue *key, int deadok) {
+static const TValue *getgeneric(Table *t, const TValue *key, int32_t deadok) {
     Node *n = mainposition(t, key);
     for (;;) {
         if (eqkey(key, n, deadok)) {
             return nodeval(n);
         } else {
-            int next = nodenext(n);
+            int32_t next = nodenext(n);
             if (next == 0) /* end of node list ? */
                 return &absentkey;
             n += next;
@@ -260,7 +260,7 @@ static const TValue *getgeneric(Table *t, const TValue *key, int deadok) {
 ** its main position), new key goes to an empty position. Return 0 if
 ** could not insert key (could not find a free space).
 */
-static int insertkey(Table *t, const TValue *key, const TValue *value) {
+static int32_t insertkey(Table *t, const TValue *key, const TValue *value) {
     Node *mp = mainposition(t, key); /* get main position for 'key' */
     toku_assert(isabstkey(getgeneric(t, key, 0)));
     if (!isempty(nodeval(mp)) || isdummy(t)) { /* mainposition taken? */
@@ -274,19 +274,19 @@ static int insertkey(Table *t, const TValue *key, const TValue *value) {
             /* yes; move colliding node into free position */
             while (othern + nodenext(othern) != mp) /* find previous */
                 othern += nodenext(othern);
-            nodenext(othern) = cast_int(f - othern); /* rechain to point to 'f' */
+            nodenext(othern) = cast_i32(f - othern); /* rechain to point to 'f' */
             *f = *mp; /* copy colliding node into free pos. (mp->next also goes) */
             if (nodenext(mp) != 0) {
-                nodenext(f) += cast_int(mp - f); /* correct 'next' */
+                nodenext(f) += cast_i32(mp - f); /* correct 'next' */
                 nodenext(mp) = 0; /* now 'mp' is free */
             }
             setemptyval(nodeval(mp));
         } else { /* colliding node is in its own main position */
             /* new node will go into free position */
             if (nodenext(mp) != 0)
-                nodenext(f) = cast_int(mp + nodenext(mp) - f); /* chain new */
+                nodenext(f) = cast_i32(mp + nodenext(mp) - f); /* chain new */
             else toku_assert(nodenext(f) == 0);
-            nodenext(mp) = cast_int(f - mp);
+            nodenext(mp) = cast_i32(f - mp);
             mp = f;
         }
     }
@@ -298,12 +298,12 @@ static int insertkey(Table *t, const TValue *key, const TValue *value) {
 
 
 static void rehash(toku_State *T, Table *t) {
-    t_uint nhash = 0;
+    uint32_t nhash = 0;
     if (!isdummy(t)) {
-        t_uint size = htsize(t);
+        uint32_t size = htsize(t);
         toku_assert(tablesize_invariant(t, size));
         const Node *n = htnode(t, 0);
-        t_uint i;
+        uint32_t i;
         for (i = 0; i < size; i += 4) { /* unroll */
             nhash += !isempty(nodeval(n)); n++;
             nhash += !isempty(nodeval(n)); n++;
@@ -322,7 +322,7 @@ static void rehash(toku_State *T, Table *t) {
 ** key is valid, and the value is not nil.
 */
 static void newcheckedkey(Table *t, const TValue *key, const TValue *value) {
-    int done = insertkey(t, key, value); /* insert key */
+    int32_t done = insertkey(t, key, value); /* insert key */
     toku_assert(done); /* it cannot fail */
     UNUSED(done); /* to avoid warnings */
 }
@@ -331,7 +331,7 @@ static void newcheckedkey(Table *t, const TValue *key, const TValue *value) {
 static void newkey(toku_State *T, Table *t, const TValue *key,
                                             const TValue *value) {
     if (!ttisnil(value)) { /* do not insert nil values */
-        int done = insertkey(t, key, value);
+        int32_t done = insertkey(t, key, value);
         if (!done) { /* could not find a free place? */
             rehash(T, t); /* grow table */
             newcheckedkey(t, key, value); /* insert key in grown table */
@@ -343,7 +343,7 @@ static void newkey(toku_State *T, Table *t, const TValue *key,
 }
 
 
-t_sinline t_ubyte finishget(const TValue *slot, TValue *res) {
+t_sinline uint8_t finishget(const TValue *slot, TValue *res) {
     if (!ttisnil(slot)) {
         setobj(cast(toku_State *, NULL), res, slot);
     }
@@ -355,20 +355,20 @@ t_sinline t_ubyte finishget(const TValue *slot, TValue *res) {
 ** Returns the index of a 'key' for table traversals.
 ** The beginning of a traversal is signaled by 0.
 */
-static t_uint getindex(toku_State *T, Table *t, const TValue *k) {
+static uint32_t getindex(toku_State *T, Table *t, const TValue *k) {
     const TValue *slot;
     if (ttisnil(k)) return 0; /* first iteration */
     slot = getgeneric(t, k, 1);
     if (t_unlikely(isabstkey(slot)))
         tokuD_runerror(T, "invalid key passed to 'nextfield'"); /* not found */
      /* return next slot index */
-    return cast_uint(cast(Node *, slot) - htnode(t, 0) + 1);
+    return cast_u32(cast(Node *, slot) - htnode(t, 0) + 1);
 }
 
 
-int tokuH_next(toku_State *T, Table *t, SPtr key) {
-    t_uint size = htsize(t);
-    t_uint i = getindex(T, t, s2v(key));
+int32_t tokuH_next(toku_State *T, Table *t, SPtr key) {
+    uint32_t size = htsize(t);
+    uint32_t i = getindex(T, t, s2v(key));
     for (; i < size; i++) {
         Node *slot = htnode(t, i);
         if (!isempty(nodeval(slot))) {
@@ -384,12 +384,12 @@ int tokuH_next(toku_State *T, Table *t, SPtr key) {
 /*
 ** Length of a table is the number of key-(non-nil)value fields.
 */
-int tokuH_len(Table *t) {
-    int len = 0;
+int32_t tokuH_len(Table *t) {
+    int32_t len = 0;
     if (!isdummy(t)) {
-        t_uint size = check_exp(htsize(t) <= INT_MAX, htsize(t));
+        uint32_t size = check_exp(htsize(t) <= INT_MAX, htsize(t));
         const Node *n = htnode(t, 0);
-        t_uint i;
+        uint32_t i;
         toku_assert(tablesize_invariant(t, size));
         for (i = 0; i < size; i += 4) { /* unroll */
             len += !isempty(nodeval(n)); n++;
@@ -422,9 +422,9 @@ t_sinline void copynode(toku_State *T, const Node *n, Table *t) {
 void tokuH_copy(toku_State *T, Table *dest, Table *src) {
     if  (!isdummy(src)) {
         const Node *n = htnode(src, 0);
-        t_uint size = htsize(src);
-        t_uint lsrc = cast_uint(tokuH_len(src));
-        t_uint i;
+        uint32_t size = htsize(src);
+        uint32_t lsrc = cast_u32(tokuH_len(src));
+        uint32_t i;
         if (isdummy(dest) || htsize(dest) < lsrc)
             tokuH_resize(T, dest, lsrc);
         toku_assert(tablesize_invariant(src, size));
@@ -447,7 +447,7 @@ const TValue *tokuH_Hgetshortstr(Table *t, OString *key) {
         if (keyisshrstr(n) && eqshrstr(key, keystrval(n)))
             return nodeval(n);
         else {
-            int next = nodenext(n);
+            int32_t next = nodenext(n);
             if (next == 0) break;
             n += next;
         }
@@ -472,7 +472,7 @@ const TValue *Hgetstr(Table *t, OString *key) {
 }
 
 
-t_ubyte tokuH_getstr(Table *t, OString *key, TValue *res) {
+uint8_t tokuH_getstr(Table *t, OString *key, TValue *res) {
     return finishget(Hgetstr(t, key), res);
 }
 
@@ -483,7 +483,7 @@ const TValue *Hgetint(Table *t, toku_Integer key) {
         if (keyisint(n) && keyival(n) == key)
             return nodeval(n);
         else {
-            int next = nodenext(n);
+            int32_t next = nodenext(n);
             if (next == 0)
                 return &absentkey;
             n += next;
@@ -492,7 +492,7 @@ const TValue *Hgetint(Table *t, toku_Integer key) {
 }
 
 
-t_ubyte tokuH_getint(Table *t, toku_Integer key, TValue *res) {
+uint8_t tokuH_getint(Table *t, toku_Integer key, TValue *res) {
     return finishget(Hgetint(t, key), res);
 }
 
@@ -500,7 +500,7 @@ t_ubyte tokuH_getint(Table *t, toku_Integer key, TValue *res) {
 /*
 ** Main search function.
 */
-t_ubyte tokuH_get(Table *t, const TValue *key, TValue *res) {
+uint8_t tokuH_get(Table *t, const TValue *key, TValue *res) {
     const TValue *slot;
     switch (ttypetag(key)) {
         case TOKU_VSHRSTR:
@@ -523,7 +523,7 @@ t_ubyte tokuH_get(Table *t, const TValue *key, TValue *res) {
 }
 
 
-t_ubyte tokuH_getshortstr(Table *t, OString *key, TValue *res) {
+uint8_t tokuH_getshortstr(Table *t, OString *key, TValue *res) {
     return finishget(tokuH_Hgetshortstr(t, key), res);
 }
 
@@ -532,15 +532,15 @@ t_ubyte tokuH_getshortstr(Table *t, OString *key, TValue *res) {
 ** When a 'pset' cannot be completed, this function returns an encoding
 ** of its result, to be used by 'luaH_finishset'.
 */
-static int retpsetcode (Table *t, const TValue *slot) {
+static int32_t retpsetcode (Table *t, const TValue *slot) {
     if (isabstkey(slot))
         return HNOTFOUND; /* no slot with that key */
     else /* return node encoded */
-        return cast_int((cast(Node*, slot) - t->node)) + HFIRSTNODE;
+        return cast_i32((cast(Node*, slot) - t->node)) + HFIRSTNODE;
 }
 
 
-t_sinline int finishset(Table *t, const TValue *slot, const TValue *value) {
+t_sinline int32_t finishset(Table *t, const TValue *slot, const TValue *value) {
     if (!ttisnil(slot)) {
         setobj(cast(toku_State *, NULL), cast(TValue *, slot), value);
         return HOK;  /* success */
@@ -549,22 +549,22 @@ t_sinline int finishset(Table *t, const TValue *slot, const TValue *value) {
 }
 
 
-int tokuH_psetint(Table *t, toku_Integer key, const TValue *value) {
+int32_t tokuH_psetint(Table *t, toku_Integer key, const TValue *value) {
     return finishset(t, Hgetint(t, key), value);
 }
 
 
-int tokuH_psetshortstr(Table *t, OString *key, const TValue *value) {
+int32_t tokuH_psetshortstr(Table *t, OString *key, const TValue *value) {
     return finishset(t, tokuH_Hgetshortstr(t, key), value);
 }
 
 
-static int psetlongstr(Table *t, OString *key, const TValue *value) {
+static int32_t psetlongstr(Table *t, OString *key, const TValue *value) {
     return finishset(t, Hgetlongstr(t, key), value);
 }
 
 
-int tokuH_psetstr(Table *t, OString *key, const TValue *value) {
+int32_t tokuH_psetstr(Table *t, OString *key, const TValue *value) {
     if (strisshr(key))
         return tokuH_psetshortstr(t, key, value);
     else
@@ -572,7 +572,7 @@ int tokuH_psetstr(Table *t, OString *key, const TValue *value) {
 }
 
 
-int tokuH_pset(Table *t, const TValue *key, const TValue *value) {
+int32_t tokuH_pset(Table *t, const TValue *key, const TValue *value) {
     switch (ttypetag(key)) {
         case TOKU_VLNGSTR: return psetlongstr(t, strval(key), value);
         case TOKU_VSHRSTR: return tokuH_psetshortstr(t, strval(key), value);
@@ -595,7 +595,7 @@ int tokuH_pset(Table *t, const TValue *key, const TValue *value) {
 ** check a GC barrier and invalidate the TM cache.
 */
 void tokuH_finishset(toku_State *T, Table *t, const TValue *key,
-                                    const TValue *value, int hres) {
+                                    const TValue *value, int32_t hres) {
     toku_assert(hres != HOK && hres > 0);
     if (hres == HNOTFOUND) {
         TValue aux;
@@ -607,7 +607,7 @@ void tokuH_finishset(toku_State *T, Table *t, const TValue *key,
             if (tokuO_n2i(f, &k, N2IEQ)) {
                 setival(&aux, k); /* key is equal to an integer */
                 key = &aux; /* insert it as an integer */
-            } else if (t_unlikely(t_numisnan(f)))
+            } else if (t_unlikely(tokui_numisnan(f)))
                 tokuD_runerror(T, "table index is NaN");
         }
         newkey(T, t, key, value);
@@ -622,13 +622,13 @@ void tokuH_finishset(toku_State *T, Table *t, const TValue *key,
 */
 void tokuH_set(toku_State *T, Table *t, const TValue *key,
                                         const TValue *value) {
-    int hres = tokuH_pset(t, key, value);
+    int32_t hres = tokuH_pset(t, key, value);
     if (hres != HOK)
         tokuH_finishset(T, t, key, value, hres);
 }
 
 
-static int rawfinishset(const TValue *slot, const TValue *value) {
+static int32_t rawfinishset(const TValue *slot, const TValue *value) {
     if (isabstkey(slot))
         return 0;  /* no slot with that key */
     else {
@@ -672,18 +672,18 @@ void tokuH_setint(toku_State *T, Table *t, toku_Integer key,
 ** during a resize, so the "real" table can keep their values.)
 */
 static void exchangehashes(Table *t1, Table *t2) {
-    t_ubyte sz = t1->size;
+    uint8_t sz = t1->size;
     Node *node = t1->node;
     Node *lastfree = t1->lastfree;
-    t_ubyte bitdummy1 = t1->flags & BITDUMMY;
+    uint8_t bitdummy1 = t1->flags & BITDUMMY;
     t1->size = t2->size;
     t1->node = t2->node;
     t1->lastfree = t2->lastfree;
-    t1->flags = cast_ubyte((t1->flags & NOTBITDUMMY) | (t2->flags & BITDUMMY));
+    t1->flags = cast_u8((t1->flags & NOTBITDUMMY) | (t2->flags & BITDUMMY));
     t2->size = sz;
     t2->node = node;
     t2->lastfree = lastfree;
-    t2->flags = cast_ubyte((t2->flags & NOTBITDUMMY) | bitdummy1);
+    t2->flags = cast_u8((t2->flags & NOTBITDUMMY) | bitdummy1);
 }
 
 
@@ -698,9 +698,9 @@ t_sinline void reinsertnode(toku_State *T, const Node *oldn, Table *t) {
 
 static void reinserthash(toku_State *T, Table *ot, Table *t) {
     if (!isdummy(ot)) {
-        t_uint size = htsize(ot);
+        uint32_t size = htsize(ot);
         const Node *oldn = htnode(ot, 0);
-        t_uint i;
+        uint32_t i;
         toku_assert(tablesize_invariant(ot, size));
         for (i = 0; i < size; i += 4) { /* unroll */
             reinsertnode(T, oldn, t); oldn++;
@@ -721,7 +721,7 @@ t_sinline void initnode(Node *n) {
 
 
 /* allocate hash array */
-static void newhasharray(toku_State *cr, Table *t, t_uint size) {
+static void newhasharray(toku_State *cr, Table *t, uint32_t size) {
     if (size == 0) { /* no elements? */
         t->node = cast(Node *, dummynode); /* use common 'dummynode' */
         t->size = 0;
@@ -729,19 +729,19 @@ static void newhasharray(toku_State *cr, Table *t, t_uint size) {
         setdummy(t); /* signal that it is using dummy node */
     } else {
         Node *n;
-        int nbits;
+        int32_t nbits;
         size = (MINHSIZE <= size) ? size : MINHSIZE;
         nbits = tokuO_ceillog2(size);
-        if (t_unlikely(MAXHBITS < nbits || cast_uint(MAXHSIZE) < twoto(nbits)))
+        if (t_unlikely(MAXHBITS < nbits || cast_u32(MAXHSIZE) < twoto(nbits)))
             tokuD_runerror(cr, "table overflow");
         size = twoto(nbits);
         t->node = tokuM_newarray(cr, size, Node);
-        t->size = cast_ubyte(nbits);
+        t->size = cast_u8(nbits);
         t->lastfree = htnode(t, size);
         setnodummy(t);
         toku_assert(tablesize_invariant(t, size));
         n = htnode(t, 0);
-        for (t_uint i = 0; i < size; i += 4) { /* unroll */
+        for (uint32_t i = 0; i < size; i += 4) { /* unroll */
             initnode(n++);
             initnode(n++);
             initnode(n++);
@@ -770,7 +770,7 @@ static inline void freehash(toku_State *T, Table *t) {
 /*
 ** (Re)insert all elements from the hash part of 'ot' into table 't'.
 */
-void tokuH_resize(toku_State *T, Table *t, t_uint newsize) {
+void tokuH_resize(toku_State *T, Table *t, uint32_t newsize) {
     Table newt = {0};
     newhasharray(T, &newt, newsize);
     exchangehashes(t, &newt);

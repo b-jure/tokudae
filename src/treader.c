@@ -32,7 +32,7 @@ void tokuR_init(toku_State *T, BuffReader *Z, toku_Reader freader, void *ud) {
 ** In case there is no more data to be read, 'reader' should set 'size'
 ** to 0 or return NULL.
 */
-int tokuR_fill(BuffReader *Z) {
+int32_t tokuR_fill(BuffReader *Z) {
     size_t size;
     toku_State *T = Z->T;
     const char *p;
@@ -43,7 +43,7 @@ int tokuR_fill(BuffReader *Z) {
         return TEOF;
     Z->n = size - 1; /* discount char being returned */
     Z->p = p;
-    return cast_ubyte(*(Z->p++));
+    return cast_u8(*(Z->p++));
 }
 
 
@@ -51,7 +51,7 @@ int tokuR_fill(BuffReader *Z) {
 ** Load
 ** ==================================================================== */
 
-static int checkbuffer(BuffReader *Z) {
+static int32_t checkbuffer(BuffReader *Z) {
     if (Z->n == 0) { /* no bytes in buffer? */
         if (tokuR_fill(Z) == TEOF) /* try to read more */
             return 0; /* no more input */

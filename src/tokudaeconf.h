@@ -336,6 +336,9 @@
 #define TOKU_UNSIGNED           unsgined TOKU_INTEGER
 #define TOKU_UNSIGNED_MAX       _UI64_MAX
 
+#define t_intatt(i)             INT64_C(i)
+#define t_uintatt(i)            UINT64_C(i)
+
 #define TOKU_INTEGER_FMTLEN     "I64"
 #define TOKU_INTEGER_FMT        "%" TOKU_INTEGER_FMTLEN "d"
 #define TOKU_UINTEGER_FMTLEN    TOKU_INTEGER_FMTLEN
@@ -396,9 +399,9 @@
 
 
 /*
+** Branch hints for compiler (assembly reordering).
 ** @tokui_likely - likely branch to be taken.
 ** @tokui_unlikely - unlikely branch to be taken.
-** Jump prediction macros.
 */
 #if !defined(tokui_likely)
 
@@ -462,7 +465,7 @@
 
 
 /*
-** @TOKU_OPARGS - the maximum number of instruction arguments.
+** @TOKU_OPARGS - the maximum number of opcode arguments.
 ** Refer to the 'tcode.h' for complete listing of the opcodes and
 ** formats.
 */

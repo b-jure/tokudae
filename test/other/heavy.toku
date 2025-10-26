@@ -42,7 +42,7 @@ local fn loadrep(x, what) {
 fn controlstruct() {
     print("control structure too long");
     /// Magic breakdown:
-    /// '(1<<24) - 1' - max value of a long instruction argument (in bytes)
+    /// '(1<<24) - 1' - max value of a long opcode argument (in bytes)
     /// '16' - size of the loop chunk excluding the loop body (in bytes)
     /// '27' - total size of repeated code in 's' (in bytes)
     local lim = ((1 << 24)-1-16) // 27;
@@ -86,8 +86,8 @@ fn hugeid() {
 }
 
 fn toomanyinst() {
-    print("loading chunk with too many instructions");
-    local st, msg = loadrep("a = 10; ", "instructions");
+    print("loading chunk with too many opcodes");
+    local st, msg = loadrep("a = 10; ", "opcodes");
     print("+");
     __G.a = nil;
 }

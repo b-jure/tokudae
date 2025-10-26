@@ -170,10 +170,10 @@
 
 /* 
 ** Some GC parameters are stored divided by 4 to allow a
-** maximum value of up to 1023 in a 't_ubyte'.
+** maximum value of up to 1023 in a 'uint8_t'.
 */
 #define getgcparam(p)       ((p) * 4)
-#define setgcparam(p,v)     ((p) = cast_ubyte((v) / 4))
+#define setgcparam(p,v)     ((p) = cast_u8((v) / 4))
 
 
 TOKUI_FUNC GCObject *tokuG_new(toku_State *T, size_t size, int tt_);

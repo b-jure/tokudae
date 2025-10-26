@@ -12,27 +12,10 @@
 
 
 typedef size_t          t_umem;
-#define TOKU_MAXUMEM    cast_umem(~cast_umem(0))
 typedef ptrdiff_t       t_mem;
+
+#define TOKU_MAXUMEM    cast_umem(~cast_umem(0))
 #define TOKU_MAXMEM     cast_mem(TOKU_MAXUMEM >> 1)
-
-
-typedef unsigned char   t_ubyte;
-#define TOKU_MAXUBYTE   cast_ubyte(~cast_ubyte(0))
-typedef signed char     t_byte;
-#define TOKU_MAXBYTE    cast_ubyte(TOKU_MAXUBYTE >> 1)
-
-
-/* 
-** Unsigned size of (at least) 4 bytes.
-*/
-typedef uint32_t        t_uint32;
-
-
-/* nice to have */
-typedef unsigned short  t_ushort;
-typedef unsigned int    t_uint;
-typedef unsigned long   t_ulong;
 
 
 /* maximum value for 'size_t' */
@@ -48,14 +31,46 @@ typedef unsigned long   t_ulong;
             ? TOKU_MAXSIZET : cast_sizet(TOKU_INTEGER_MAX))
 
 
-/* convert pointer 'p' to 'unsigned int' */
+/* convert pointer 'p' to uint32_t */
 #if defined(UINTPTR_MAX)
 #define T_P2I   uintptr_t
 #else
 #define T_P2I   uintmax_t
 #endif
 
-#define pointer2uint(p)     cast_uint(cast(T_P2I, (p)) & UINT_MAX)
+#define pointer2u32(p)     cast_u32(cast(T_P2I, (p)) & UINT32_MAX)
+
+
+/* inline functions */
+#if defined(__GNUC__)
+#define t_inline        __inline__
+#else
+#define t_inline        inline
+#endif
+
+/* static inline */
+#define t_sinline       static t_inline
+
+
+/* non-return type */
+#if defined(__GNUC__)
+#define t_noret         void __attribute__((noreturn))
+#elif defined(_MST_VER) && _MST_VER >= 1200
+#define t_noret         void __declspec(noreturn)
+#else
+#define t_noret         void
+#endif
+
+
+/*
+** Allow threaded code by default on GNU C compilers.
+** What this allows is usage of jump table, meaning the use of
+** local labels inside arrays, making opcode dispatch O(1)
+** inside the interpreter loop.
+*/
+#if defined(__GNUC__)
+#define PRECOMPUTED_GOTO
+#endif
 
 
 /* internal assertions for debugging */
@@ -80,51 +95,6 @@ typedef unsigned long   t_ulong;
 #define api_check(T,e,err)      tokui_checkapi(T, (e) && err)
 
 
-
-/*
-** Allow threaded code by default on GNU C compilers.
-** What this allows is usage of jump table, meaning the use of
-** local labels inside arrays, making instruction dispatch O(1)
-** inside the interpreter loop.
-*/
-#if defined(__GNUC__)
-#define PRECOMPUTED_GOTO
-#endif
-
-
-
-/* inline functions */
-#if defined(__GNUC__)
-#define t_inline        __inline__
-#else
-#define t_inline        inline
-#endif
-
-/* static inline */
-#define t_sinline       static t_inline
-
-
-
-/* non-return type */
-#if defined(__GNUC__)
-#define t_noret         void __attribute__((noreturn))
-#elif defined(_MST_VER) && _MST_VER >= 1200
-#define t_noret         void __declspec(noreturn)
-#else
-#define t_noret         void
-#endif
-
-
-
-/*
-** Type for vm instructions.
-** Instructions (opcodes) are 1-byte in size not including the instruction
-** arguments.
-*/
-typedef t_ubyte Instruction;
-
-
-
 /*
 ** Maximum length for short strings, that is, strings that are
 ** internalized. (Cannot be smaller than reserved words or keys for
@@ -134,7 +104,6 @@ typedef t_ubyte Instruction;
 #if !defined(TOKUI_MAXSHORTLEN)
 #define TOKUI_MAXSHORTLEN       40
 #endif
-
 
 
 /*
@@ -148,7 +117,6 @@ typedef t_ubyte Instruction;
 #endif
 
 
-
 /*
 ** Minimum size for string buffer during lexing, this buffer memory
 ** will be freed after compilation.
@@ -156,7 +124,6 @@ typedef t_ubyte Instruction;
 #if !defined(TOKUI_MINBUFFER)
 #define TOKUI_MINBUFFER         32
 #endif
-
 
 
 /*
@@ -168,7 +135,6 @@ typedef t_ubyte Instruction;
 #if !defined(TOKUI_MAXCCALLS)
 #define TOKUI_MAXCCALLS         200
 #endif
-
 
 
 /*
@@ -205,6 +171,10 @@ typedef t_ubyte Instruction;
 
 
 /*
+** Casting via macros.
+*/
+
+/*
 ** @UNUSED - marks variable unused to avoid compiler
 ** warnings.
 */
@@ -219,29 +189,30 @@ typedef t_ubyte Instruction;
 #define cast_void(e)        cast(void,(e))
 #define cast_voidp(e)       cast(void *,(e))
 #define cast_cvoidp(e)      cast(const void *,(e))
+
 #define cast_num(e)         cast(toku_Number,(e))
 #define cast_Integer(e)     cast(toku_Integer,(e))
 #define cast_Unsigned(e)    cast(toku_Unsigned,(e))
-#define cast_ubyte(e)       cast(t_ubyte,(e))
-#define cast_ubytep(e)      cast(t_ubyte *,(e))
-#define cast_byte(e)        cast(t_byte,(e))
-#define cast_ushort(e)      cast(t_ushort,(e))
-#define cast_long(e)        cast(long,(e))
-#define cast_ulong(e)       cast(t_ulong,(e))
-#define cast_int(e)         cast(int,(e))
-#define cast_uint(e)        cast(t_uint,(e))
-#define cast_float(e)       cast(float,(e))
-#define cast_double(e)      cast(double,(e))
-#define cast_umem(e)        cast(t_umem,(e))
-#define cast_mem(e)         cast(t_mem,(e))
+
 #define cast_charp(e)       cast(char *,(e))
 #define cast_char(e)        cast(char,(e))
+
+#define cast_i8(e)          cast(int8_t,(e))
+#define cast_u8(e)          cast(uint8_t,(e))
+#define cast_u8p(e)         cast(uint8_t *,(e))
+#define cast_i16(e)         cast(int16_t,(e))
+#define cast_u16(e)         cast(uint16_t,(e))
+#define cast_i32(e)         cast(int32_t,(e))
+#define cast_u32(e)         cast(uint32_t,(e))
+
+#define cast_mem(e)         cast(t_mem,(e))
+#define cast_umem(e)        cast(t_umem,(e))
 #define cast_sizet(e)       cast(size_t,(e))
 
 
 /* cast a signed toku_Integer to toku_Unsigned */
 #if !defined(t_castS2U)
-#define t_castS2U(i)        ((toku_Unsigned)(i))
+#define t_castS2U(i)        cast_Unsigned(i)
 #endif
 
 /*
@@ -250,20 +221,20 @@ typedef t_ubyte Instruction;
 ** work fine.
 */
 #if !defined(t_castU2S)
-#define t_castU2S(i)        ((toku_Integer)(i))
+#define t_castU2S(i)        cast_Integer(i)
 #endif
 
 /* 
 ** Cast a size_t to toku_Integer: These casts are always valid for
 ** sizes of Tokudae objects (see TOKU_MAXSIZE).
 */
-#define cast_sz2S(sz)       ((toku_Integer)(sz))
+#define cast_sz2S(sz)       cast_Integer(sz)
 
 /* 
 ** Casts a ptrdiff_t to size_t when it is known that the minuend
 ** comes from the subtrahend (the base).
 */
-#define cast_diff2sz(df)    ((size_t)(df))
+#define cast_diff2sz(df)    cast_sizet(df)
 
 /* cast a ptrdiff_t to toku_Integer */
 #define cast_diff2S(df)     cast_sz2S(cast_diff2sz(df))
@@ -280,19 +251,18 @@ typedef void (*voidf)(void);
 ** (The '__extension__' in gnu compilers is only to avoid warnings.)
 */
 #if defined(__GNUC__)
-#define cast_func(p)    (__extension__ (voidf)(p))
+#define cast_func(p)        (__extension__ cast(voidf, p))
 #else
-#define cast_func(p)    ((voidf)(p))
+#define cast_func(p)        cast(voidf, p)
 #endif
+
 
 
 /*
 ** Check if 'x' is a power of 2.
-** The second macro also takes care of the zero edge case.
 */
 #if !defined(t_ispow2)
 #define t_ispow2(x)         (((x) & ((x)-1)) == 0)
-#define t_ispow2n0(x)       ((x) && t_ispow2(x))
 #endif
 
 
@@ -305,7 +275,7 @@ typedef void (*voidf)(void);
 ** Number of bits in a given type.
 */
 #if !defined(t_nbits)
-#define t_nbits(x)          cast_int(sizeof(x) * CHAR_BIT)
+#define t_nbits(x)          cast_i32(sizeof(x) * CHAR_BIT)
 #endif
 
 
@@ -313,7 +283,7 @@ typedef void (*voidf)(void);
 ** Size of fixed array.
 */
 #if !defined(t_arraysize)
-#define t_arraysize(x)        (sizeof(x)/sizeof((x)[0]))
+#define t_arraysize(x)      (sizeof(x)/sizeof((x)[0]))
 #endif
 
 
@@ -332,44 +302,58 @@ typedef void (*voidf)(void);
 #endif
 
 
-#if !defined(t_nummod)
 
-/* modulo 'a - floor(a/b)*b' */
-#define t_nummod(T,a,b,m) \
-        { UNUSED(T); (m) = t_mathop(fmod)(a, b); \
-          if (((m) > 0) ? (b) < 0 : ((m) < 0 && (b) > 0)) (m) += (b); }
+/*
+** The tokui_num* macros define the primitive operations over numbers.
+*/
 
-#define t_numdiv(T, a, b)       (UNUSED(T), (a)/(b))
+/* floor division (defined as 'floor(a/b)') */
+#if !defined(tokui_numidiv)
+#define tokui_numidiv(T,a,b)    (UNUSED(T), t_floor(tokui_numdiv(T,a,b)))
+#endif
 
-#define t_numidiv(T, a, b)      (UNUSED(T), t_floor(t_numdiv(T,a,b)))
+/* float division */
+#if !defined(tokui_numdiv)
+#define tokui_numdiv(T,a,b)     (UNUSED(T), (a)/(b))
+#endif
 
-#define t_numpow(T, a, b) \
+/*
+** modulo: defined as 'a - floor(a/b)*b'; the direct computation
+** using this definition has several problems with rounding errors,
+** so it is better to use 'fmod'. 'fmod' gives the result of
+** 'a - trunc(a/b)*b', and therefore must be corrected when
+** 'trunc(a/b) ~= floor(a/b)'. That happens when the division has a
+** non-integer negative result: non-integer result is equivalent to
+** a non-zero remainder 'm'; negative result is equivalent to 'a' and
+** 'b' with different signs, or 'm' and 'b' with different signs
+** (as the result 'm' of 'fmod' has the same sign of 'a').
+*/
+#if !defined(tokui_nummod)
+#define tokui_nummod(T,a,b,m) \
+    { UNUSED(T); (m) = t_mathop(fmod)(a, b); \
+      if (((m) > 0) ? (b) < 0 : ((m) < 0 && (b) > 0)) (m) += (b); }
+#endif
+
+/* exponentiation */
+#if !defined(tokui_numpow)
+#define tokui_numpow(T,a,b) \
         (UNUSED(T), (b) == 2 ? (a)*(a) : t_mathop(pow)(a, b))
-
 #endif
 
-
-#if !defined(t_numadd)
-#define t_numadd(T, a, b)       (UNUSED(T), (a) + (b))
-#define t_numsub(T, a, b)       (UNUSED(T), (a) - (b))
-#define t_nummul(T, a, b)       (UNUSED(T), ((a) * (b)))
-#define t_numunm(T, a)          (UNUSED(T), -(a))
+#if !defined(tokui_numadd)
+#define tokui_numadd(T, a, b)   (UNUSED(T), (a) + (b))
+#define tokui_numsub(T, a, b)   (UNUSED(T), (a) - (b))
+#define tokui_nummul(T, a, b)   (UNUSED(T), ((a) * (b)))
+#define tokui_numunm(T, a)      (UNUSED(T), -(a))
+#define tokui_numeq(a, b)       ((a) == (b))
+#define tokui_numne(a, b)       (!tokui_numeq(a, b))
+#define tokui_numlt(a, b)       ((a) < (b))
+#define tokui_numle(a, b)       ((a) <= (b))
+#define tokui_numgt(a, b)       ((a) > (b))
+#define tokui_numge(a, b)       ((a) >= (b))
+#define tokui_numisnan(a)       (!tokui_numeq(a, a))
 #endif
 
-
-#if !defined(t_numeq)
-#define t_numeq(a, b)       ((a) == (b))
-#define t_numne(a, b)       (!t_numeq(a, b))
-#define t_numlt(a, b)       ((a) < (b))
-#define t_numle(a, b)       ((a) <= (b))
-#define t_numgt(a, b)       ((a) > (b))
-#define t_numge(a, b)       ((a) >= (b))
-#endif
-
-
-#if !defined(t_numisnan)
-#define t_numisnan(a)       (!t_numeq(a, a))
-#endif
 
 
 /*
@@ -392,13 +376,14 @@ typedef void (*voidf)(void);
 #endif
 
 
-/* write a message to 'fp' stream */
-#if !defined(toku_writelen)
-#define toku_writelen(fp,s,l)         fwrite((s), sizeof(char), (l), fp)
-#define toku_writeline(fp)            (toku_writelen(fp, "\n", 1), fflush(fp))
-#define toku_writefmt(fp, msg, ...)   (fprintf(fp, msg, __VA_ARGS__), fflush(fp))
-#define toku_writevfmt(fp,msg,ap)     (vfprintf(fp, msg, ap), fflush(fp))
-#endif
 
+/*
+** Basic report of messages and errors.
+*/
+#if !defined(t_writestring)
+#define t_writestring(s,l)      fwrite((s), sizeof(char), (l), stdout)
+#define t_writeline()           (t_writestring("\n", 1), fflush(stdout))
+#define t_writestringerr(s,p)   (fprintf(stderr, (s), (p)), fflush(stdout))
+#endif
 
 #endif

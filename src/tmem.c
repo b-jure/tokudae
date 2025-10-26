@@ -86,7 +86,7 @@ void *tokuM_saferealloc(toku_State *T, void *ptr, size_t osz, size_t nsz) {
 }
 
 
-void *tokuM_malloc_(toku_State *T, size_t size, t_ubyte tag) {
+void *tokuM_malloc_(toku_State *T, size_t size, uint8_t tag) {
     if (size == 0) {
         return NULL;
     } else {
@@ -106,9 +106,10 @@ void *tokuM_malloc_(toku_State *T, size_t size, t_ubyte tag) {
 /* minimum size of array memory block */
 #define MINASIZE    4
 
-void *tokuM_growarr_(toku_State *T, void *block, int *sizep, int len,
-                     int elemsize, int nelems, int limit, const char *what) {
-    int size = *sizep;
+void *tokuM_growarr_(toku_State *T, void *block, int32_t *sizep, int32_t len,
+                     int32_t elemsize, int32_t nelems, int32_t limit,
+                     const char *what) {
+    int32_t size = *sizep;
     toku_assert(0 <= nelems && 0 < elemsize && what);
 checkspace:
     if (t_likely(nelems <= size - len)) /* have enough space for nelems? */
@@ -123,16 +124,16 @@ checkspace:
             size = (MINASIZE <= size) ? size : MINASIZE;
         }
         block = tokuM_saferealloc(T, block,
-                                     cast_sizet(*sizep) * cast_uint(elemsize),
-                                     cast_sizet(size) * cast_uint(elemsize));
+                                     cast_sizet(*sizep) * cast_u32(elemsize),
+                                     cast_sizet(size) * cast_u32(elemsize));
         *sizep = size;
         goto checkspace;
     }
 }
 
 
-void *tokuM_shrinkarr_(toku_State *T, void *ptr, int *sizep, int nfinal,
-                       int elemsize) {
+void *tokuM_shrinkarr_(toku_State *T, void *ptr, int32_t *sizep,
+                                      int32_t nfinal, int32_t elemsize) {
     size_t osz = cast_sizet((*sizep) * elemsize);
     size_t nsz = cast_sizet(nfinal * elemsize);
     toku_assert(nsz <= osz);

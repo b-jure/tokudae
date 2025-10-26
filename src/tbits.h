@@ -13,7 +13,7 @@
 
 
 /* bit manipulation */
-#define resetbits(x,m)          ((x) &= cast_ubyte(~(m)))
+#define resetbits(x,m)          ((x) &= cast_u8(~(m)))
 #define setbits(x,m)            ((x) |= (m))
 #define testbits(x,m)           ((x) & (m))
 #define togglebits(x,m,t)       ((x) ^ (((x) ^ -((t) != 0)) & (m)))
@@ -31,17 +31,17 @@
 
 
 /* set 'src' byte at offset 'o' to 'v' */
-#define setbyte(src,o,v)    (*(cast_ubytep(src) + (o)) = cast_ubyte(v))
+#define setbyte(src,o,v)    (*(cast_u8p(src) + (o)) = cast_u8(v))
 
 
 /* 
-** Get first 3 bytes (LE byte order) from 'p' casted to 't_uint'.
+** Get first 3 bytes (LE byte order) from 'p' casted to 'uint32_t'.
 */
 #define get3bytes(p) \
-        cast_int(cast_uint(0) | \
-        cast_uint((*(cast_ubytep(p) + 2)) << 16) | \
-        cast_uint((*(cast_ubytep(p) + 1)) << 8) | \
-        (*cast_ubytep(p)))
+        cast_i32(cast_u32(0) | \
+        cast_u32((*(cast_u8p(p) + 2)) << 16) | \
+        cast_u32((*(cast_u8p(p) + 1)) << 8) | \
+        (*cast_u8p(p)))
 
 
 /* 
@@ -49,7 +49,7 @@
 ** (integer type) into 'dest'.
 */
 #define set3bytes(dest,src) \
-    { t_ubyte *dest_=cast_ubytep(dest); int src_=cast_int(src); \
+    { uint8_t *dest_=cast_u8p(dest); int src_=cast_i32(src); \
       setbyte(dest_, 0, getbyte(src_, 0)); \
       setbyte(dest_, 1, getbyte(src_, 1)); \
       setbyte(dest_, 2, getbyte(src_, 2)); }

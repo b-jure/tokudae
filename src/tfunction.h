@@ -17,10 +17,10 @@
 
 
 #define sizeofTcl(nup) \
-        (offsetof(TClosure, upvals) + (cast_uint(nup) * sizeof(UpVal*)))
+        (offsetof(TClosure, upvals) + (cast_u32(nup) * sizeof(UpVal*)))
 
 #define sizeofCcl(nup) \
-        (offsetof(CClosure, upvals) + (cast_uint(nup) * sizeof(TValue)))
+        (offsetof(CClosure, upvals) + (cast_u32(nup) * sizeof(TValue)))
 
 
 /* check if thread is in 'twups' (Threads with open UPvalueS) list */
@@ -42,19 +42,20 @@
 
 
 TOKUI_FUNC Proto *tokuF_newproto(toku_State *T);
-TOKUI_FUNC TClosure *tokuF_newTclosure(toku_State *T, int nupvals);
-TOKUI_FUNC CClosure *tokuF_newCclosure(toku_State *T, int nupvals);
-TOKUI_FUNC void tokuF_adjustvarargs(toku_State *T, int arity, CallFrame *cf,
-                                    SPtr *sp, const Proto *fn);
+TOKUI_FUNC TClosure *tokuF_newTclosure(toku_State *T, int32_t nupvals);
+TOKUI_FUNC CClosure *tokuF_newCclosure(toku_State *T, int32_t nupvals);
+TOKUI_FUNC void tokuF_adjustvarargs(toku_State *T, int32_t arity,
+                                    CallFrame *cf, SPtr *sp, const Proto *fn);
 TOKUI_FUNC void tokuF_getvarargs(toku_State *T, CallFrame *cf, SPtr *sp,
-                                 int wanted);
+                                 int32_t wanted);
 TOKUI_FUNC void tokuF_initupvals(toku_State *T, TClosure *cl);
 TOKUI_FUNC UpVal *tokuF_findupval(toku_State *T, SPtr level);
 TOKUI_FUNC void tokuF_unlinkupval(UpVal *upval);
-TOKUI_FUNC const char *tokuF_getlocalname(const Proto *fn, int lnum, int pc);
+TOKUI_FUNC const char *tokuF_getlocalname(const Proto *fn, int32_t lnum,
+                                                           int32_t pc);
 TOKUI_FUNC void tokuF_newtbcvar(toku_State *T, SPtr level);
 TOKUI_FUNC void tokuF_closeupval(toku_State *T, SPtr level);
-TOKUI_FUNC SPtr tokuF_close(toku_State *T, SPtr level, int status);
+TOKUI_FUNC SPtr tokuF_close(toku_State *T, SPtr level, int32_t status);
 TOKUI_FUNC void tokuF_freeupval(toku_State *T, UpVal *upval);
 TOKUI_FUNC void tokuF_free(toku_State *T, Proto *fn);
 

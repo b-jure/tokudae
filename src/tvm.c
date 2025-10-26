@@ -95,7 +95,7 @@
 #endif
 
 
-static t_ubyte booleans[2] = { TOKU_VFALSE, TOKU_VTRUE };
+static uint8_t booleans[2] = { TOKU_VFALSE, TOKU_VTRUE };
 
 
 /*
@@ -103,12 +103,12 @@ static t_ubyte booleans[2] = { TOKU_VFALSE, TOKU_VTRUE };
 ** its upvalues.
 */
 static void pushclosure(toku_State *T, Proto *p, UpVal **encup, SPtr base) {
-    int nup = p->sizeupvals;
+    int32_t nup = p->sizeupvals;
     UpValInfo *uv = p->upvals;
     TClosure *cl = tokuF_newTclosure(T, nup);
     cl->p = p;
     setclTval2s(T, T->sp.p++, cl); /* anchor to stack */
-    for (int i = 0; i < nup; i++) { /* fill its upvalues */
+    for (int32_t i = 0; i < nup; i++) { /* fill its upvalues */
         if (uv[i].instack) /* upvalue refers to local variable? */
             cl->upvals[i] = tokuF_findupval(T, base + uv[i].idx);
         else /* get upvalue from enclosing function */
@@ -129,7 +129,7 @@ toku_Integer tokuV_divi(toku_State *T, toku_Integer x, toku_Integer y) {
         return intop(-, 0, x);
     } else {
         toku_Integer q = x / y; /* perform C division */
-        if ((x ^ y) < 0 && x % y != 0) /* 'm/n' would be negative non-integer? */
+        if ((x ^ y) < 0 && x % y != 0) /*'m/n' would be negative non-integer?*/
             q -= 1; /* correct result for different rounding */
         return q;
     }
@@ -157,7 +157,7 @@ toku_Integer tokuV_modi(toku_State *T, toku_Integer x, toku_Integer y) {
 /* floating point modulus */
 toku_Number tokuV_modf(toku_State *T, toku_Number x, toku_Number y) {
     toku_Number r;
-    t_nummod(T, x, y, r);
+    tokui_nummod(T, x, y, r);
     return r;
 }
 
@@ -167,7 +167,7 @@ toku_Number tokuV_modf(toku_State *T, toku_Number x, toku_Number y) {
 ** to call metamethods in cases where raw arithmetics are not possible.
 */
 void tokuV_binarithm(toku_State *T, const TValue *v1, const TValue *v2,
-                     SPtr res, int op) {
+                     SPtr res, int32_t op) {
     if (!tokuO_arithmraw(T, v1, v2, s2v(res), op))
         tokuTM_trybin(T, v1, v2, res, asTM((op-TOKU_OP_ADD) + TM_ADD));
 }
@@ -177,7 +177,7 @@ void tokuV_binarithm(toku_State *T, const TValue *v1, const TValue *v2,
 ** Perform unary arithmetic operations on objects, this function is free
 ** to call metamethods in cases where raw arithmetics are not possible.
 */
-void tokuV_unarithm(toku_State *T, const TValue *v, SPtr res, int op) {
+void tokuV_unarithm(toku_State *T, const TValue *v, SPtr res, int32_t op) {
     TValue aux;
     setival(&aux, 0);
     if (!tokuO_arithmraw(T, v, &aux, s2v(T->sp.p - 1), op))
@@ -185,9 +185,9 @@ void tokuV_unarithm(toku_State *T, const TValue *v, SPtr res, int op) {
 }
 
 
-t_sinline int intLEfloat(toku_Integer i, toku_Number f) {
+t_sinline int32_t intLEfloat(toku_Integer i, toku_Number f) {
     if (t_intfitsf(i))
-        return t_numle(cast_num(i), f); /* compare them as floats */
+        return tokui_numle(cast_num(i), f); /* compare them as floats */
     else {  /* i <= f <=> i <= floor(f) */
         toku_Integer fi;
         if (tokuO_n2i(f, &fi, N2IFLOOR)) /* fi = floor(f) */
@@ -198,9 +198,9 @@ t_sinline int intLEfloat(toku_Integer i, toku_Number f) {
 }
 
 
-t_sinline int floatLEint(toku_Number f, toku_Integer i) {
+t_sinline int32_t floatLEint(toku_Number f, toku_Integer i) {
     if (t_intfitsf(i))
-        return t_numle(f, cast_num(i)); /* compare them as floats */
+        return tokui_numle(f, cast_num(i)); /* compare them as floats */
     else {  /* f <= i <=> ceil(f) <= i */
         toku_Integer fi;
         if (tokuO_n2i(f, &fi, N2ICEIL)) /* fi = ceil(f) */
@@ -212,7 +212,7 @@ t_sinline int floatLEint(toku_Number f, toku_Integer i) {
 
 
 /* less equal ordering on numbers */
-t_sinline int LEnum(const TValue *v1, const TValue *v2) {
+t_sinline int32_t LEnum(const TValue *v1, const TValue *v2) {
     toku_assert(ttisnum(v1) && ttisnum(v2));
     if (ttisint(v1)) {
         toku_Integer i1 = ival(v1);
@@ -225,13 +225,13 @@ t_sinline int LEnum(const TValue *v1, const TValue *v2) {
         if (ttisint(v2))
             return floatLEint(n1, ival(v2));
         else
-            return t_numle(n1, fval(v2));
+            return tokui_numle(n1, fval(v2));
     }
 }
 
 
 /* less equal ordering on non-number values */
-t_sinline int LEother(toku_State *T, const TValue *v1, const TValue *v2) {
+t_sinline int32_t LEother(toku_State *T, const TValue *v1, const TValue *v2) {
     if (ttisstring(v1) && ttisstring(v2))
         return (tokuS_cmp(strval(v1), strval(v2)) <= 0);
     else
@@ -240,16 +240,16 @@ t_sinline int LEother(toku_State *T, const TValue *v1, const TValue *v2) {
 
 
 /* 'less or equal' ordering '<=' */
-int tokuV_orderle(toku_State *T, const TValue *v1, const TValue *v2) {
+int32_t tokuV_orderle(toku_State *T, const TValue *v1, const TValue *v2) {
     if (ttisnum(v1) && ttisnum(v2))
         return LEnum(v1, v2);
     return LEother(T, v1, v2);
 }
 
 
-t_sinline int intLTfloat(toku_Integer i, toku_Number f) {
+t_sinline int32_t intLTfloat(toku_Integer i, toku_Number f) {
     if (t_intfitsf(i))
-        return t_numlt(cast_num(i), f);
+        return tokui_numlt(cast_num(i), f);
     else { /* i < f <=> i < ceil(f) */
         toku_Integer fi;
         if (tokuO_n2i(f, &fi, N2ICEIL)) /* fi = ceil(f) */
@@ -260,9 +260,9 @@ t_sinline int intLTfloat(toku_Integer i, toku_Number f) {
 }
 
 
-t_sinline int floatLTint(toku_Number f, toku_Integer i) {
+t_sinline int32_t floatLTint(toku_Number f, toku_Integer i) {
     if (t_intfitsf(i))
-        return t_numlt(f, cast_num(i)); /* compare them as floats */
+        return tokui_numlt(f, cast_num(i)); /* compare them as floats */
     else { /* f < i <=> floor(f) < i */
         toku_Integer fi;
         if (tokuO_n2i(f, &fi, N2IFLOOR)) /* fi = floor(f) */
@@ -274,7 +274,7 @@ t_sinline int floatLTint(toku_Number f, toku_Integer i) {
 
 
 /* 'less than' ordering '<' on number values */
-t_sinline int LTnum(const TValue *v1, const TValue *v2) {
+t_sinline int32_t LTnum(const TValue *v1, const TValue *v2) {
     toku_assert(ttisnum(v1) && ttisnum(v2));
     if (ttisint(v1)) {
         toku_Integer i1 = ival(v1);
@@ -285,7 +285,7 @@ t_sinline int LTnum(const TValue *v1, const TValue *v2) {
     } else {
         toku_Number n1 = fval(v1);
         if (ttisflt(v2))
-            return t_numlt(n1, fval(v2));
+            return tokui_numlt(n1, fval(v2));
         else
             return floatLTint(n1, ival(v2));
     }
@@ -293,7 +293,7 @@ t_sinline int LTnum(const TValue *v1, const TValue *v2) {
 
 
 /* 'less than' ordering '<' on non-number values */
-t_sinline int LTother(toku_State *T, const TValue *v1, const TValue *v2) {
+t_sinline int32_t LTother(toku_State *T, const TValue *v1, const TValue *v2) {
     if (ttisstring(v1) && ttisstring(v2))
         return tokuS_cmp(strval(v1), strval(v2)) < 0;
     else
@@ -302,7 +302,7 @@ t_sinline int LTother(toku_State *T, const TValue *v1, const TValue *v2) {
 
 
 /* 'less than' ordering '<' */
-int tokuV_orderlt(toku_State *T, const TValue *v1, const TValue *v2) {
+int32_t tokuV_orderlt(toku_State *T, const TValue *v1, const TValue *v2) {
     if (ttisnum(v1) && ttisnum(v2))
         return LTnum(v1, v2);
     return LTother(T, v1, v2);
@@ -313,7 +313,7 @@ int tokuV_orderlt(toku_State *T, const TValue *v1, const TValue *v2) {
 ** Equality ordering '=='.
 ** In case 'T' is NULL perform raw equality (without invoking '__eq').
 */
-int tokuV_ordereq(toku_State *T, const TValue *v1, const TValue *v2) {
+int32_t tokuV_ordereq(toku_State *T, const TValue *v1, const TValue *v2) {
     toku_Integer i1, i2;
     const TValue *tm;
     if (ttypetag(v1) != ttypetag(v2)) {
@@ -325,7 +325,7 @@ int tokuV_ordereq(toku_State *T, const TValue *v1, const TValue *v2) {
     switch (ttypetag(v1)) {
         case TOKU_VNIL: case TOKU_VFALSE: case TOKU_VTRUE: return 1;
         case TOKU_VNUMINT: return ival(v1) == ival(v2);
-        case TOKU_VNUMFLT: return t_numeq(fval(v1), fval(v2));
+        case TOKU_VNUMFLT: return tokui_numeq(fval(v1), fval(v2));
         case TOKU_VLCF: return lcfval(v1) == lcfval(v2);
         case TOKU_VLIGHTUSERDATA: return pval(v1) == pval(v2);
         case TOKU_VSHRSTR: return eqshrstr(strval(v1), strval(v2));
@@ -376,7 +376,7 @@ void tokuV_rawsetstr(toku_State *T, const TValue *o, const TValue *k,
         case TOKU_VINSTANCE:
             t = insval(o)->fields;
         set_table: {
-            int hres;
+            int32_t hres;
             tokuV_fastset(t, strval(k), v, hres, tokuH_psetstr);
             if (hres == HOK)
                 tokuV_finishfastset(T, t, v);
@@ -413,7 +413,7 @@ void tokuV_rawsetint(toku_State *T, const TValue *o, const TValue *k,
         case TOKU_VINSTANCE:
             t = insval(o)->fields;
         set_table: {
-            int hres;
+            int32_t hres;
             tokuV_fastset(t, ival(k), v, hres, tokuH_psetint);
             if (hres == HOK)
                 tokuV_finishfastset(T, t, v);
@@ -449,7 +449,7 @@ void tokuV_rawset(toku_State *T, const TValue *o, const TValue *k,
         case TOKU_VINSTANCE:
             t = insval(o)->fields;
         set_table: {
-            int hres;
+            int32_t hres;
             tokuV_fastset(t, k, v, hres, tokuH_pset);
             if (hres == HOK)
                 tokuV_finishfastset(T, t, v);
@@ -500,14 +500,14 @@ void tokuV_rawgetstr(toku_State *T, const TValue *o, const TValue *k,
             break;
         case TOKU_VTABLE: {
             TValue ret;
-            t_ubyte tag = tokuH_getstr(tval(o), strval(k), &ret);
+            uint8_t tag = tokuH_getstr(tval(o), strval(k), &ret);
             finishTget(T, tag, &ret, res);
             break;
         }
         case TOKU_VINSTANCE: {
             TValue ret;
             Instance *inst = insval(o);
-            t_ubyte tag = tokuH_getstr(inst->fields, strval(k), &ret);
+            uint8_t tag = tokuH_getstr(inst->fields, strval(k), &ret);
             if (tagisempty(tag)) { /* field not found? */
                 if (inst->oclass->methods) { /* have methods table? */
                     tag = tokuH_getstr(inst->oclass->methods, strval(k), &ret);
@@ -532,21 +532,22 @@ void tokuV_getstr(toku_State *T, const TValue *o, const TValue *k, SPtr res) {
 }
 
 
-void tokuV_rawgetint(toku_State *T, const TValue *o, const TValue *k, SPtr res) {
+void tokuV_rawgetint(toku_State *T, const TValue *o, const TValue *k,
+                                                     SPtr res) {
     switch (ttypetag(o)) {
         case TOKU_VLIST:
             tokuA_getindex(listval(o), ival(k), s2v(res));
             break;
         case TOKU_VTABLE: {
             TValue value;
-            t_ubyte tag = tokuH_getint(tval(o), ival(k), &value);
+            uint8_t tag = tokuH_getint(tval(o), ival(k), &value);
             finishTget(T, tag, &value, res);
             break;
         }
         case TOKU_VINSTANCE: {
             TValue ret;
             Instance *inst = insval(o);
-            t_ubyte tag = tokuH_getint(inst->fields, ival(k), &ret);
+            uint8_t tag = tokuH_getint(inst->fields, ival(k), &ret);
             if (tagisempty(tag)) {
                 if (inst->oclass->methods) {
                     tag = tokuH_getint(inst->oclass->methods, ival(k), &ret);
@@ -578,14 +579,14 @@ void tokuV_rawget(toku_State *T, const TValue *o, const TValue *k, SPtr res) {
             break;
         case TOKU_VTABLE: {
             TValue value;
-            t_ubyte tag = tokuH_get(tval(o), k, &value);
+            uint8_t tag = tokuH_get(tval(o), k, &value);
             finishTget(T, tag, &value, res);
             break;
         }
         case TOKU_VINSTANCE: {
             Instance *inst = insval(o);
             TValue value;
-            t_ubyte tag = tokuH_get(inst->fields, k, &value);
+            uint8_t tag = tokuH_get(inst->fields, k, &value);
             if (tagisempty(tag)) {
                 if (inst->oclass->methods) {
                     tag = tokuH_get(inst->oclass->methods, k, &value);
@@ -613,7 +614,7 @@ void tokuV_get(toku_State *T, const TValue *o, const TValue *k, SPtr res) {
 #define getsuper(T,inst,scls,k,res,f) { \
     if ((scls)->methods) { \
         TValue method; \
-        t_ubyte tag = f((scls)->methods, k, &method); \
+        uint8_t tag = f((scls)->methods, k, &method); \
         if (!tagisempty(tag)) { \
             newboundmethod(T, inst, &method, res); \
             vm_break; \
@@ -622,7 +623,7 @@ void tokuV_get(toku_State *T, const TValue *o, const TValue *k, SPtr res) {
     setnilval(s2v(res)); }
 
 
-t_sinline int checksuper(toku_State *T, TValue *o, int get, SPtr res) {
+t_sinline int32_t checksuper(toku_State *T, TValue *o, int32_t get, SPtr res) {
     OClass *scls;
     if (t_unlikely(!ttisinstance(o)))
         tokuD_runerror(T, "local 'self' is not an instance");
@@ -651,18 +652,18 @@ t_sinline int checksuper(toku_State *T, TValue *o, int get, SPtr res) {
 ** 'oldpc'. (Note that this correction is needed by the line hook, so it
 ** is done even when return hooks are off.)
 */
-static void rethook(toku_State *T, CallFrame *cf, int nres) {
+static void rethook(toku_State *T, CallFrame *cf, int32_t nres) {
     if (T->hookmask & TOKU_MASK_RET) { /* is return hook on? */
         SPtr firstres = T->sp.p - nres; /* index of first result */
-        int delta = 0; /* correction for vararg functions */
-        int ftransfer;
+        int32_t delta = 0; /* correction for vararg functions */
+        int32_t ftransfer;
         if (isTokudae(cf)) {
             Proto *p = cf_func(cf)->p;
             if (p->isvararg)
                 delta = cf->t.nvarargs + p->arity + 1;
         }
         cf->func.p += delta; /* if vararg, back to virtual 'func' */
-        ftransfer = cast(t_ushort, firstres - cf->func.p) - 1;
+        ftransfer = cast_u16(firstres - cf->func.p) - 1;
         toku_assert(ftransfer >= 0);
         tokuD_hook(T, TOKU_HOOK_RET, -1, ftransfer, nres); /* call it */
         cf->func.p -= delta;
@@ -673,8 +674,9 @@ static void rethook(toku_State *T, CallFrame *cf, int nres) {
 
 
 /* properly move results and if needed close variables */
-t_sinline void moveresults(toku_State *T, SPtr res, int nres, int wanted) {
-    int i;
+t_sinline void moveresults(toku_State *T, SPtr res, int32_t nres,
+                                                    int32_t wanted) {
+    int32_t i;
     SPtr firstresult;
     switch (wanted) {
         case TOKU_MULTRET: /* all values needed */
@@ -718,20 +720,20 @@ t_sinline void moveresults(toku_State *T, SPtr res, int nres, int wanted) {
 
 #define next_cf(T)   ((T)->cf->next ? (T)->cf->next : tokuT_newcf(T))
 
-t_sinline CallFrame *prepCallframe(toku_State *T, SPtr func, int nres,
-                                   int mask, SPtr top) {
+t_sinline CallFrame *prepCallframe(toku_State *T, SPtr func, int32_t nres,
+                                   int32_t mask, SPtr top) {
     CallFrame *cf = T->cf = next_cf(T);
     cf->func.p = func;
     cf->top.p = top;
     cf->nresults = nres;
-    cf->status = cast_ubyte(mask);
+    cf->status = cast_u8(mask);
     return cf;
 }
 
 
 /* move the results into correct place and return to caller */
-t_sinline void poscall(toku_State *T, CallFrame *cf, int nres) {
-    int wanted = cf->nresults;
+t_sinline void poscall(toku_State *T, CallFrame *cf, int32_t nres) {
+    int32_t wanted = cf->nresults;
     if (t_unlikely(T->hookmask && !hastocloseCfunc(wanted)))
         rethook(T, cf, nres);
     /* move results to proper place */
@@ -742,15 +744,16 @@ t_sinline void poscall(toku_State *T, CallFrame *cf, int nres) {
 }
 
 
-t_sinline int precallC(toku_State *T, SPtr func, int nres, toku_CFunction f) {
-    int n;
+t_sinline int32_t precallC(toku_State *T, SPtr func, int32_t nres,
+                                                     toku_CFunction f) {
+    int32_t n;
     CallFrame *cf;
     checkstackGCp(T, TOKU_MINSTACK, func); /* ensure minimum stack space */
     T->cf = cf = prepCallframe(T, func, nres, CFST_CCALL,
                                               T->sp.p + TOKU_MINSTACK);
     toku_assert(cf->top.p <= T->stackend.p);
     if (t_unlikely(T->hookmask & TOKU_MASK_CALL)) {
-        int narg = cast_int(T->sp.p - func) - 1;
+        int32_t narg = cast_i32(T->sp.p - func) - 1;
         tokuD_hook(T, TOKU_HOOK_CALL, -1, 0, narg);
     }
     toku_unlock(T);
@@ -786,7 +789,7 @@ t_sinline SPtr trymetacall(toku_State *T, SPtr func) {
 }
 
 
-CallFrame *precall(toku_State *T, SPtr func, int nres) {
+CallFrame *precall(toku_State *T, SPtr func, int32_t nres) {
 retry:
     switch (ttypetag(s2v(func))) {
         case TOKU_VCCL: /* C closure */
@@ -798,9 +801,9 @@ retry:
         case TOKU_VTCL: { /* Tokudae closure */
             CallFrame *cf;
             Proto *p = clTval(s2v(func))->p;
-            int nargs = cast_int(T->sp.p - func - 1); /* num of args received */
-            int nparams = p->arity; /* number of fixed parameters */
-            int fsize = p->maxstack; /* frame size */
+            int32_t nargs = cast_i32(T->sp.p - func - 1); /*num args received*/
+            int32_t nparams = p->arity; /* number of fixed parameters */
+            int32_t fsize = p->maxstack; /* frame size */
             checkstackGCp(T, fsize, func);
             T->cf = cf = prepCallframe(T, func, nres, 0, func + 1 + fsize);
             cf->t.pc = cf->t.pcret = p->code; /* set starting point */
@@ -821,7 +824,7 @@ retry:
             ;
             if (fasttm(T, mt, TM_INIT)) { /* have __init ? */
                 checkstackGCp(T, 1, func); /* space for 'tm' */
-                tm = fasttm(T, ins->oclass->metatable, TM_INIT); /* (after GC) */
+                tm = fasttm(T, ins->oclass->metatable, TM_INIT); /*(after GC)*/
                 if (t_likely(tm)) { /* have __init (after GC)? */
                     auxinsertf(T, func, tm); /* insert it into stack... */
                     goto retry; /* ...and try calling it */
@@ -855,14 +858,14 @@ retry:
 }
 
 
-t_sinline void ccall(toku_State *T, SPtr func, int nresults, t_uint32 inc) {
+t_sinline void ccall(toku_State *T, SPtr func, int32_t nres, uint32_t inc) {
     CallFrame *cf;
     T->nCcalls += inc;
     if (t_unlikely(getCcalls(T) >= TOKUI_MAXCCALLS)) {
         checkstackp(T, 0, func); /* free any use of EXTRA_STACK */
         tokuT_checkCstack(T);
     }
-    if ((cf = precall(T, func, nresults)) != NULL) { /* Tokudae function? */
+    if ((cf = precall(T, func, nres)) != NULL) { /* Tokudae function? */
         cf->status = CFST_FRESH; /* mark it as a "fresh" execute */
         tokuV_execute(T, cf); /* call it */
     }
@@ -871,15 +874,15 @@ t_sinline void ccall(toku_State *T, SPtr func, int nresults, t_uint32 inc) {
 
 
 /* external interface for 'ccall' */
-void tokuV_call(toku_State *T, SPtr func, int nresults) {
-    ccall(T, func, nresults, nyci);
+void tokuV_call(toku_State *T, SPtr func, int32_t nres) {
+    ccall(T, func, nres, nyci);
 }
 
 
 #define isemptystr(v)   (ttisshrstring(v) && strval(v)->shrlen == 0)
 
 
-static void copy2buff(SPtr top, int n, char *buff) {
+static void copy2buff(SPtr top, int32_t n, char *buff) {
     size_t done = 0;
     do {
         OString *s = strval(s2v(top - n));
@@ -890,17 +893,17 @@ static void copy2buff(SPtr top, int n, char *buff) {
 }
 
 
-void tokuV_concat(toku_State *T, int total) {
+void tokuV_concat(toku_State *T, int32_t total) {
     if (total == 1)
         return; /* done */
     do {
         SPtr top = T->sp.p;
-        int n = 2; /* number of elements (minimum 2) */
+        int32_t n = 2; /* number of elements (minimum 2) */
         if (!(ttisstring(s2v(top - 2)) && ttisstring(s2v(top - 1))))
             tokuTM_tryconcat(T); /* at least one operand is not a string */
-        else if (isemptystr(s2v(top - 1))) /* second operand is empty string? */
+        else if (isemptystr(s2v(top - 1))) /*second operand is empty string?*/
             ; /* result already in the first operand */
-        else if (isemptystr(s2v(top - 2))) { /* first operand is empty string? */
+        else if (isemptystr(s2v(top - 2))) { /*first operand is empty string?*/
             setobjs2s(T, top - 2, top - 1); /* result is second operand */
         } else { /* at least two non-empty strings */
             size_t ltotal = getstrlen(strval(s2v(top - 1)));
@@ -961,7 +964,7 @@ static void doinherit(toku_State *T, OClass *cls, OClass *supcls) {
 #define log2size1(b)     ((b > 0) ? (1<<((b)-1)) : 0)
 
 
-t_sinline void pushclass(toku_State *T, int b) {
+t_sinline void pushclass(toku_State *T, int32_t b) {
     OClass *cls = tokuTM_newclass(T);
     setclsval2s(T, T->sp.p++, cls);
     if (b & 0x80) { /* have metatable entries? */
@@ -970,12 +973,12 @@ t_sinline void pushclass(toku_State *T, int b) {
     }
     if (b > 0) { /* have methods? */
         cls->methods = tokuH_new(T);
-        tokuH_resize(T, cls->methods, cast_uint(log2size1(b)));
+        tokuH_resize(T, cls->methods, cast_u32(log2size1(b)));
     }
 }
 
 
-t_sinline void pushlist(toku_State *T, int b) {
+t_sinline void pushlist(toku_State *T, int32_t b) {
     List *l = tokuA_new(T);
     setlistval2s(T, T->sp.p++, l);
     if (b > 0) /* list is not empty? */
@@ -983,11 +986,11 @@ t_sinline void pushlist(toku_State *T, int b) {
 }
 
 
-t_sinline void pushtable(toku_State *T, int b) {
+t_sinline void pushtable(toku_State *T, int32_t b) {
     Table *t = tokuH_new(T);
     settval2s(T, T->sp.p++, t);
     if (b > 0) /* table is not empty? */
-        tokuH_resize(T, t, cast_uint(log2size1(b)));
+        tokuH_resize(T, t, cast_u32(log2size1(b)));
 }
 
 
@@ -1056,7 +1059,7 @@ t_sinline void pushtable(toku_State *T, int b) {
 #define op_arithIf(T,fop) { \
     TValue *v = peek(0); \
     toku_Number n = 0; /* to prevent warnings on MSVC */ \
-    int imm; \
+    int32_t imm; \
     savestate(T); \
     imm = fetch_l(); \
     imm = IMML(imm); \
@@ -1071,7 +1074,7 @@ t_sinline void pushtable(toku_State *T, int b) {
 /* arithmetic operations with immediate operand */
 #define op_arithI(T,iop,fop) { \
     TValue *v = peek(0); \
-    int imm; \
+    int32_t imm; \
     savestate(T); \
     imm = fetch_l(); \
     imm = IMML(imm); \
@@ -1141,7 +1144,7 @@ t_sinline void pushtable(toku_State *T, int b) {
 /* bitwise operations with immediate operand */
 #define op_bitwiseI(T,op) { \
     TValue *v = peek(0); \
-    int imm; \
+    int32_t imm; \
     savestate(T); \
     imm = fetch_l(); \
     imm = IMML(imm); \
@@ -1185,7 +1188,7 @@ t_sinline void pushtable(toku_State *T, int b) {
     TValue *res = peek(1); \
     TValue *v1 = res; \
     TValue *v2 = peek(0); \
-    int cond; \
+    int32_t cond; \
     savestate(T); \
     if (fetch_s()) t_swap(v1, v2); \
     if (ttisint(v1) && ttisint(v2)) { \
@@ -1207,8 +1210,8 @@ t_sinline void pushtable(toku_State *T, int b) {
 
 /* order operations with immediate operand */
 #define op_orderI(T,iop,fop) { \
-    int cond = 0; /* to prevent warnings */ \
-    int imm; \
+    int32_t cond = 0; /* to prevent warnings */ \
+    int32_t imm; \
     savestate(T); \
     imm = fetch_l(); \
     imm = IMML(imm); \
@@ -1265,7 +1268,7 @@ t_sinline void pushtable(toku_State *T, int b) {
 
 /*
 ** Store global 'pc' and 'sp', must be done before fetching the
-** instruction arguments (via fetch_l/fetch_s) in order to properly fetch
+** opcode arguments (via fetch_l/fetch_s) in order to properly fetch
 ** debug information for the error message (if error occurrs).
 */
 #define savestate(T)        (storepc(T), storesp(T))
@@ -1279,7 +1282,7 @@ t_sinline void pushtable(toku_State *T, int b) {
 #define checkGC(T)      tokuG_condGC(T, (void)0, updatetrap(cf))
 
 
-/* fetch instruction */
+/* fetch opcode */
 #define fetch() { \
     if (t_unlikely(trap)) { /* stack reallocation or hooks? */ \
         ptrdiff_t sizestack = sp - base; \
@@ -1290,14 +1293,14 @@ t_sinline void pushtable(toku_State *T, int b) {
     I = *(pc++); \
 }
 
-/* fetch short instruction argument */
+/* fetch short opcode argument */
 #define fetch_s()       (*(pc++))
 
-/* fetch long instruction argument */
+/* fetch long opcode argument */
 #define fetch_l()       (pc += SIZE_ARG_L, get3bytes(pc - SIZE_ARG_L))
 
 
-#define hookdelta()     (getopSize(*pc) + SIZE_INSTR)
+#define hookdelta()     (getopSize(*pc) + SIZE_OPCODE)
 
 
 /* In cases where jump table is not available or prefered. */
@@ -1307,11 +1310,11 @@ t_sinline void pushtable(toku_State *T, int b) {
 
 
 /*
-** Do a conditional jump: skip next instruction if 'cond_' is not what
-** was expected, else do next instruction, which must be a jump.
+** Do a conditional jump: skip next opcode if 'cond_' is not what
+** was expected, else do next opcode, which must be a jump.
 */
 #define docondjumppre(pre) \
-    { int cond_ = fetch_s(); TValue *v = peek(0); pre; \
+    { int32_t cond_ = fetch_s(); TValue *v = peek(0); pre; \
       if ((!t_isfalse(v)) != cond_) check_exp(getopSize(*pc) == 4, pc += 4); \
       vm_break; }
 
@@ -1323,8 +1326,8 @@ void tokuV_execute(toku_State *T, CallFrame *cf) {
     TValue *k;                  /* constants */
     SPtr base;                  /* frame stack base */
     SPtr sp;                    /* local stack pointer (for performance) */
-    const Instruction *pc;      /* program counter */
-    int trap;                   /* true if 'base' reallocated */
+    const uint8_t *pc;      /* program counter */
+    int32_t trap;                   /* true if 'base' reallocated */
 #if TOKU_USE_JUMPTABLE
 #include "tjmptable.h"
 #endif
@@ -1341,7 +1344,7 @@ returning: /* trap already set */
     base = cf->func.p + 1;
     /* main loop of interpreter */
     for (;;) {
-        Instruction I; /* instruction being executed */
+        uint8_t I; /* opcode being executed */
         fetch();
         debugline(cl->p, pc);
         toku_assert(base == cf->func.p + 1);
@@ -1358,7 +1361,7 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_NIL) {
-                int n = fetch_l();
+                int32_t n = fetch_l();
                 while (n--) setnilval(s2v(sp++));
                 vm_break;
             }
@@ -1383,25 +1386,25 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_CONSTI) {
-                int imm = fetch_s();
+                int32_t imm = fetch_s();
                 setival(s2v(sp), IMM(imm));
                 sp++;
                 vm_break;
             }
             vm_case(OP_CONSTIL) {
-                int imm = fetch_l();
+                int32_t imm = fetch_l();
                 setival(s2v(sp), IMML(imm));
                 sp++;
                 vm_break;
             }
             vm_case(OP_CONSTF) {
-                int imm = fetch_s();
+                int32_t imm = fetch_s();
                 setfval(s2v(sp), cast_num(IMM(imm)));
                 sp++;
                 vm_break;
             }
             vm_case(OP_CONSTFL) {
-                int imm = fetch_l();
+                int32_t imm = fetch_l();
                 setfval(s2v(sp), cast_num(IMML(imm)));
                 sp++;
                 vm_break;
@@ -1456,7 +1459,7 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_METHOD) {
-                int hres;
+                int32_t hres;
                 Table *t = classval(peek(1))->methods;
                 TValue *f = peek(0);
                 TValue *key;
@@ -1478,13 +1481,13 @@ returning: /* trap already set */
                 Table *mt = classval(peek(1))->metatable;
                 TValue *v = peek(0);
                 OString *key;
-                int hres;
+                int32_t hres;
                 TM ev;
                 savestate(T);
                 toku_assert(mt != NULL);
                 ev = asTM(fetch_s());
                 key = eventstring(T, ev);
-                toku_assert(cast_uint(ev) < TM_NUM);
+                toku_assert(cast_u32(ev) < TM_NUM);
                 tokuV_fastset(mt, key, v, hres, tokuH_psetstr);
                 if (t_likely(hres == HOK))
                     tokuV_finishfastset(T, mt, v);
@@ -1502,7 +1505,7 @@ returning: /* trap already set */
                 Table *mt = classval(peek(1))->metatable;
                 TValue *v = peek(0);
                 TValue *key;
-                int hres;
+                int32_t hres;
                 savestate(T);
                 toku_assert(mt != NULL);
                 key = K(fetch_l());
@@ -1531,23 +1534,23 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_ADDK) {
-                op_arithK(T, iadd, t_numadd);
+                op_arithK(T, iadd, tokui_numadd);
                 vm_break;
             }
             vm_case(OP_SUBK) {
-                op_arithK(T, isub, t_numsub);
+                op_arithK(T, isub, tokui_numsub);
                 vm_break;
             }
             vm_case(OP_MULK) {
-                op_arithK(T, imul, t_nummul);
+                op_arithK(T, imul, tokui_nummul);
                 vm_break;
             }
             vm_case(OP_DIVK) {
-                op_arithKf(T, t_numdiv);
+                op_arithKf(T, tokui_numdiv);
                 vm_break;
             }
             vm_case(OP_IDIVK) {
-                op_arithK(T, tokuV_divi, t_numidiv);
+                op_arithK(T, tokuV_divi, tokui_numidiv);
                 vm_break;
             }
             vm_case(OP_MODK) {
@@ -1555,7 +1558,7 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_POWK) {
-                op_arithKf(T, t_numpow);
+                op_arithKf(T, tokui_numpow);
                 vm_break;
             }
             vm_case(OP_BSHLK) {
@@ -1579,23 +1582,23 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_ADDI) {
-                op_arithI(T, iadd, t_numadd);
+                op_arithI(T, iadd, tokui_numadd);
                 vm_break;
             }
             vm_case(OP_SUBI) {
-                op_arithI(T, isub, t_numsub);
+                op_arithI(T, isub, tokui_numsub);
                 vm_break;
             }
             vm_case(OP_MULI) {
-                op_arithI(T, imul, t_nummul);
+                op_arithI(T, imul, tokui_nummul);
                 vm_break;
             }
             vm_case(OP_DIVI) {
-                op_arithIf(T, t_numdiv);
+                op_arithIf(T, tokui_numdiv);
                 vm_break;
             }
             vm_case(OP_IDIVI) {
-                op_arithI(T, tokuV_divi, t_numidiv);
+                op_arithI(T, tokuV_divi, tokui_numidiv);
                 vm_break;
             }
             vm_case(OP_MODI) {
@@ -1603,7 +1606,7 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_POWI) {
-                op_arithIf(T, t_numpow);
+                op_arithIf(T, tokui_numpow);
                 vm_break;
             }
             vm_case(OP_BSHLI) {
@@ -1627,24 +1630,24 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_ADD) {
-                op_arith(T, iadd, t_numadd);
+                op_arith(T, iadd, tokui_numadd);
                 vm_break;
             }
             vm_case(OP_SUB) {
-                op_arith(T, isub, t_numsub);
+                op_arith(T, isub, tokui_numsub);
                 vm_break;
             }
             vm_case(OP_MUL) {
-                op_arith(T, imul, t_nummul);
+                op_arith(T, imul, tokui_nummul);
                 vm_break;
             }
             vm_case(OP_DIV) {
-                op_arithf(T, t_numdiv);
+                op_arithf(T, tokui_numdiv);
                 vm_break;
             }
             vm_case(OP_IDIV) {
                 savestate(T);
-                op_arith(T, tokuV_divi, t_numidiv);
+                op_arith(T, tokuV_divi, tokui_numidiv);
                 vm_break;
             }
             vm_case(OP_MOD) {
@@ -1653,7 +1656,7 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_POW) {
-                op_arithf(T, t_numpow);
+                op_arithf(T, tokui_numpow);
                 vm_break;
             }
             vm_case(OP_BSHL) {
@@ -1677,7 +1680,7 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_CONCAT) {
-                int total;
+                int32_t total;
                 savestate(T);
                 total = fetch_l();
                 Protect(tokuV_concat(T, total));
@@ -1688,45 +1691,45 @@ returning: /* trap already set */
             vm_case(OP_EQK) {
                 TValue *v1 = peek(0);
                 const TValue *vk = K(fetch_l());
-                int eq = fetch_s();
-                int cond = tokuV_raweq(v1, vk);
+                int32_t eq = fetch_s();
+                int32_t cond = tokuV_raweq(v1, vk);
                 setorderres(v1, cond, eq);
                 vm_break;
             }
             vm_case(OP_EQI) {
                 TValue *v1 = peek(0);
-                int imm = fetch_l();
-                int eq = fetch_s();
-                int cond;
+                int32_t imm = fetch_l();
+                int32_t eq = fetch_s();
+                int32_t cond;
                 if (ttisint(v1))
                     cond = (ival(v1) == IMML(imm));
                 else if (ttisflt(v1))
-                    cond = t_numeq(fval(v1), IMML(imm));
+                    cond = tokui_numeq(fval(v1), IMML(imm));
                 else
                     cond = 0;
                 setorderres(v1, cond, eq);
                 vm_break;
             }
             vm_case(OP_LTI) {
-                op_orderI(T, ilt, t_numlt);
+                op_orderI(T, ilt, tokui_numlt);
                 vm_break;
             }
             vm_case(OP_LEI) {
-                op_orderI(T, ile, t_numle);
+                op_orderI(T, ile, tokui_numle);
                 vm_break;
             }
             vm_case(OP_GTI) {
-                op_orderI(T, igt, t_numgt);
+                op_orderI(T, igt, tokui_numgt);
                 vm_break;
             }
             vm_case(OP_GEI) {
-                op_orderI(T, ige, t_numge);
+                op_orderI(T, ige, tokui_numge);
                 vm_break;
             }
             vm_case(OP_EQ) {
                 TValue *v1 = peek(1);
                 TValue *v2 = peek(0);
-                int condexp, cond;
+                int32_t condexp, cond;
                 savestate(T);
                 condexp = fetch_s();
                 Protect(cond = tokuV_ordereq(T, v1, v2));
@@ -1745,7 +1748,7 @@ returning: /* trap already set */
             vm_case(OP_EQPRESERVE) {
                 TValue *v1 = peek(1);
                 TValue *v2 = peek(0);
-                int cond;
+                int32_t cond;
                 savestate(T);
                 Protect(cond = tokuV_ordereq(T, v1, v2));
                 setorderres(v2, cond, 1);
@@ -1766,7 +1769,7 @@ returning: /* trap already set */
                     setival(v, intop(-, 0, ib));
                 } else if (ttisflt(v)) {
                     toku_Number n = fval(v);
-                    setfval(v, t_numunm(T, n));
+                    setfval(v, tokui_numunm(T, n));
                 } else {
                     savestate(T);
                     Protect(tokuTM_tryunary(T, v, sp-1, TM_UNM));
@@ -1785,13 +1788,13 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_JMP) {
-                int offset = fetch_l();
+                int32_t offset = fetch_l();
                 pc += offset;
                 updatetrap(cf);
                 vm_break;
             }
             vm_case(OP_JMPS) {
-                int offset = fetch_l();
+                int32_t offset = fetch_l();
                 pc -= offset;
                 updatetrap(cf);
                 vm_break;
@@ -1805,7 +1808,7 @@ returning: /* trap already set */
             vm_case(OP_CALL) {
                 CallFrame *newcf;
                 SPtr func;
-                int nres;
+                int32_t nres;
                 savestate(T);
                 func = STK(fetch_l());
                 nres = fetch_l() - 1;
@@ -1817,7 +1820,7 @@ returning: /* trap already set */
                     goto startfunc;
                 }
                 /* recalculate 'sp' from maybe outdated (current) 'base' */
-                sp = base + (cast_int(T->sp.p - cf->func.p) - 1);
+                sp = base + (cast_i32(T->sp.p - cf->func.p) - 1);
                 vm_break;
             }
             vm_case(OP_CLOSE) {
@@ -1832,7 +1835,7 @@ returning: /* trap already set */
             }
             vm_case(OP_CHECKADJ) {
                 SPtr first = STK(fetch_l());
-                int nres = fetch_l() - 1;
+                int32_t nres = fetch_l() - 1;
                 toku_assert(0 <= nres); /* must be fixed */
                 sp = first + nres;
                 vm_break;
@@ -1862,7 +1865,7 @@ returning: /* trap already set */
             vm_case(OP_SETLIST) {
                 List *l;
                 SPtr sl;
-                int len, n;
+                int32_t len, n;
                 savestate(T);
                 sl = STK(fetch_l()); /* list stack slot */
                 l = listval(s2v(sl)); /* 'sl' as list value */
@@ -1870,10 +1873,10 @@ returning: /* trap already set */
                 n = fetch_s(); /* num of elements to store */
                 if (l->len == len) { /* list has no prior holes? */
                     if (n == 0)
-                        n = cast_int(sp - sl - 1); /* get up to the top */
+                        n = cast_i32(sp - sl - 1); /* get up to the top */
                     toku_assert(0 <= n);
                     tokuA_ensure(T, l, len + n);
-                    for (int i = 0; i < n; i++) { /* set the list */
+                    for (int32_t i = 0; i < n; i++) { /* set the list */
                         TValue *v = s2v(sl + i + 1);
                         if (ttisnil(v)) break; /* value creates a hole? */
                         tokuA_fastset(T, l, len, v); 
@@ -1950,7 +1953,7 @@ returning: /* trap already set */
             vm_case(OP_GETINDEXINT) {
                 TValue *v = peek(0);
                 TValue i;
-                int imm;
+                int32_t imm;
                 savestate(T);
                 imm = fetch_s();
                 setival(&i, IMM(imm));
@@ -1960,7 +1963,7 @@ returning: /* trap already set */
             vm_case(OP_GETINDEXINTL) {
                 TValue *v = peek(0);
                 TValue i;
-                int imm;
+                int32_t imm;
                 savestate(T);
                 imm = fetch_l();
                 setival(&i, IMML(imm));
@@ -2024,13 +2027,13 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_FORPREP) {
-                int offset;
+                int32_t offset;
                 savestate(T);
                 /* create to-be-closed upvalue (if any) */
                 tokuF_newtbcvar(T, STK(fetch_l()) + VAR_TBC);
                 offset = fetch_l();
                 pc += offset;
-                /* go to the next instruction */
+                /* go to the next opcode */
                 I = *(pc++);
                 toku_assert(I == OP_FORCALL);
                 goto l_forcall;
@@ -2051,8 +2054,8 @@ returning: /* trap already set */
                 T->sp.p = stk + VAR_N + VAR_CNTL + 1;
                 Protect(tokuV_call(T, stk + VAR_N + VAR_ITER, fetch_l()));
                 updatestack(cf); /* stack may have changed */
-                sp = T->sp.p; /* correct sp for next instruction */
-                /* go to the next instruction */
+                sp = T->sp.p; /* correct sp for next opcode */
+                /* go to the next opcode */
                 I = *(pc++);
                 toku_assert(I == OP_FORLOOP);
                 goto l_forloop;
@@ -2060,8 +2063,8 @@ returning: /* trap already set */
             vm_case(OP_FORLOOP) {
             l_forloop: {
                 SPtr stk = STK(fetch_l());
-                int offset = fetch_l();
-                int nvars = fetch_l();
+                int32_t offset = fetch_l();
+                int32_t nvars = fetch_l();
                 if (!ttisnil(s2v(stk + VAR_N))) { /* continue loop? */
                     /* save control variable (first iterator result) */
                     setobjs2s(T, stk + VAR_CNTL, stk + VAR_N + VAR_ITER);
@@ -2072,12 +2075,12 @@ returning: /* trap already set */
             }}
             vm_case(OP_RETURN) {
                 SPtr stk;
-                int nres; /* number of results */
+                int32_t nres; /* number of results */
                 savestate(T);
                 stk = STK(fetch_l());
                 nres = fetch_l() - 1;
                 if (nres < 0) /* not fixed ? */
-                    nres = cast_int(sp - stk);
+                    nres = cast_i32(sp - stk);
                 if (fetch_s()) { /* have open upvalues? */
                     tokuF_close(T, base, CLOSEKTOP);
                     updatetrap(cf);

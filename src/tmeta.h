@@ -18,7 +18,7 @@
 ** corresponding metamethod field. (Bit 7 of the flag indicates that
 ** the table is using the dummy node.)
 */
-#define maskflags   cast_ubyte(~(~0u << (TM_INIT + 1)))
+#define maskflags   cast_u8(~(~0u << (TM_INIT + 1)))
 
 
 #define notm(tm)    ttisnil(tm)
@@ -84,31 +84,40 @@ TOKUI_FUNC const TValue *tokuTM_objget(toku_State *T, const TValue *o,
 TOKUI_FUNC const TValue *tokuTM_get(Table *events, TM event, OString *ename);
 TOKUI_FUNC OClass *tokuTM_newclass(toku_State *T);
 TOKUI_FUNC Instance *tokuTM_newinstance(toku_State *T, OClass *cls);
-TOKUI_FUNC UserData *tokuTM_newuserdata(toku_State *T, size_t size, t_ushort nuv);
+TOKUI_FUNC UserData *tokuTM_newuserdata(toku_State *T, size_t size,
+                                                       uint16_t nuv);
 TOKUI_FUNC IMethod *tokuTM_newinsmethod(toku_State *T, Instance *receiver,
-                                        const TValue *method);
+                                                       const TValue *method);
 TOKUI_FUNC int tokuTM_eqim(const IMethod *v1, const IMethod *v2);
 TOKUI_FUNC UMethod *tokuTM_newudmethod(toku_State *T, UserData *ud,
-                                       const TValue *method);
+                                                      const TValue *method);
 TOKUI_FUNC int tokuTM_equm(const UMethod *v1, const UMethod *v2);
 TOKUI_FUNC const char *tokuTM_objtypename(toku_State *T, const TValue *o);
 TOKUI_FUNC void tokuTM_callset(toku_State *T, const TValue *fn,
-                               const TValue *o, const TValue *k,
-                               const TValue *v);
+                                              const TValue *o,
+                                              const TValue *k,
+                                              const TValue *v);
 TOKUI_FUNC void tokuTM_callgetres(toku_State *T, const TValue *fn,
-                                  const TValue *o, const TValue *k,
-                                  SPtr res);
+                                                 const TValue *o,
+                                                 const TValue *k,
+                                                 SPtr res);
 TOKUI_FUNC void tokuTM_callbinres(toku_State *T, const TValue *fn,
-                                  const TValue *v1, const TValue *v2,
-                                  SPtr res);
+                                                 const TValue *v1,
+                                                 const TValue *v2,
+                                                 SPtr res);
 TOKUI_FUNC void tokuTM_callunaryres(toku_State *T, const TValue *fn,
-                                    const TValue *o, SPtr res);
-TOKUI_FUNC int tokuTM_order(toku_State *T, const TValue *v1, const TValue *v2,
-                            TM event);
+                                                   const TValue *o,
+                                                   SPtr res);
+TOKUI_FUNC int tokuTM_order(toku_State *T, const TValue *v1,
+                                           const TValue *v2,
+                                           TM event);
 TOKUI_FUNC void tokuTM_trybin(toku_State *T, const TValue *v1,
-                              const TValue *v2, SPtr res, TM event);
+                                             const TValue *v2,
+                                             SPtr res,
+                                             TM event);
 TOKUI_FUNC void tokuTM_tryunary(toku_State *T, const TValue *o,
-                                SPtr res, TM event);
+                                               SPtr res,
+                                               TM event);
 TOKUI_FUNC void tokuTM_tryconcat(toku_State *T);
 
 #endif

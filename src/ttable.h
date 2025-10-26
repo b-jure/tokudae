@@ -17,7 +17,7 @@
 ** may have any of these metamethods. (First access that fails after the
 ** clearing will set the bit again.)
 */
-#define invalidateTMcache(t)    ((t)->flags &= cast_ubyte(~maskflags))
+#define invalidateTMcache(t)    ((t)->flags &= cast_u8(~maskflags))
 
 
 #define nodeval(n)          (&(n)->i_val)
@@ -34,7 +34,7 @@
 */
 
 #define BITDUMMY            (1 << 7)
-#define NOTBITDUMMY         cast_ubyte(~BITDUMMY)
+#define NOTBITDUMMY         cast_u8(~BITDUMMY)
 #define isdummy(t)          ((t)->flags & BITDUMMY)
 
 #define setnodummy(t)       ((t)->flags &= NOTBITDUMMY)
@@ -66,10 +66,10 @@
 */
 
 
-TOKUI_FUNC t_ubyte tokuH_get(Table *t, const TValue *key, TValue *res);
-TOKUI_FUNC t_ubyte tokuH_getshortstr(Table *t, OString *key, TValue *res);
-TOKUI_FUNC t_ubyte tokuH_getstr(Table *t, OString *key, TValue *res);
-TOKUI_FUNC t_ubyte tokuH_getint(Table *t, toku_Integer key, TValue *res);
+TOKUI_FUNC uint8_t tokuH_get(Table *t, const TValue *key, TValue *res);
+TOKUI_FUNC uint8_t tokuH_getshortstr(Table *t, OString *key, TValue *res);
+TOKUI_FUNC uint8_t tokuH_getstr(Table *t, OString *key, TValue *res);
+TOKUI_FUNC uint8_t tokuH_getint(Table *t, toku_Integer key, TValue *res);
 
 /* special get for metamethods */
 TOKUI_FUNC const TValue *tokuH_Hgetshortstr(Table *t, OString *key);
@@ -90,7 +90,7 @@ TOKUI_FUNC void tokuH_finishset(toku_State *T, Table *t, const TValue *key,
                                 const TValue *value, int hres);
 
 TOKUI_FUNC Table *tokuH_new(toku_State *T);
-TOKUI_FUNC void tokuH_resize(toku_State *T, Table *t, t_uint newsize);
+TOKUI_FUNC void tokuH_resize(toku_State *T, Table *t, uint32_t newsize);
 TOKUI_FUNC void tokuH_copy(toku_State *T, Table *dest, Table *src);
 TOKUI_FUNC void tokuH_free(toku_State *T, Table *t);
 TOKUI_FUNC int tokuH_len(Table *t);

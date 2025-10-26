@@ -20,7 +20,7 @@
 #include "tokudaelimits.h"
 
 
-/* {=======================================================================
+/* {{======================================================================
 ** t_isregfile - fopen can treat directories as files, therefore if we are
 ** using POSIX or Windows, this function serves as a concrete test.
 ** In terms of ISO C, we assume the 'DIR*' returned by 'fopen' is a
@@ -52,9 +52,9 @@
 
 #if defined(TOKU_USE_POSIX) || defined(TOKU_USE_WINDOWS)    /* { */
 
-static int t_isregfile(const char *path, const char **msg) {
+static int32_t t_isregfile(const char *path, const char **msg) {
     struct t_stat st = {0};
-    int ok, mode;
+    int32_t ok, mode;
     errno = 0;
     ok = t_stat(path, &st);
     if (ok < 0) return errno;
@@ -95,7 +95,7 @@ static int t_isregfile(const char *path, const char **msg) {
 ** Errors
 ** ======================================================================== */
 
-TOKULIB_API int tokuL_error(toku_State *T, const char *fmt, ...) {
+TOKULIB_API int32_t tokuL_error(toku_State *T, const char *fmt, ...) {
     va_list ap;
     tokuL_where(T, 1);
     va_start(ap, fmt);
@@ -114,7 +114,7 @@ TOKULIB_API int tokuL_error(toku_State *T, const char *fmt, ...) {
 ** limit is the limit of recursive calls in case table field
 ** contains another table value.
 */
-static int findfield(toku_State *T, int idx, int limit) {
+static int32_t findfield(toku_State *T, int32_t idx, int32_t limit) {
     if (limit == 0 || !toku_is_table(T, -1))
         return 0; /* not found */
     toku_push_nil(T); /* start 'next' loop (from beginning) */
@@ -142,9 +142,9 @@ static int findfield(toku_State *T, int idx, int limit) {
 ** If function is global function, then the its name is pushed
 ** on the top of the stack.
 */
-static int push_glbfunc_name(toku_State *T, toku_Debug *ar) {
-    int top = toku_gettop(T); /* index of value on top of the stack */
-    int func = top + 1;
+static int32_t push_glbfunc_name(toku_State *T, toku_Debug *ar) {
+    int32_t top = toku_gettop(T); /* index of value on top of the stack */
+    int32_t func = top + 1;
     toku_getinfo(T, "f", ar); /* push function (top + 1) */
     toku_get_cfield_str(T, TOKU_LOADED_TABLE);
     tokuL_check_stack(T, 6, "not enough stack space"); /* for 'findfield' */
@@ -164,7 +164,8 @@ static int push_glbfunc_name(toku_State *T, toku_Debug *ar) {
 }
 
 
-TOKULIB_API int tokuL_error_arg(toku_State *T, int arg, const char *extra) {
+TOKULIB_API int32_t tokuL_error_arg(toku_State *T, int32_t arg,
+                                                   const char *extra) {
     toku_Debug ar;
     if (!toku_getstack(T, 0, &ar)) /* no stack frame? */
         return tokuL_error(T, "bad argument #%d (%s)", arg+1, extra);
@@ -172,15 +173,16 @@ TOKULIB_API int tokuL_error_arg(toku_State *T, int arg, const char *extra) {
     if (strcmp(ar.namewhat, "metamethod") == 0) {
         arg--; /* ignore 'self' */
         if (arg == -1) /* 'self' is the invalid argument? */
-            tokuL_error(T, "calling '%s' on a bad 'self' (%s)", ar.name, extra);
+            tokuL_error(T,"calling '%s' on a bad 'self' (%s)", ar.name, extra);
     }
     if (ar.name == NULL)
         ar.name = (push_glbfunc_name(T, &ar)) ? toku_to_string(T, -1) : "?";
-    return tokuL_error(T, "bad argument #%d to '%s' (%s)", arg+1, ar.name, extra);
+    return tokuL_error(T,"bad argument #%d to '%s' (%s)", arg+1,ar.name,extra);
 }
 
 
-TOKULIB_API int tokuL_error_type(toku_State *T, int arg, const char *tname) {
+TOKULIB_API int32_t tokuL_error_type(toku_State *T, int32_t arg,
+                                                    const char *tname) {
     const char *msg, *type;
     if (tokuL_get_metafield(T, arg, "__name") == TOKU_T_STRING)
         type = toku_to_string(T, -1);
@@ -191,7 +193,7 @@ TOKULIB_API int tokuL_error_type(toku_State *T, int arg, const char *tname) {
 }
 
 
-static void terror(toku_State *T, int arg, int t) {
+static void terror(toku_State *T, int32_t arg, int32_t t) {
     tokuL_error_type(T, arg, toku_typename(T, t));
 }
 
@@ -202,8 +204,8 @@ static void terror(toku_State *T, int arg, int t) {
 ** Required argument/option and other checks
 ** ======================================================================== */
 
-TOKULIB_API toku_Number tokuL_check_number(toku_State *T, int idx) {
-    int isnum;
+TOKULIB_API toku_Number tokuL_check_number(toku_State *T, int32_t idx) {
+    int32_t isnum;
     toku_Number n = toku_to_numberx(T, idx, &isnum);
     if (t_unlikely(!isnum))
         terror(T, idx, TOKU_T_NUMBER);
@@ -211,7 +213,7 @@ TOKULIB_API toku_Number tokuL_check_number(toku_State *T, int idx) {
 }
 
 
-static void interror(toku_State *T, int argindex) {
+static void interror(toku_State *T, int32_t argindex) {
     if (toku_is_number(T, argindex))
         tokuL_error_arg(T, argindex, "number has no integer representation");
     else
@@ -219,8 +221,8 @@ static void interror(toku_State *T, int argindex) {
 }
 
 
-TOKULIB_API toku_Integer tokuL_check_integer(toku_State *T, int idx) {
-    int isint;
+TOKULIB_API toku_Integer tokuL_check_integer(toku_State *T, int32_t idx) {
+    int32_t isint;
     toku_Integer i = toku_to_integerx(T, idx, &isint);
     if (t_unlikely(!isint))
         interror(T, idx);
@@ -228,7 +230,7 @@ TOKULIB_API toku_Integer tokuL_check_integer(toku_State *T, int idx) {
 }
 
 
-TOKULIB_API const char *tokuL_check_lstring(toku_State *T, int idx,
+TOKULIB_API const char *tokuL_check_lstring(toku_State *T, int32_t idx,
                                                            size_t *len) {
     const char *str = toku_to_lstring(T, idx, len);
     if (t_unlikely(str == NULL))
@@ -237,7 +239,8 @@ TOKULIB_API const char *tokuL_check_lstring(toku_State *T, int idx,
 }
 
 
-TOKULIB_API void *tokuL_check_userdata(toku_State *T, int idx, const char *n) {
+TOKULIB_API void *tokuL_check_userdata(toku_State *T, int32_t idx,
+                                                      const char *n) {
     void *p = tokuL_test_userdata(T, idx, n);
     if (t_unlikely(p == NULL))
         tokuL_error_type(T, idx, n);
@@ -245,7 +248,8 @@ TOKULIB_API void *tokuL_check_userdata(toku_State *T, int idx, const char *n) {
 }
 
 
-TOKULIB_API void tokuL_check_stack(toku_State *T, int sz, const char *msg) {
+TOKULIB_API void tokuL_check_stack(toku_State *T, int32_t sz,
+                                                  const char *msg) {
     if (t_unlikely(!toku_checkstack(T, sz))) {
         if (msg)
             tokuL_error(T, "stack overflow (%s)", msg);
@@ -255,23 +259,25 @@ TOKULIB_API void tokuL_check_stack(toku_State *T, int sz, const char *msg) {
 }
 
 
-TOKULIB_API void tokuL_check_type(toku_State *T, int arg, int t) {
+TOKULIB_API void tokuL_check_type(toku_State *T, int32_t arg, int32_t t) {
     if (t_unlikely(toku_type(T, arg) != t))
         terror(T, arg, t);
 }
 
 
-TOKULIB_API void tokuL_check_any(toku_State *T, int arg) {
+TOKULIB_API void tokuL_check_any(toku_State *T, int32_t arg) {
     if (t_unlikely(toku_type(T, arg) == TOKU_T_NONE))
         tokuL_error_arg(T, arg, "value expected");
 }
 
 
-TOKULIB_API int tokuL_check_option(toku_State *T, int arg, const char *dfl,
-                                   const char *const opts[]) {
+TOKULIB_API int32_t tokuL_check_option(toku_State *T,
+                                       int32_t arg,
+                                       const char *dfl,
+                                       const char *const opts[]) {
     const char *str = dfl ? tokuL_opt_string(T, arg, dfl)
                           : tokuL_check_string(T, arg);
-    for (int i = 0; opts[i]; i++)
+    for (int32_t i = 0; opts[i]; i++)
         if (strcmp(str, opts[i]) == 0)
             return i;
     return tokuL_error_arg(T, arg,
@@ -285,19 +291,19 @@ TOKULIB_API int tokuL_check_option(toku_State *T, int arg, const char *dfl,
 ** Optional argument
 ** ======================================================================== */
 
-TOKULIB_API toku_Number tokuL_opt_number(toku_State *T, int idx,
+TOKULIB_API toku_Number tokuL_opt_number(toku_State *T, int32_t idx,
                                                         toku_Number dfl) {
     return tokuL_opt(T, tokuL_check_number, idx, dfl);
 }
 
 
-TOKULIB_API toku_Integer tokuL_opt_integer(toku_State *T, int idx,
+TOKULIB_API toku_Integer tokuL_opt_integer(toku_State *T, int32_t idx,
                                                           toku_Integer dfl) {
     return tokuL_opt(T, tokuL_check_integer, idx, dfl);
 }
 
 
-TOKULIB_API const char *tokuL_opt_lstring(toku_State *T, int idx,
+TOKULIB_API const char *tokuL_opt_lstring(toku_State *T, int32_t idx,
                                           const char *dfl, size_t *plen) {
     if (toku_is_noneornil(T, idx)) {
         if (plen)
@@ -315,7 +321,7 @@ TOKULIB_API const char *tokuL_opt_lstring(toku_State *T, int idx,
 ** ======================================================================== */
 
 typedef struct LoadFile {
-    int n; /* number of pre-read characters */
+    int32_t n; /* number of pre-read characters */
     FILE *f; /* file being read */
     char buff[BUFSIZ];
 } LoadFile;
@@ -325,7 +331,7 @@ static const char *filereader(toku_State *T, void *data, size_t *szread) {
     LoadFile *lf = cast(LoadFile *, data);
     UNUSED(T); /* unused */
     if (lf->n > 0) { /* have pre-read characters ? */
-        *szread = cast_uint(lf->n);
+        *szread = cast_u32(lf->n);
         lf->n = 0;
     } else { /* read from a file */
         if (feof(lf->f)) return NULL;
@@ -335,8 +341,8 @@ static const char *filereader(toku_State *T, void *data, size_t *szread) {
 }
 
 
-static int errorfile(toku_State *T, const char *what, int fidx) {
-    int err = errno;
+static int32_t errorfile(toku_State *T, const char *what, int32_t fidx) {
+    int32_t err = errno;
     const char *fname = toku_to_string(T, fidx);
     if (err != 0)
         toku_push_fstring(T, "cannot %s %s: %s", what, fname, strerror(err)); 
@@ -347,16 +353,16 @@ static int errorfile(toku_State *T, const char *what, int fidx) {
 }
 
 
-TOKULIB_API int tokuL_loadfilex(toku_State *T, const char *fname,
+TOKULIB_API int32_t tokuL_loadfilex(toku_State *T, const char *fname,
                                                const char *mode) {
     LoadFile lf = {0};
-    int filename_index = toku_getntop(T);
-    int status, readstatus, c;
+    int32_t filename_index = toku_getntop(T);
+    int32_t status, readstatus, c;
     if (fname == NULL) { /* stdin? */
         toku_push_string(T, "=stdin");
         lf.f = stdin;
     } else { /* otherwise real file */
-        int stat;
+        int32_t stat;
         const char *msg = NULL;
         toku_push_fstring(T, "@%s", fname);
         if ((stat = t_isregfile(fname, &msg)) != TOKU_STATUS_OK) {
@@ -412,13 +418,14 @@ static const char *stringreader(toku_State *T, void *data, size_t *szread) {
 }
 
 
-TOKULIB_API int tokuL_loadstring(toku_State *T, const char *s) {
+TOKULIB_API int32_t tokuL_loadstring(toku_State *T, const char *s) {
     return tokuL_loadbuffer(T, s, strlen(s), s);
 }
 
 
-TOKULIB_API int tokuL_loadbufferx(toku_State *T, const char *buff, size_t sz,
-                                  const char *name, const char *mode) {
+TOKULIB_API int32_t tokuL_loadbufferx(toku_State *T, const char *buff,
+                                      size_t sz, const char *name,
+                                      const char *mode) {
     LoadString ls;
     ls.sz = sz;
     ls.str = buff;
@@ -432,7 +439,7 @@ TOKULIB_API int tokuL_loadbufferx(toku_State *T, const char *buff, size_t sz,
 ** Userdata and metatable functions
 ** ======================================================================== */
 
-TOKULIB_API int tokuL_new_metatable(toku_State *T, const char *tname) {
+TOKULIB_API int32_t tokuL_new_metatable(toku_State *T, const char *tname) {
     if (tokuL_get_metatable(T, tname) != TOKU_T_NIL) /* name already in use? */
         return 0; /* false; metatable already exists */
     toku_pop(T, 1); /* remove nil */
@@ -451,11 +458,12 @@ TOKULIB_API void tokuL_set_metatable(toku_State *T, const char *tname) {
 }
 
 
-TOKULIB_API int tokuL_get_metafield(toku_State *T, int idx, const char *ev) {
+TOKULIB_API int32_t tokuL_get_metafield(toku_State *T, int32_t idx,
+                                                       const char *ev) {
     if (!toku_get_metatable(T, idx))
         return TOKU_T_NIL;
     else {
-        int t = toku_get_field_str(T, -1, ev);
+        int32_t t = toku_get_field_str(T, -1, ev);
         if (t == TOKU_T_NIL)
             toku_pop(T, 2); /* remove metatable and nil */
         else
@@ -465,8 +473,9 @@ TOKULIB_API int tokuL_get_metafield(toku_State *T, int idx, const char *ev) {
 }
 
 
-TOKULIB_API int tokuL_callmeta(toku_State *T, int idx, const char *event) {
-    int t = toku_type(T, idx);
+TOKULIB_API int32_t tokuL_callmeta(toku_State *T, int32_t idx,
+                                                  const char *event) {
+    int32_t t = toku_type(T, idx);
     idx = toku_absindex(T, idx);
     if ((t != TOKU_T_INSTANCE && t != TOKU_T_USERDATA) ||
             tokuL_get_metafield(T, idx, event) == TOKU_T_NIL)
@@ -477,7 +486,8 @@ TOKULIB_API int tokuL_callmeta(toku_State *T, int idx, const char *event) {
 }
 
 
-TOKULIB_API void *tokuL_test_userdata(toku_State *T, int idx, const char *tn) {
+TOKULIB_API void *tokuL_test_userdata(toku_State *T, int32_t idx,
+                                                     const char *tn) {
     void *p = tokuL_to_fulluserdata(T, idx);
     if (p != NULL) { /* 'idx' is full userdata? */
         if (toku_get_metatable(T, 0)) { /* it has a metatable? */
@@ -498,8 +508,9 @@ TOKULIB_API void *tokuL_test_userdata(toku_State *T, int idx, const char *tn) {
 ** File/Exec result process functions
 ** ======================================================================== */
 
-TOKULIB_API int tokuL_fileresult(toku_State *T, int stat, const char *fname) {
-    int err = errno;
+TOKULIB_API int32_t tokuL_fileresult(toku_State *T, int32_t stat,
+                                                    const char *fname) {
+    int32_t err = errno;
     if (stat) { /* ok? */
         toku_push_bool(T, 1);
         return 1; /* return true */
@@ -536,7 +547,7 @@ TOKULIB_API int tokuL_fileresult(toku_State *T, int stat, const char *fname) {
 #endif                          /* } */
 
 
-TOKULIB_API int tokuL_execresult(toku_State *T, int stat) {
+TOKULIB_API int32_t tokuL_execresult(toku_State *T, int32_t stat) {
     if (stat != 0 && errno != 0) /* error with an 'errno'? */
         return tokuL_fileresult(T, 0, NULL);
     else {
@@ -559,7 +570,8 @@ TOKULIB_API int tokuL_execresult(toku_State *T, int stat) {
 ** Miscellaneous functions
 ** ======================================================================== */
 
-TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int idx, size_t *pl) {
+TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int32_t idx,
+                                                        size_t *pl) {
     idx = toku_absindex(T, idx);
     if (tokuL_callmeta(T, idx, "__tostring")) {
         if (!toku_is_string(T, -1))
@@ -587,7 +599,7 @@ TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int idx, size_t *pl) {
             }
             default: {
                 /* get metatable entry '__name' */
-                int tt = tokuL_get_metafield(T, idx, "__name");
+                int32_t tt = tokuL_get_metafield(T, idx, "__name");
                 const char *kind = (tt == TOKU_T_STRING) /* is it a string? */
                                  ? toku_to_string(T, -1) /* use it */
                                  : tokuL_typename(T, idx); /* fallback name */
@@ -602,12 +614,12 @@ TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int idx, size_t *pl) {
 }
 
 
-TOKULIB_API void *tokuL_to_fulluserdata(toku_State *T, int idx) {
+TOKULIB_API void *tokuL_to_fulluserdata(toku_State *T, int32_t idx) {
     return toku_is_fulluserdata(T, idx) ? toku_to_userdata(T, idx) : NULL;
 }
 
 
-TOKULIB_API void tokuL_where(toku_State *T, int level) {
+TOKULIB_API void tokuL_where(toku_State *T, int32_t level) {
     toku_Debug ar;
     if (toku_getstack(T, level, &ar)) {
         toku_getinfo(T, "sl", &ar);
@@ -631,21 +643,22 @@ static void *allocator(void *ptr, void *ud, size_t osz, size_t nsz) {
 }
 
 
-static int panic(toku_State *T) {
+static int32_t panic(toku_State *T) {
     const char *msg = (toku_type(T, -1) == TOKU_T_STRING
                        ? toku_to_string(T, -1)
                        : "error object is not a string");
-    toku_writefmt(stderr, "PANIC: unprotected error in call to "
-                          "Tokudae API: %s\n", msg);
+    t_writestringerr("PANIC: unprotected error in call to Tokudae API: %s\n",
+                      msg);
     return 0; /* return to abort */
 }
 
 
-static void fwarnon(void *ud, const char *msg, int tocont);
-static void fwarnoff(void *ud, const char *msg, int tocont);
+static void fwarnon(void *ud, const char *msg, int32_t tocont);
+static void fwarnoff(void *ud, const char *msg, int32_t tocont);
 
 
-static int warning_checkmessage(toku_State *T, const char *msg, int tocont) {
+static int32_t warning_checkmessage(toku_State *T, const char *msg,
+                                                   int32_t tocont) {
     if (tocont || *msg++ != '@') /* not a control message? */
         return 0;
     else {
@@ -658,27 +671,27 @@ static int warning_checkmessage(toku_State *T, const char *msg, int tocont) {
 }
 
 
-static void fwarncont(void *ud, const char *msg, int tocont) {
+static void fwarncont(void *ud, const char *msg, int32_t tocont) {
     toku_State *T = (toku_State *)ud;
-    toku_writefmt(stderr, "%s", msg);
+    t_writestringerr("%s", msg);
     if (tocont) /* to be continued? */
         toku_setwarnf(T, fwarncont, ud);
     else { /* this is the end of the warning */
-        toku_writefmt(stderr, "%s", "\n");
+        t_writestringerr("%s", "\n");
         toku_setwarnf(T, fwarnon, T);
     }
 }
 
 
-static void fwarnon(void *ud, const char *msg, int tocont) {
+static void fwarnon(void *ud, const char *msg, int32_t tocont) {
     if (warning_checkmessage((toku_State *)ud, msg, tocont))
         return; /* it was a control message */
-    toku_writefmt(stderr, "%s", "Tokudae warning: ");
+    t_writestringerr("%s", "Tokudae warning: ");
     fwarncont(ud, msg, tocont);
 }
 
 
-static void fwarnoff(void *ud, const char *msg, int tocont) {
+static void fwarnoff(void *ud, const char *msg, int32_t tocont) {
     warning_checkmessage((toku_State *)ud, msg, tocont);
 }
 
@@ -691,8 +704,8 @@ static void fwarnoff(void *ud, const char *msg, int tocont) {
 /* Size for the buffer, in bytes */
 #define BUFSEEDB        (sizeof(void*) + sizeof(time_t))
 
-/* Size for the buffer in int's, rounded up */
-#define BUFSEED         ((BUFSEEDB + sizeof(int) - 1) / sizeof(int))
+/* Size for the buffer in int32_t's, rounded up */
+#define BUFSEED         ((BUFSEEDB + sizeof(int32_t) - 1) / sizeof(int32_t))
 
 /*
 ** Copy the contents of variable 'v' into the buffer pointed by 'b'.
@@ -701,10 +714,10 @@ static void fwarnoff(void *ud, const char *msg, int tocont) {
 #define addbuff(b,v)    (memcpy(&b[0], &(v), sizeof(v)), b += sizeof(v))
 
 
-static t_uint tokui_makeseed(void) {
-    t_uint buff[BUFSEED];
-    t_uint res;
-    t_uint i;
+static uint32_t tokui_makeseed(void) {
+    uint32_t buff[BUFSEED];
+    uint32_t res;
+    uint32_t i;
     time_t t = time(NULL);
     char *b = (char*)buff;
     addbuff(b, b);  /* local variable's address */
@@ -730,7 +743,8 @@ TOKULIB_API toku_State *tokuL_newstate(void) {
 }
 
 
-TOKULIB_API int tokuL_get_subtable(toku_State *T, int idx, const char *k) {
+TOKULIB_API int32_t tokuL_get_subtable(toku_State *T, int32_t idx,
+                                                      const char *k) {
     if (toku_get_field_str(T, idx, k) == TOKU_T_TABLE) {
         return 1; /* true, already have table */
     } else {
@@ -745,7 +759,7 @@ TOKULIB_API int tokuL_get_subtable(toku_State *T, int idx, const char *k) {
 
 
 TOKULIB_API void tokuL_importf(toku_State *T, const char *modname,
-                               toku_CFunction openf, int global) {
+                               toku_CFunction openf, int32_t global) {
     tokuL_get_subtable(T, TOKU_CTABLE_INDEX, TOKU_LOADED_TABLE);
     toku_get_field_str(T, -1, modname); /* get __LOADED[modname] */
     if (!toku_to_bool(T, -1)) { /* package not already loaded? */
@@ -765,9 +779,9 @@ TOKULIB_API void tokuL_importf(toku_State *T, const char *modname,
 
 
 /* find and return last call frame level */
-static int lastlevel(toku_State *T) {
+static int32_t lastlevel(toku_State *T) {
     toku_Debug ar;
-    int low = 0, high = 0;
+    int32_t low = 0, high = 0;
     /* get upper bound, and store last known valid level in 'low' */
     while (toku_getstack(T, high, &ar)) {
         low = high;
@@ -776,7 +790,7 @@ static int lastlevel(toku_State *T) {
     }
     /* binary search between 'low' and 'high' levels */
     while (low < high) {
-        int mid = low + ((high - low)/2);
+        int32_t mid = low + ((high - low)/2);
         if (toku_getstack(T, mid, &ar))
             low = mid + 1;
         else
@@ -804,11 +818,11 @@ static void push_func_name(toku_State *T, toku_Debug *ar) {
 #define STACKLEVELS     10
 
 TOKULIB_API void tokuL_traceback(toku_State *T, toku_State *T1,
-                                 int level, const char *msg) {
+                                 int32_t level, const char *msg) {
     tokuL_Buffer B;
     toku_Debug ar;
-    int last = lastlevel(T1);
-    int limit2show = (last - level > (STACKLEVELS * 2) ? STACKLEVELS : -1);
+    int32_t last = lastlevel(T1);
+    int32_t limit2show = (last - level > (STACKLEVELS * 2) ? STACKLEVELS : -1);
     tokuL_buff_init(T, &B);
     if (msg) {
         tokuL_buff_push_string(&B, msg);
@@ -817,7 +831,7 @@ TOKULIB_API void tokuL_traceback(toku_State *T, toku_State *T1,
     tokuL_buff_push_string(&B, "stack traceback:");
     while (toku_getstack(T1, level++, &ar)) { /* tracing back... */
         if (limit2show-- == 0) { /* too many levels? */
-            int n = last - level - STACKLEVELS + 1; /* levels to skip */
+            int32_t n = last - level - STACKLEVELS + 1; /* levels to skip */
             toku_push_fstring(T, "\n\t...\t(skipping %d levels)", n);
             tokuL_buff_push_stack(&B);
             level += n; /* skip to last levels */
@@ -826,7 +840,7 @@ TOKULIB_API void tokuL_traceback(toku_State *T, toku_State *T1,
             if (ar.currline <= 0)
                 toku_push_fstring(T, "\n\t%s in ", ar.shortsrc);
             else
-                toku_push_fstring(T, "\n\t%s:%d: in ", ar.shortsrc, ar.currline);
+                toku_push_fstring(T,"\n\t%s:%d: in ", ar.shortsrc,ar.currline);
             tokuL_buff_push_stack(&B);
             push_func_name(T, &ar);
             tokuL_buff_push_stack(&B);
@@ -836,13 +850,14 @@ TOKULIB_API void tokuL_traceback(toku_State *T, toku_State *T1,
 }
 
 
-TOKULIB_API void tokuL_set_funcs(toku_State *T, const tokuL_Entry *l, int nup){
+TOKULIB_API void tokuL_set_funcs(toku_State *T, const tokuL_Entry *l,
+                                                int32_t nup){
     tokuL_check_stack(T, nup, "too many upvalues");
     for (; l->name != NULL; l++) {
         if (l->func == NULL) { /* placeholder? */
             toku_push_bool(T, 0);
         } else { /* otherwise a function */
-            for (int i = 0; i < nup; i++) /* copy upvalues */
+            for (int32_t i = 0; i < nup; i++) /* copy upvalues */
                 toku_push(T, -nup);
             toku_push_cclosure(T, l->func, nup); /* create closure */
         }
@@ -861,7 +876,7 @@ TOKULIB_API void tokuL_check_version_(toku_State *T, toku_Number ver) {
 }
 
 
-TOKULIB_API t_uint tokuL_makeseed(toku_State *T) {
+TOKULIB_API uint32_t tokuL_makeseed(toku_State *T) {
     UNUSED(T);
     return tokui_makeseed();
 }
@@ -876,7 +891,7 @@ TOKULIB_API t_uint tokuL_makeseed(toku_State *T) {
 /* index of free-list header (after the predefined values) */
 #define freelist    (TOKU_CLIST_LAST + 1)
 
-TOKULIB_API int tokuL_ref(toku_State *T, int l) {
+TOKULIB_API int32_t tokuL_ref(toku_State *T, int32_t l) {
     toku_Integer ref;
     if (toku_is_nil(T, -1)) { /* value on top is 'nil'? */
         toku_pop(T, 1); /* remove it from the stack */
@@ -898,11 +913,11 @@ TOKULIB_API int tokuL_ref(toku_State *T, int l) {
     } else /* no free elements */
         ref = t_castU2S(toku_len(T, l)); /* get a new reference */
     toku_set_index(T, l, ref);
-    return cast_int(ref);
+    return cast_i32(ref);
 }
 
 
-TOKULIB_API void tokuL_unref(toku_State *T, int l, int ref) {
+TOKULIB_API void tokuL_unref(toku_State *T, int32_t l, int32_t ref) {
     if (ref >= 0) {
         l = toku_absindex(T, l);
         toku_get_index(T, l, freelist);
@@ -928,7 +943,7 @@ typedef struct UserBox {
 } UserBox;
 
 
-static char *resizebox(toku_State *T, int idx, size_t newsz) {
+static char *resizebox(toku_State *T, int32_t idx, size_t newsz) {
     void *ud;
     toku_Alloc falloc = toku_getallocf(T, &ud);
     UserBox *box = tobox(toku_to_userdata(T, idx));
@@ -943,7 +958,7 @@ static char *resizebox(toku_State *T, int idx, size_t newsz) {
 }
 
 
-static int boxgc(toku_State *T) {
+static int32_t boxgc(toku_State *T) {
     resizebox(T, 0, 0);
     return 0;
 }
@@ -1008,7 +1023,7 @@ static size_t newbuffsize(tokuL_Buffer *B, size_t sz) {
 ** Ensure that buffer 'B' can fit 'sz' bytes.
 ** This also creates 'UserBox' if internal buffer is not big enough.
 */
-static char *buffensure(tokuL_Buffer *B, size_t sz, int boxindex) {
+static char *buffensure(tokuL_Buffer *B, size_t sz, int32_t boxindex) {
     checkbufflevel(B, boxindex);
     if (B->sz - B->n >= sz) { /* have enough space? */
         return B->b + B->n;
@@ -1101,7 +1116,7 @@ TOKULIB_API void tokuL_buff_push_gsub(tokuL_Buffer *B, const char *s,
     const char *wild;
     size_t l = strlen(p);
     while ((wild = strstr(s, p)) != NULL) { /* find 'p' (pattern) */
-        tokuL_buff_push_lstring(B, s, cast_diff2sz(wild - s)); /* push prefix */
+        tokuL_buff_push_lstring(B, s, cast_diff2sz(wild - s));/* push prefix */
         tokuL_buff_push_string(B, r); /* push 'r' in place of pattern */
         s = wild + l; /* continue after 'p' */
     }
@@ -1138,4 +1153,4 @@ TOKULIB_API void tokuL_buff_endsz(tokuL_Buffer *B, size_t sz) {
     tokuL_buff_end(B);
 }
 
-/* }======================================================================= */
+/* }}====================================================================== */

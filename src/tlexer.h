@@ -53,15 +53,15 @@ typedef union {
 
 
 typedef struct {
-    int tk;
+    int32_t tk;
     Literal lit;
 } Token;
 
 
 typedef struct Lexer {
-    int c; /* current char */
-    int lastline; /* line of previous token */
-    int line; /* current line number */
+    int32_t c; /* current char */
+    int32_t lastline; /* line of previous token */
+    int32_t line; /* current line number */
     Token t; /* current token */
     Token tahead; /* lookahead token */
     Table *tab; /* scanner table */
@@ -78,12 +78,12 @@ typedef struct Lexer {
 #define tokuY_newliteral(lx, l)   tokuY_newstring(lx, "" (l), LL(l))
 
 TOKUI_FUNC void tokuY_setinput(toku_State *T, Lexer *lx, BuffReader *Z,
-                               OString *source, int firstchar);
+                               OString *source, int32_t firstchar);
 TOKUI_FUNC void tokuY_init(toku_State *T);
-TOKUI_FUNC const char *tokuY_tok2str(Lexer *lx, int t);
+TOKUI_FUNC const char *tokuY_tok2str(Lexer *lx, int32_t t);
 TOKUI_FUNC OString *tokuY_newstring(Lexer *lx, const char *str, size_t len);
 TOKUI_FUNC t_noret tokuY_syntaxerror(Lexer *lx, const char *err);
 TOKUI_FUNC void tokuY_scan(Lexer *lx);
-TOKUI_FUNC int tokuY_scanahead(Lexer *lx);
+TOKUI_FUNC int32_t tokuY_scanahead(Lexer *lx);
 
 #endif

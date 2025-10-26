@@ -57,7 +57,7 @@ typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
 #define INIT_STACKSIZE  (TOKU_MINSTACK * 2)
 
 
-#define stacksize(th)   cast_int((th)->stackend.p - (th)->stack.p)
+#define stacksize(th)   cast_i32((th)->stackend.p - (th)->stack.p)
 
 
 /* {======================================================================
@@ -76,13 +76,13 @@ typedef struct CallFrame {
     SIndex top; /* top for this function */
     struct CallFrame *prev, *next; /* dynamic call link */
     struct { /* only for Tokudae function */
-        const Instruction *pc; /* current pc (points to instruction) */
-        const Instruction *pcret; /* after return continue from this pc */
+        const uint8_t *pc; /* current pc (points to opcode) */
+        const uint8_t *pcret; /* after return continue from this pc */
         volatile t_signal trap; /* hooks or stack reallocation flag */
-        int nvarargs; /* number of optional arguments */
+        int32_t nvarargs; /* number of optional arguments */
     } t;
-    int nresults; /* number of expected/wanted results from this function */
-    t_ubyte status; /* call status */
+    int32_t nresults; /* number of expected/wanted results from this function */
+    uint8_t status; /* call status */
 } CallFrame;
 
 
@@ -105,8 +105,8 @@ typedef struct CallFrame {
 */
 typedef struct StringTable {
     OString **hash; /* array of buckets (linked lists of strings) */
-    int nuse; /* number of elements */
-    int size; /* number of buckets */
+    int32_t nuse; /* number of elements */
+    int32_t size; /* number of buckets */
 } StringTable;
 
 
@@ -120,14 +120,14 @@ typedef struct GState {
     TValue c_list; /* API list */
     TValue c_table; /* API table */
     TValue nil; /* special nil value (also init flag) */
-    t_uint seed; /* initial seed for hashing */
-    t_ubyte whitebit; /* current white bit (WHITEBIT0 or WHITEBIT1) */
-    t_ubyte gcstate; /* GC state bits */
-    t_ubyte gcstopem; /* stops emergency collections */
-    t_ubyte gcstop; /* control whether GC is running */
-    t_ubyte gcemergency; /* true if this is emergency collection */
-    t_ubyte gcparams[TOKU_GCP_NUM]; /* GC options */
-    t_ubyte gccheck; /* true if collection was triggered since last check */
+    uint32_t seed; /* initial seed for hashing */
+    uint8_t whitebit; /* current white bit (WHITEBIT0 or WHITEBIT1) */
+    uint8_t gcstate; /* GC state bits */
+    uint8_t gcstopem; /* stops emergency collections */
+    uint8_t gcstop; /* control whether GC is running */
+    uint8_t gcemergency; /* true if this is emergency collection */
+    uint8_t gcparams[TOKU_GCP_NUM]; /* GC options */
+    uint8_t gccheck; /* true if collection was triggered since last check */
     GCObject *objects; /* list of all collectable objects */
     GCObject **sweeppos; /* current position of sweep in list */
     GCObject *fin; /* list of objects that have finalizer */
@@ -157,9 +157,9 @@ typedef struct GState {
 /* Tokudae thread state */
 struct toku_State {
     ObjectHeader;
-    t_ubyte status;
-    t_ubyte allowhook;
-    t_ushort ncf; /* number of call frames in 'cf' list */
+    uint8_t status;
+    uint8_t allowhook;
+    uint16_t ncf; /* number of call frames in 'cf' list */
     GCObject *gclist;
     struct toku_State *twups; /* next thread with open upvalues */
     GState *gstate; /* shared global state */
@@ -173,14 +173,14 @@ struct toku_State {
     UpVal *openupval; /* list of open upvalues */
     SIndex tbclist; /* list of to-be-closed variables */
     ptrdiff_t errfunc; /* error handling function (on stack) */
-    t_uint32 nCcalls; /* number of C calls */
-    int oldpc; /* last pc traced */
-    int basehookcount;
-    int hookcount;
+    uint32_t nCcalls; /* number of C calls */
+    int32_t oldpc; /* last pc traced */
+    int32_t basehookcount;
+    int32_t hookcount;
     volatile t_signal hookmask;
     struct { /* info about transferred values (for call/return hooks) */
-        int ftransfer; /* offset of first value transferred */
-        int ntransfer; /* number of values transferred */
+        int32_t ftransfer; /* offset of first value transferred */
+        int32_t ntransfer; /* number of values transferred */
     } transferinfo;
 };
 
@@ -212,7 +212,7 @@ struct toku_State {
 
 /* eXtra space + main thread State */
 typedef struct XS {
-    t_ubyte extra_[TOKU_EXTRASPACE];
+    uint8_t extra_[TOKU_EXTRASPACE];
     toku_State t;
 } XS;
 
@@ -225,7 +225,7 @@ typedef struct XSG {
 
 
 /* cast 'toku_State' back to start of 'XS' */
-#define fromstate(T)    cast(XS *, cast(t_ubyte *, (T)) - offsetof(XS, t))
+#define fromstate(T)    cast(XS *, cast(uint8_t *, (T)) - offsetof(XS, t))
 
 /* }====================================================================== */
 
@@ -268,14 +268,15 @@ union GCUnion {
 
 
 TOKUI_FUNC CallFrame *tokuT_newcf(toku_State *T);
-TOKUI_FUNC int tokuT_reallocstack(toku_State *T, int size, int raiseerr);
-TOKUI_FUNC int tokuT_growstack(toku_State *T, int n, int raiseerr);
+TOKUI_FUNC int32_t tokuT_reallocstack(toku_State *T, int32_t size,
+                                                     int32_t raiseerr);
+TOKUI_FUNC int32_t tokuT_growstack(toku_State *T, int32_t n, int32_t raiseerr);
 TOKUI_FUNC void tokuT_shrinkstack(toku_State *T);
 TOKUI_FUNC void tokuT_incsp(toku_State *T);
 TOKUI_FUNC void tokuT_incCstack(toku_State *T);
 TOKUI_FUNC void tokuT_checkCstack(toku_State *T);
-TOKUI_FUNC int tokuT_resetthread(toku_State *T, int status);
-TOKUI_FUNC void tokuT_warning(toku_State *T, const char *msg, int cont);
+TOKUI_FUNC int32_t tokuT_resetthread(toku_State *T, int32_t status);
+TOKUI_FUNC void tokuT_warning(toku_State *T, const char *msg, int32_t cont);
 TOKUI_FUNC void tokuT_warnerror(toku_State *T, const char *where);
 TOKUI_FUNC void tokuT_free(toku_State *T, toku_State *thread);
 

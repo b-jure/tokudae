@@ -11,6 +11,10 @@
 #include <stdarg.h>
 
 
+#include "tokudaeconf.h"
+
+/* {{Constants============================================================ */
+
 #define TOKU_VERSION_MAJOR_N        1
 #define TOKU_VERSION_MINOR_N        0
 #define TOKU_VERSION_RELEASE_N      0
@@ -20,11 +24,9 @@
         (TOKU_VERSION_NUM * 100 + TOKU_VERSION_RELEASE_N)
 
 
-#include "tokudaeconf.h"
-
-
 /* mark for precompiled code ('<esc>Tokudae') */
 #define TOKU_SIGNATURE      "\x1bTokudae"
+
 
 /* option for multiple returns in 'toku_pcall' and 'toku_call' */
 #define TOKU_MULTRET        (-1)
@@ -64,11 +66,10 @@
 #define TOKU_T_NUM              13  /* total number of types */
 
 
-
 /* minimum stack space available to a C function */
 #define TOKU_MINSTACK       20
 
-
+/* }{Types================================================================ */
 
 /* Tokudae thread state */
 typedef struct toku_State toku_State;
@@ -85,19 +86,20 @@ typedef TOKU_NUMBER toku_Number;
 
 
 /* type of C function registered with Tokudae */
-typedef int (*toku_CFunction)(toku_State *T);
+typedef int32_t (*toku_CFunction)(toku_State *T);
 
 /* type of function that de/allocates memory */
 typedef void *(*toku_Alloc)(void *ptr, void *ud, size_t osz, size_t nsz);
 
 /* type of warning function */
-typedef void (*toku_WarnFunction)(void *ud, const char *msg, int tocont);
+typedef void (*toku_WarnFunction)(void *ud, const char *msg, int32_t tocont);
 
 /* type of function that reads or Tokudae (compiled) chunks */
 typedef const char *(*toku_Reader)(toku_State *T, void *data, size_t *szread);
 
 /* type of function for writing precompiled chunks */
-typedef int (*toku_Writer)(toku_State *T, const void *b, size_t sz, void *data);
+typedef int32_t (*toku_Writer)(toku_State *T, const void *b, size_t sz,
+                                                             void *data);
 
 
 /* type for general debug API */
@@ -115,57 +117,51 @@ typedef struct toku_Opdesc toku_Opdesc;
 /* type for storing pre-compiled Tokudae function information */
 typedef struct toku_Cinfo toku_Cinfo;
 
+/* }{State manipulation=================================================== */
 
-/* {======================================================================
-** State manipulation
-** ======================================================================= */
-TOKU_API toku_State *toku_newstate(toku_Alloc alloc, void *ud, unsigned seed); 
+TOKU_API toku_State *toku_newstate(toku_Alloc alloc, void *ud, uint32_t seed); 
 TOKU_API void        toku_close(toku_State *T);
 TOKU_API toku_State *toku_newthread(toku_State *T);
-TOKU_API int         toku_resetthread(toku_State *T);
+TOKU_API int32_t     toku_resetthread(toku_State *T);
 TOKU_API toku_CFunction toku_atpanic(toku_State *T, toku_CFunction fn);
 TOKU_API void        toku_setallocf(toku_State *T, toku_Alloc alloc, void *ud); 
 TOKU_API toku_Alloc  toku_getallocf(toku_State *T, void **ud); 
-/* }====================================================================== */
 
-/* {======================================================================
-** Stack manipulation
-** ======================================================================= */
-TOKU_API void toku_setntop(toku_State *T, int n); 
-TOKU_API int  toku_gettop(const toku_State *T); 
-TOKU_API int  toku_absindex(toku_State *T, int idx); 
-TOKU_API void toku_rotate(toku_State *T, int idx, int n); 
-TOKU_API void toku_copy(toku_State *T, int src, int dest); 
-TOKU_API int  toku_checkstack(toku_State *T, int n); 
-TOKU_API void toku_push(toku_State *T, int idx); 
-TOKU_API void toku_xmove(toku_State *src, toku_State *dest, int n); 
-/* }====================================================================== */
+/* }{Stack manipulation=================================================== */
 
-/* {======================================================================
-** Access functions (Stack -> C)
-** ======================================================================= */
-TOKU_API int          toku_is_number(toku_State *T, int idx); 
-TOKU_API int          toku_is_integer(toku_State *T, int idx); 
-TOKU_API int          toku_is_string(toku_State *T, int idx); 
-TOKU_API int          toku_is_cfunction(toku_State *T, int idx); 
-TOKU_API int          toku_is_udatamethod(toku_State *T, int idx); 
-TOKU_API int          toku_is_userdata(toku_State *T, int idx); 
-TOKU_API int          toku_type(toku_State *T, int idx); 
-TOKU_API const char  *toku_typename(toku_State *T, int type); 
+TOKU_API void    toku_setntop(toku_State *T, int32_t n); 
+TOKU_API int32_t toku_gettop(const toku_State *T); 
+TOKU_API int32_t toku_absindex(toku_State *T, int32_t idx); 
+TOKU_API void    toku_rotate(toku_State *T, int32_t idx, int32_t n); 
+TOKU_API void    toku_copy(toku_State *T, int32_t src, int32_t dest); 
+TOKU_API int32_t toku_checkstack(toku_State *T, int32_t n); 
+TOKU_API void    toku_push(toku_State *T, int32_t idx); 
+TOKU_API void    toku_xmove(toku_State *src, toku_State *dest, int32_t n); 
 
-TOKU_API toku_Number    toku_to_numberx(toku_State *T, int idx, int *isnum); 
-TOKU_API toku_Integer   toku_to_integerx(toku_State *T, int idx, int *isnum); 
-TOKU_API int            toku_to_bool(toku_State *T, int idx); 
-TOKU_API const char    *toku_to_lstring(toku_State *T, int idx, size_t *len); 
-TOKU_API toku_CFunction toku_to_cfunction(toku_State *T, int idx); 
-TOKU_API void          *toku_to_userdata(toku_State *T, int idx); 
-TOKU_API const void    *toku_to_pointer(toku_State *T, int idx); 
-TOKU_API toku_State    *toku_to_thread(toku_State *T, int idx); 
-/* }====================================================================== */
+/* }{Access functions (Stack -> C)======================================== */
 
-/* {======================================================================
-** Ordering & Arithmetic functions
-** ======================================================================= */
+TOKU_API int32_t     toku_is_number(toku_State *T, int32_t idx); 
+TOKU_API int32_t     toku_is_integer(toku_State *T, int32_t idx); 
+TOKU_API int32_t     toku_is_string(toku_State *T, int32_t idx); 
+TOKU_API int32_t     toku_is_cfunction(toku_State *T, int32_t idx); 
+TOKU_API int32_t     toku_is_udatamethod(toku_State *T, int32_t idx); 
+TOKU_API int32_t     toku_is_userdata(toku_State *T, int32_t idx); 
+TOKU_API int32_t     toku_type(toku_State *T, int32_t idx); 
+TOKU_API const char *toku_typename(toku_State *T, int32_t type); 
+
+TOKU_API toku_Number  toku_to_numberx(toku_State *T, int32_t idx,
+                                                     int32_t *isnum); 
+TOKU_API toku_Integer toku_to_integerx(toku_State *T, int32_t idx,
+                                                      int32_t *isnum); 
+TOKU_API int32_t     toku_to_bool(toku_State *T, int32_t idx); 
+TOKU_API const char *toku_to_lstring(toku_State *T, int32_t idx, size_t *len); 
+TOKU_API toku_CFunction toku_to_cfunction(toku_State *T, int32_t idx); 
+TOKU_API void       *toku_to_userdata(toku_State *T, int32_t idx); 
+TOKU_API const void *toku_to_pointer(toku_State *T, int32_t idx); 
+TOKU_API toku_State *toku_to_thread(toku_State *T, int32_t idx); 
+
+/* }{Ordering & Arithmetic functions====================================== */
+
 /* Arithmetic operations */
 #define TOKU_OP_ADD         0
 #define TOKU_OP_SUB         1
@@ -183,7 +179,7 @@ TOKU_API toku_State    *toku_to_thread(toku_State *T, int idx);
 #define TOKU_OP_BNOT        13
 #define TOKU_OP_NUM         14
 
-TOKU_API void toku_arith(toku_State *T, int op); 
+TOKU_API void toku_arith(toku_State *T, int32_t op); 
 
 
 /* Ordering operations */
@@ -192,76 +188,70 @@ TOKU_API void toku_arith(toku_State *T, int op);
 #define TOKU_ORD_LE         2
 #define TOKU_ORD_NUM        3
 
-TOKU_API int toku_rawequal(toku_State *T, int idx1, int idx2); 
-TOKU_API int toku_compare(toku_State *T, int idx1, int idx2, int op); 
-/* }====================================================================== */
+TOKU_API int32_t toku_rawequal(toku_State *T, int32_t idx1, int32_t idx2); 
+TOKU_API int32_t toku_compare(toku_State *T, int32_t idx1, int32_t idx2,
+                                                           int32_t op); 
 
-/* {======================================================================
-** Push functions (C -> Stack)
-** ======================================================================= */
+/* }{Push functions (C -> Stack)========================================== */
+
 TOKU_API void        toku_push_nil(toku_State *T); 
 TOKU_API void        toku_push_number(toku_State *T, toku_Number n); 
 TOKU_API void        toku_push_integer(toku_State *T, toku_Integer n); 
 TOKU_API const char *toku_push_lstring(toku_State *T, const char *s, size_t l); 
 TOKU_API const char *toku_push_string(toku_State *T, const char *s); 
 TOKU_API const char *toku_push_fstring(toku_State *T, const char *f, ...); 
-TOKU_API const char *toku_push_vfstring(toku_State *T, const char *f, va_list ap); 
-TOKU_API void      toku_push_cclosure(toku_State *T, toku_CFunction fn, int n); 
-TOKU_API void        toku_push_bool(toku_State *T, int b); 
-TOKU_API void        toku_push_lightuserdata(toku_State *T, void *p); 
-TOKU_API void *toku_push_userdata(toku_State *T, size_t sz, unsigned short nuv); 
-TOKU_API void        toku_push_list(toku_State *T, int sz);
-TOKU_API void        toku_push_table(toku_State *T, int sz);
-TOKU_API int         toku_push_thread(toku_State *T); 
-TOKU_API void        toku_push_class(toku_State *T);
-TOKU_API void        toku_push_instance(toku_State *T, int idx);
-TOKU_API void        toku_push_boundmethod(toku_State *T, int idx);
-/* }====================================================================== */
+TOKU_API const char *toku_push_vfstring(toku_State *T, const char *f,
+                                                       va_list ap); 
+TOKU_API void toku_push_cclosure(toku_State *T, toku_CFunction f, int32_t nup); 
+TOKU_API void    toku_push_bool(toku_State *T, int32_t b); 
+TOKU_API void    toku_push_lightuserdata(toku_State *T, void *p); 
+TOKU_API void   *toku_push_userdata(toku_State *T, size_t sz, uint16_t nuv); 
+TOKU_API void    toku_push_list(toku_State *T, int32_t sz);
+TOKU_API void    toku_push_table(toku_State *T, int32_t sz);
+TOKU_API int32_t toku_push_thread(toku_State *T); 
+TOKU_API void    toku_push_class(toku_State *T);
+TOKU_API void    toku_push_instance(toku_State *T, int32_t idx);
+TOKU_API void    toku_push_boundmethod(toku_State *T, int32_t idx);
 
-/* {======================================================================
-** Get functions (Tokudae -> Stack)
-** ======================================================================= */
-TOKU_API int  toku_get(toku_State *T, int idx); 
-TOKU_API int  toku_get_raw(toku_State *T, int idx); 
-TOKU_API int  toku_get_global_str(toku_State *T, const char *name); 
-TOKU_API int  toku_get_index(toku_State *T, int idx, toku_Integer i);
-TOKU_API int  toku_get_cindex(toku_State *T, toku_Integer i); 
-TOKU_API int  toku_get_field(toku_State *T, int idx); 
-TOKU_API int  toku_get_field_str(toku_State *T, int idx, const char *s); 
-TOKU_API int  toku_get_field_int(toku_State *T, int idx, toku_Integer i); 
-TOKU_API int  toku_get_cfield_str(toku_State *T, const char *s); 
-TOKU_API int  toku_get_class(toku_State *T, int idx); 
-TOKU_API int  toku_get_superclass(toku_State *T, int idx); 
-TOKU_API int  toku_get_method(toku_State *T, int idx); 
-TOKU_API int  toku_get_self(toku_State *T, int idx);
-TOKU_API int  toku_get_uservalue(toku_State *T, int idx, unsigned short n); 
-TOKU_API int  toku_get_methodtable(toku_State *T, int idx); 
-TOKU_API int  toku_get_metatable(toku_State *T, int idx);
-TOKU_API void toku_get_fieldtable(toku_State *T, int idx); 
-/* }====================================================================== */
+/* }{Get functions (Tokudae -> Stack)===================================== */
 
-/* {======================================================================
-** Set functions (Stack -> Tokudae)
-** ======================================================================= */
-TOKU_API void toku_set(toku_State *T, int idx); 
-TOKU_API void toku_set_raw(toku_State *T, int idx); 
+TOKU_API int32_t toku_get(toku_State *T, int32_t idx); 
+TOKU_API int32_t toku_get_raw(toku_State *T, int32_t idx); 
+TOKU_API int32_t toku_get_global_str(toku_State *T, const char *name); 
+TOKU_API int32_t toku_get_index(toku_State *T, int32_t idx, toku_Integer i);
+TOKU_API int32_t toku_get_cindex(toku_State *T, toku_Integer i); 
+TOKU_API int32_t toku_get_field(toku_State *T, int32_t idx); 
+TOKU_API int32_t toku_get_field_str(toku_State *T, int32_t idx, const char *s); 
+TOKU_API int32_t toku_get_field_int(toku_State *T, int32_t idx, toku_Integer i); 
+TOKU_API int32_t toku_get_cfield_str(toku_State *T, const char *s); 
+TOKU_API int32_t toku_get_class(toku_State *T, int32_t idx); 
+TOKU_API int32_t toku_get_superclass(toku_State *T, int32_t idx); 
+TOKU_API int32_t toku_get_method(toku_State *T, int32_t idx); 
+TOKU_API int32_t toku_get_self(toku_State *T, int32_t idx);
+TOKU_API int32_t toku_get_uservalue(toku_State *T, int32_t idx, uint16_t n); 
+TOKU_API int32_t toku_get_methodtable(toku_State *T, int32_t idx); 
+TOKU_API int32_t toku_get_metatable(toku_State *T, int32_t idx);
+TOKU_API void    toku_get_fieldtable(toku_State *T, int32_t idx); 
+
+/* }{Set functions (Stack -> Tokudae)===================================== */
+
+TOKU_API void toku_set(toku_State *T, int32_t idx); 
+TOKU_API void toku_set_raw(toku_State *T, int32_t idx); 
 TOKU_API void toku_set_global_str(toku_State *T, const char *name); 
-TOKU_API void toku_set_index(toku_State *T, int idx, toku_Integer i);
+TOKU_API void toku_set_index(toku_State *T, int32_t idx, toku_Integer i);
 TOKU_API void toku_set_cindex(toku_State *T, toku_Integer i);
-TOKU_API void toku_set_field(toku_State *T, int idx); 
-TOKU_API void toku_set_field_str(toku_State *T, int idx, const char *s); 
-TOKU_API void toku_set_field_int(toku_State *T, int idx, toku_Integer i); 
+TOKU_API void toku_set_field(toku_State *T, int32_t idx); 
+TOKU_API void toku_set_field_str(toku_State *T, int32_t idx, const char *s); 
+TOKU_API void toku_set_field_int(toku_State *T, int32_t idx, toku_Integer i); 
 TOKU_API void toku_set_cfield_str(toku_State *T, const char *s);
-TOKU_API void toku_set_superclass(toku_State *T, int idx); 
-TOKU_API void toku_set_metatable(toku_State *T, int idx);
-TOKU_API int  toku_set_uservalue(toku_State *T, int idx, unsigned short n); 
-TOKU_API void toku_set_methodtable(toku_State *T, int idx); 
-TOKU_API void toku_set_fieldtable(toku_State *T, int idx);
-/* }====================================================================== */
+TOKU_API void toku_set_superclass(toku_State *T, int32_t idx); 
+TOKU_API void toku_set_metatable(toku_State *T, int32_t idx);
+TOKU_API int32_t toku_set_uservalue(toku_State *T, int32_t idx, uint16_t n); 
+TOKU_API void toku_set_methodtable(toku_State *T, int32_t idx); 
+TOKU_API void toku_set_fieldtable(toku_State *T, int32_t idx);
 
-/* {======================================================================
-** Status and Error reporting
-** ======================================================================= */
+/* }{Status and Error reporting=========================================== */
+
 /* thread status codes */
 #define TOKU_STATUS_OK          0 /* ok */
 #define TOKU_STATUS_ERUNTIME    1 /* runtime error */
@@ -270,25 +260,22 @@ TOKU_API void toku_set_fieldtable(toku_State *T, int idx);
 #define TOKU_STATUS_EERROR      4 /* error while handling error */
 #define TOKU_STATUS_NUM         5 /* total number of status codes */
 
-TOKU_API int toku_status(toku_State *T); 
-TOKU_API int toku_error(toku_State *T); 
-/* }====================================================================== */
+TOKU_API int32_t toku_status(toku_State *T); 
+TOKU_API int32_t toku_error(toku_State *T); 
 
-/* {======================================================================
-** Call/Load/Dump Tokudae chunks
-** ======================================================================= */
-TOKU_API void toku_call(toku_State *T, int nargs, int nresults); 
-TOKU_API int  toku_pcall(toku_State *T, int nargs, int nresults, int absmsgh); 
-TOKU_API int  toku_load(toku_State *T, toku_Reader freader, void *userdata,
-                        const char *chunkname, const char *mode); 
-// TODO: add docs
-TOKU_API int  toku_combine(toku_State *T, const char *chunkname, int n);
-TOKU_API int  toku_dump(toku_State *T, toku_Writer fw, void *data, int strip);
-/* }====================================================================== */
+/* }{Call/Load/Combine/Dump Tokudae chunks================================ */
 
-/* {======================================================================
-** Garbage collector API
-** ======================================================================= */
+TOKU_API void    toku_call(toku_State *T, int32_t nargs, int32_t nresults); 
+TOKU_API int32_t toku_pcall(toku_State *T, int32_t nargs, int32_t nresults,
+                                                          int32_t absmsgh); 
+TOKU_API int32_t toku_load(toku_State *T, toku_Reader freader, void *userdata,
+                           const char *chunkname, const char *mode); 
+TOKU_API int32_t toku_combine(toku_State *T, const char *chunkname, int32_t n);
+TOKU_API int32_t toku_dump(toku_State *T, toku_Writer fw, void *data,
+                                                          int32_t strip);
+
+/* }{Garbage collector API================================================ */
+
 /* GC options (what) */
 #define TOKU_GC_STOP            0 /* stop GC */
 #define TOKU_GC_RESTART         1 /* restart GC (start if stopped) */
@@ -306,32 +293,29 @@ TOKU_API int  toku_dump(toku_State *T, toku_Writer fw, void *data, int strip);
 #define TOKU_GCP_STEPSIZE       2 /* GC "granularity" */
 #define TOKU_GCP_NUM            3 /* number of parameters */
 
-TOKU_API int toku_gc(toku_State *T, int what, ...); 
-/* }====================================================================== */
+TOKU_API int32_t toku_gc(toku_State *T, int32_t what, ...); 
 
-/* {======================================================================
-** Warning-related functions
-** ======================================================================= */
+/* }{Warning-related functions============================================ */
+
 TOKU_API void toku_setwarnf(toku_State *T, toku_WarnFunction fwarn, void *ud); 
-TOKU_API void toku_warning(toku_State *T, const char *msg, int cont); 
-/* }====================================================================== */
+TOKU_API void toku_warning(toku_State *T, const char *msg, int32_t cont); 
 
-/* {======================================================================
-** Miscellaneous functions and useful macros
-** ======================================================================= */
+/* }{Miscellaneous functions and useful macros============================ */
+
 #define TOKU_N2SBUFFSZ     64
-TOKU_API unsigned toku_numbertocstring(toku_State *T, int idx, char *buff); 
+TOKU_API uint32_t toku_numbertocstring(toku_State *T, int32_t idx, char *buff); 
 
-TOKU_API size_t      toku_stringtonumber(toku_State *T, const char *s, int *f); 
+TOKU_API size_t toku_stringtonumber(toku_State *T, const char *s, int32_t *f); 
+
 TOKU_API toku_Number    toku_version(toku_State *T);
-TOKU_API toku_Unsigned  toku_len(toku_State *T, int idx); 
-TOKU_API size_t         toku_lenudata(toku_State *T, int idx);
-TOKU_API int            toku_nextfield(toku_State *T, int idx); 
-TOKU_API void           toku_concat(toku_State *T, int n); 
-TOKU_API void           toku_toclose(toku_State *T, int idx); 
-TOKU_API void           toku_closeslot(toku_State *T, int idx); 
-TOKU_API int            toku_shrinklist(toku_State *T, int idx);
-TOKU_API unsigned short toku_numuservalues(toku_State *T, int idx);
+TOKU_API toku_Unsigned  toku_len(toku_State *T, int32_t idx); 
+TOKU_API size_t         toku_lenudata(toku_State *T, int32_t idx);
+TOKU_API int32_t        toku_nextfield(toku_State *T, int32_t idx); 
+TOKU_API void           toku_concat(toku_State *T, int32_t n); 
+TOKU_API void           toku_toclose(toku_State *T, int32_t idx); 
+TOKU_API void           toku_closeslot(toku_State *T, int32_t idx); 
+TOKU_API int32_t        toku_shrinklist(toku_State *T, int32_t idx);
+TOKU_API uint16_t       toku_numuservalues(toku_State *T, int32_t idx);
 
 #define toku_is_function(T, n)      (toku_type(T, (n)) == TOKU_T_FUNCTION)
 #define toku_is_boundmethod(T, n)   (toku_type(T, (n)) == TOKU_T_BMETHOD)
@@ -374,11 +358,9 @@ TOKU_API unsigned short toku_numuservalues(toku_State *T, int idx);
 #define toku_getextraspace(T)   ((void *)((char *)(T) - TOKU_EXTRASPACE))
 
 #define toku_getntop(T)         (toku_gettop(T) + 1)
-/* }====================================================================== */
 
-/* {======================================================================
-** Debug API
-** ======================================================================= */
+/* }{Debug API============================================================ */
+
 /* Event codes */
 #define TOKU_HOOK_CALL      0
 #define TOKU_HOOK_RET       1
@@ -391,53 +373,55 @@ TOKU_API unsigned short toku_numuservalues(toku_State *T, int idx);
 #define TOKU_MASK_LINE      (1 << TOKU_HOOK_LINE)
 #define TOKU_MASK_COUNT     (1 << TOKU_HOOK_COUNT)
 
-TOKU_API int   toku_getstack(toku_State *T, int level, toku_Debug *ar); 
-TOKU_API int   toku_getinfo(toku_State *T, const char *what, toku_Debug *ar); 
-TOKU_API int   toku_stackinuse(toku_State *T);
-TOKU_API const char *toku_getlocal(toku_State *T, const toku_Debug *ar, int n); 
-TOKU_API const char *toku_setlocal(toku_State *T, const toku_Debug *ar, int n); 
-TOKU_API const char *toku_getupvalue(toku_State *T, int idx, int n); 
-TOKU_API const char *toku_setupvalue(toku_State *T, int idx, int n); 
-TOKU_API void *toku_upvalueid(toku_State *T, int idx, int n);
-TOKU_API void  toku_upvaluejoin(toku_State *T, int i1, int n1, int i2, int n2);
-
-TOKU_API void toku_sethook(toku_State *T, toku_Hook fh, int mask, int count);
-TOKU_API toku_Hook toku_gethook(toku_State *T);
-TOKU_API int  toku_gethookmask(toku_State *T);
-TOKU_API int  toku_gethookcount(toku_State *T);
+TOKU_API int32_t toku_getstack(toku_State *T, int32_t level, toku_Debug *ar); 
+TOKU_API int32_t toku_getinfo(toku_State *T, const char *what, toku_Debug *ar); 
+TOKU_API const char *toku_getlocal(toku_State *T, const toku_Debug *ar,
+                                                  int32_t n); 
+TOKU_API const char *toku_setlocal(toku_State *T, const toku_Debug *ar,
+                                                  int32_t n); 
+TOKU_API const char *toku_getupvalue(toku_State *T, int32_t idx, int32_t n); 
+TOKU_API const char *toku_setupvalue(toku_State *T, int32_t idx, int32_t n); 
+TOKU_API void       *toku_upvalueid(toku_State *T, int32_t idx, int32_t n);
+TOKU_API void        toku_upvaluejoin(toku_State *T, int32_t i1, int32_t n1,
+                                                     int32_t i2, int32_t n2);
+TOKU_API void        toku_sethook(toku_State *T, toku_Hook fh, int32_t mask,
+                                                               int32_t count);
+TOKU_API toku_Hook   toku_gethook(toku_State *T);
+TOKU_API int32_t     toku_gethookmask(toku_State *T);
+TOKU_API int32_t     toku_gethookcount(toku_State *T);
+TOKU_API int32_t     toku_stackinuse(toku_State *T);
 
 struct toku_Debug {
-    int event;
+    int32_t event;
     const char *name;           /* (n) */
     const char *namewhat;       /* (n) */
     const char *what;           /* (s) */
     const char *source;         /* (s) */
     size_t srclen;              /* (s) */
-    int currline;               /* (l) */
-    int defline;                /* (s) */
-    int lastdefline;            /* (s) */
-    int nupvals;                /* (u) */
-    int nparams;                /* (u) */
-    unsigned char isvararg;     /* (u) */
-    int ftransfer;              /* (r) */
-    int ntransfer;              /* (r) */
+    int32_t defline;            /* (s) */
+    int32_t lastdefline;        /* (s) */
+    int32_t currline;           /* (l) */
+    int32_t ftransfer;          /* (r) */
+    int32_t ntransfer;          /* (r) */
+    int32_t nupvals;            /* (u) */
+    int32_t nparams;            /* (u) */
+    uint8_t isvararg;           /* (u) */
     char shortsrc[TOKU_IDSIZE]; /* (s) */
     /* private part */
     struct CallFrame *cf;
 };
 
-TOKU_API int toku_getopcode(toku_State *T, const toku_Cinfo *ci, int n,
-                            toku_Opcode *opc);
-// TODO: implement
-//TOKU_API int toku_getopcodeoff(toku_State *T, const toku_Cinfo *ci, int off,
-//                               toku_Opcode *opc);
-//TOKU_API int toku_getopcode_next(toku_State *T, toku_Opcode *opc);
+TOKU_API int32_t toku_getopcode(toku_State *T, const toku_Cinfo *ci,
+                                int32_t n, toku_Opcode *opc);
+TOKU_API void    toku_getopcodeoff(toku_State *T, const toku_Cinfo *ci,
+                                   int32_t offset, toku_Opcode *opc);
+TOKU_API int32_t toku_getopcode_next(toku_State *T, toku_Opcode *opc);
 
 struct toku_Opcode {
-    int args[TOKU_OPARGS];
-    int line;
-    int offset;
-    int op;
+    int32_t args[TOKU_OPARGS];
+    int32_t line;
+    int32_t offset;
+    int32_t op;
     char name[TOKU_OPCNAMESIZE];
     /* private part */
     struct Proto *f;
@@ -448,9 +432,9 @@ TOKU_API void toku_getopdesc(toku_State *T, toku_Opdesc *opd,
 
 struct toku_Opdesc {
     struct {
-        int type;
+        int32_t type;
         union {
-            int b;
+            int32_t b;
             toku_Number n;
             const char *s;
         } value;
@@ -458,13 +442,16 @@ struct toku_Opdesc {
     char desc[TOKU_OPCDESCSIZE];
 };
 
-TOKU_API int  toku_getcompinfo(toku_State *T, int idx, toku_Cinfo *ci);
-TOKU_API int  toku_getconstant(toku_State *T, const toku_Cinfo *ci, int n);
+TOKU_API int32_t toku_getcompinfo(toku_State *T, int32_t idx, toku_Cinfo *ci);
+TOKU_API int32_t toku_getconstant(toku_State *T, const toku_Cinfo *ci,
+                                                 int32_t n);
 TOKU_API void toku_getshortsrc(toku_State *T, const toku_Cinfo *ci, char *out);
-TOKU_API const char *toku_getlocalinfo(toku_State *T, toku_Cinfo *ci, int n);
-TOKU_API const char *toku_getupvalueinfo(toku_State *T, toku_Cinfo *ci, int n);
-TOKU_API int  toku_getfunction(toku_State *T, const toku_Cinfo *src,
-                                                    toku_Cinfo *dest, int n);
+TOKU_API const char *toku_getlocalinfo(toku_State *T, toku_Cinfo *ci,
+                                                      int32_t n);
+TOKU_API const char *toku_getupvalueinfo(toku_State *T, toku_Cinfo *ci,
+                                                        int32_t n);
+TOKU_API int32_t toku_getfunction(toku_State *T, const toku_Cinfo *src,
+                                  toku_Cinfo *dest, int32_t n);
 
 struct toku_Cinfo {
     const void *func;
@@ -475,29 +462,29 @@ struct toku_Cinfo {
     size_t srclen;
     union {
         struct {
-            int startoff;
-            int endoff;
+            int32_t startoff;
+            int32_t endoff;
         } l;
         struct {
-            int instack;
-            int idx;
+            int32_t instack;
+            int32_t idx;
         } u;
     } info;
-    int defline;
-    int lastdefline;
-    int nupvals;
-    int nlocals;
-    int nparams;
-    int nconstants;
-    int nfunctions;
-    int ncode;
-    int nslots;
-    unsigned char isvararg;
+    int32_t defline;
+    int32_t lastdefline;
+    int32_t nupvals;
+    int32_t nlocals;
+    int32_t nparams;
+    int32_t nconstants;
+    int32_t nfunctions;
+    int32_t ncode;
+    int32_t nslots;
+    uint8_t isvararg;
     /* private part */
     struct Proto *f;
 };
-/* }====================================================================== */
 
+/* }{Copyright============================================================ */
 
 #define TOKUI_TOSTR_AUX(x)      #x
 #define TOKUI_TOSTR(x)          TOKUI_TOSTR_AUX(x)
@@ -540,5 +527,7 @@ struct toku_Cinfo {
 ** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 ** SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ** ======================================================================= */
+
+/* }}EOF================================================================== */
 
 #endif

@@ -56,8 +56,8 @@ typedef void (*ProtectedFn)(toku_State *T, void *userdata);
 TOKUI_FUNC void tokuPR_seterrorobj(toku_State *T, int errcode, SPtr oldtop);
 TOKUI_FUNC t_noret tokuPR_throw(toku_State *T, int code);
 TOKUI_FUNC int tokuPR_rawcall(toku_State *T, ProtectedFn fn, void *ud);
-TOKUI_FUNC int tokuPR_call(toku_State *T, ProtectedFn fn, void *ud, ptrdiff_t top,
-                           ptrdiff_t errfunc);
+TOKUI_FUNC int tokuPR_call(toku_State *T, ProtectedFn fn, void *ud,
+                                          ptrdiff_t top, ptrdiff_t errfunc);
 TOKUI_FUNC int tokuPR_close(toku_State *T, ptrdiff_t level, int status);
 TOKUI_FUNC int tokuPR_parse(toku_State *T, BuffReader *Z, const char *name,
                                                           const char *mode); 

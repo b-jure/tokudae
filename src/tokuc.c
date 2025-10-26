@@ -19,9 +19,9 @@
 #endif
 
 
-static int dump = 1;                            /* dump bytecode? */
-static int list = 0;                            /* list bytecode? */
-static int strip = 0;                           /* strip debug info? */
+static int32_t dump = 1;                            /* dump bytecode? */
+static int32_t list = 0;                            /* list bytecode? */
+static int32_t strip = 0;                           /* strip debug info? */
 static char verbosity = 0;                      /* verbosity level */
 static char showdesc = 0;                       /* show opcode description? */
 static const char *progname = TOKU_PROGNAMEC;   /* actual program name */
@@ -49,7 +49,7 @@ static void usage(void) {
 }
 
 
-static void _fatal(int usg, const char *fmt, ...) {
+static void _fatal(int32_t usg, const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     fprintf(stderr, "%s: ", progname);
@@ -67,7 +67,7 @@ static void _fatal(int usg, const char *fmt, ...) {
 #define ufatalf(fmt,...)    _fatal(1, fmt, __VA_ARGS__)
 
 
-static const char *getarg(char *v[], int *i, int j, const char *opt) {
+static const char *getarg(char *v[], int32_t *i, int32_t j, const char *opt) {
     const char *arg;
     if (v[*i][j+1] == '\0') {
         *i += 1; /* go to next arg */
@@ -87,10 +87,10 @@ err:
 #define checkrest()     if ((arg)[j+1] != 0) { j++; goto read_opt; }
 #define pversion()      printf("%s\n", TOKU_COPYRIGHT);
 
-static int cliargs(int argc, char *argv[]) {
-    int i, version = 0;
+static int32_t cliargs(int32_t argc, char *argv[]) {
+    int32_t i, version = 0;
     for (i=1; i<argc; i++) {
-        int j = 0;
+        int32_t j = 0;
         const char *arg = argv[i];
         if (arg[0] != '-') break; /* end of options */
     read_opt:
@@ -98,7 +98,7 @@ static int cliargs(int argc, char *argv[]) {
             case 'l': {
                 arg = getarg(argv, &i, j, "-l");
                 if (strlen(arg) > 1 || *arg < '0' || *arg > '3')
-                    fatalf("invalid 'n' ('%s') for '-l', expected [0, 3]", arg);
+                    fatalf("invalid 'n' ('%s') for '-l', expected [0, 3]",arg);
                 verbosity = *arg - '0';
                 list = 1;
                 break;
@@ -173,34 +173,38 @@ static void list_header(const toku_Cinfo *ci) {
 }
 
 
-static void list_bytecode(toku_State *T, toku_Cinfo *ci, int verb) {
+static void list_opcode(toku_State *T, toku_Cinfo *ci, int32_t verb) {
+    int32_t i = 0;
     toku_Opcode opc;
-    for (int i=0; toku_getopcode(T, ci, i, &opc); i++) {
+    if (tokui_unlikely(!toku_getopcode(T, ci, 0, &opc))) /* no bytecode? */
+        return; /* (this should not happen) */
+    do {
         printf("\t%d\t", opc.offset);
         if (opc.line > 0)
             printf("[%d]\t", opc.line);
         else
             printf("[-]\t");
         printf("%-16s\t", opc.name);
-        if (verb >= 1) { /* show instruction arguments? */
-            for (int j=0; cast_uint(j)<t_arraysize(opc.args); j++) {
+        if (verb >= 1) { /* show opcode arguments? */
+            for (int32_t j=0; cast_u32(j)<t_arraysize(opc.args); j++) {
                 if (opc.args[j] == -1)
                     printf("- ");
                 else
                     printf("%d ", opc.args[j]);
             }
         }
-        if (showdesc) { /* show instruction description? */
+        if (showdesc) { /* show opcode description? */
             toku_Opdesc opd;
             toku_getopdesc(T, &opd, &opc);
             printf("    # %s", opd.desc);
         }
         printf("\n");
-    }
+        i++;
+    } while (toku_getopcode_next(T, &opc));
 }
 
 
-static void printType(toku_State *T, int t) {
+static void printType(toku_State *T, int32_t t) {
     switch (t) {
         case TOKU_T_NIL: printf("N"); break;
         case TOKU_T_BOOL: printf("B"); break;
@@ -220,7 +224,7 @@ static void printType(toku_State *T, int t) {
 static void printString(const char *s, size_t l) {
     printf("\"");
     for (size_t i=0; i<l; i++) {
-        int c = cast_int(cast_ubyte(s[i]));
+        int32_t c = cast_i32(cast_u8(s[i]));
         switch (c) {
             case '"': printf("\\\""); break;
             case '\\': printf("\\\\"); break;
@@ -244,7 +248,7 @@ static void printString(const char *s, size_t l) {
 }
 
 
-static void printConstant(toku_State *T, int t) {
+static void printConstant(toku_State *T, int32_t t) {
     switch (t) {
         case TOKU_T_NIL:
             printf("nil");
@@ -277,14 +281,14 @@ static void printConstant(toku_State *T, int t) {
 }
 
 
-static void list_debug(toku_State *T, toku_Cinfo *ci, int verb) {
-    int n = ci->nconstants;
+static void list_debug(toku_State *T, toku_Cinfo *ci, int32_t verb) {
+    int32_t n = ci->nconstants;
     printf("constants (%d) for %p",n, ci->func);
     if (ci->constants)
         printf(" (at %p):", ci->constants);
     printf("\n");
-    for (int i=0; i<n; i++) {
-        int t = toku_getconstant(T, ci, i);
+    for (int32_t i=0; i<n; i++) {
+        int32_t t = toku_getconstant(T, ci, i);
         printf("\t%d\t", i);
         printType(T, t);
         if (verb >= 3) {
@@ -296,14 +300,14 @@ static void list_debug(toku_State *T, toku_Cinfo *ci, int verb) {
     }
     n = ci->nlocals;
     printf("locals (%d) for %p:\n", n, ci->func);
-    for (int i=0; i<n; i++) {
+    for (int32_t i=0; i<n; i++) {
         const char *name = toku_getlocalinfo(T, ci, i);
         printf("\t%d\t%s\t%d\t%d\n",
                 i, name, ci->info.l.startoff, ci->info.l.endoff);
     }
     n = ci->nupvals;
     printf("upvalues (%d) for %p:\n", n, ci->func);
-    for (int i=0; i<n; i++) {
+    for (int32_t i=0; i<n; i++) {
         const char *name = toku_getupvalueinfo(T, ci, i);
         printf("\t%d\t%s\t%d\t%d\n",
                 i, name, ci->info.u.instack, ci->info.u.idx);
@@ -311,25 +315,25 @@ static void list_debug(toku_State *T, toku_Cinfo *ci, int verb) {
 }
 
 
-static void list_function(toku_State *T, toku_Cinfo *ci, int verb) {
+static void list_function(toku_State *T, toku_Cinfo *ci, int32_t verb) {
     toku_Cinfo dest;
     list_header(ci);
-    list_bytecode(T, ci, verb);
+    list_opcode(T, ci, verb);
     if (verb >= 2) /* list debug information? */
         list_debug(T, ci, verb);
-    for (int i=0; toku_getfunction(T, ci, &dest, i); i++)
+    for (int32_t i=0; toku_getfunction(T, ci, &dest, i); i++)
         list_function(T, &dest, verb);
 }
 
 
-static void list_opcodes(toku_State *T, int verb) {
+static void list_opcodes(toku_State *T, int32_t verb) {
     toku_Cinfo ci;
     toku_getcompinfo(T, -1, &ci);
     list_function(T, &ci, verb);
 }
 
 
-static int writer(toku_State *T, const void *b, size_t sz, void *data) {
+static int32_t writer(toku_State *T, const void *b, size_t sz, void *data) {
     UNUSED(T);
     return (b==NULL || fwrite(b, sz, 1, cast(FILE*, data)) != 1) && (sz != 0);
 }
@@ -339,14 +343,14 @@ static int writer(toku_State *T, const void *b, size_t sz, void *data) {
         tokuL_error(T, "cannot %s %s: %s", what, output, strerror(errno))
 
 
-static int pmain(toku_State *T) {
-    int argc = cast_int(toku_to_integer(T, 0));
+static int32_t pmain(toku_State *T) {
+    int32_t argc = cast_i32(toku_to_integer(T, 0));
     char** argv = cast(char **, toku_to_userdata(T, 1));
-    int firstfunc;
+    int32_t firstfunc;
     if (!toku_checkstack(T, argc + 1)) /* +1 for potential constant value */
         tokuL_error(T, "too many input files");
     firstfunc = toku_getntop(T);
-    for (int i=0; i<argc; i++) { /* load all input files */
+    for (int32_t i=0; i<argc; i++) { /* load all input files */
         const char* filename = EQ(argv[i], "-") ? NULL : argv[i];
         if (tokuL_loadfile(T, filename) != TOKU_STATUS_OK)
             toku_error(T);
@@ -378,8 +382,8 @@ static int pmain(toku_State *T) {
 }
 
 
-int main(int argc, char *argv[]) {
-    int i = cliargs(argc, argv);
+int32_t main(int32_t argc, char *argv[]) {
+    int32_t i = cliargs(argc, argv);
     toku_State *T;
     argc -= i; argv += i;
     if (argc <= 0)

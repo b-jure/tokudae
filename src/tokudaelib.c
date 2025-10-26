@@ -13,16 +13,16 @@
 #include "tokudaeaux.h"
 
 
-TOKUI_FUNC int tokuopen_basic(toku_State *T);
-TOKUI_FUNC int tokuopen_package(toku_State *T);
-TOKUI_FUNC int tokuopen_string(toku_State *T);
-TOKUI_FUNC int tokuopen_math(toku_State *T);
-TOKUI_FUNC int tokuopen_io(toku_State *T);
-TOKUI_FUNC int tokuopen_os(toku_State *T);
-TOKUI_FUNC int tokuopen_reg(toku_State *T);
-TOKUI_FUNC int tokuopen_debug(toku_State *T);
-TOKUI_FUNC int tokuopen_list(toku_State *T);
-TOKUI_FUNC int tokuopen_utf8(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_basic(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_package(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_string(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_math(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_io(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_os(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_reg(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_debug(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_list(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_utf8(toku_State *T);
 
 
 /*
@@ -44,8 +44,9 @@ static const tokuL_Entry stdlibs[] = {
 };
 
 
-TOKULIB_API void tokuL_openlibsx(toku_State *T, int libload, int libpreload) {
-    int mask;
+TOKULIB_API void tokuL_openlibsx(toku_State *T, int32_t libload,
+                                                int32_t libpreload) {
+    int32_t mask;
     const tokuL_Entry *lib;
     tokuL_get_subtable(T, TOKU_CTABLE_INDEX, TOKU_PRELOAD_TABLE);
     for (lib = stdlibs, mask = 1; lib->name != NULL; lib++, mask <<= 1) {

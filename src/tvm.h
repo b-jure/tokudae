@@ -45,22 +45,29 @@ TOKUI_FUNC toku_Integer tokuV_modi(toku_State *T, toku_Integer x,
 TOKUI_FUNC toku_Number tokuV_modf(toku_State *T, toku_Number x, toku_Number y);
 TOKUI_FUNC void tokuV_binarithm(toku_State *T, const TValue *a,
                                 const TValue *b, SPtr res, int op);
-TOKUI_FUNC void tokuV_unarithm(toku_State *T, const TValue *v, SPtr res, int op);
+TOKUI_FUNC void tokuV_unarithm(toku_State *T, const TValue *v,
+                                              SPtr res, int op);
 TOKUI_FUNC int tokuV_ordereq(toku_State *T, const TValue *v1, const TValue *v2);
 TOKUI_FUNC int tokuV_orderlt(toku_State *T, const TValue *v1, const TValue *v2);
 TOKUI_FUNC int tokuV_orderle(toku_State *T, const TValue *v1, const TValue *v2);
 TOKUI_FUNC void tokuV_execute(toku_State *T, CallFrame *cf);
-TOKUI_FUNC void tokuV_rawsetstr(toku_State *T, const TValue *o, const TValue *k,
-                                const TValue *val);
-TOKUI_FUNC void tokuV_rawset(toku_State *T, const TValue *o, const TValue *k,
-                             const TValue *val);
-TOKUI_FUNC void tokuV_set(toku_State *T, const TValue *o, const TValue *k,
-                          const TValue *val);
-TOKUI_FUNC void tokuV_rawgetstr(toku_State *T, const TValue *o, const TValue *k,
-                                SPtr res);
-TOKUI_FUNC void tokuV_rawget(toku_State *T, const TValue *o, const TValue *k,
-                             SPtr res);
-TOKUI_FUNC void tokuV_get(toku_State *T, const TValue *o, const TValue *k,
-                          SPtr res);
+TOKUI_FUNC void tokuV_rawsetstr(toku_State *T, const TValue *o,
+                                               const TValue *k,
+                                               const TValue *v);
+TOKUI_FUNC void tokuV_rawset(toku_State *T, const TValue *o,
+                                            const TValue *k,
+                                            const TValue *v);
+TOKUI_FUNC void tokuV_set(toku_State *T, const TValue *o,
+                                         const TValue *k,
+                                         const TValue *v);
+TOKUI_FUNC void tokuV_rawgetstr(toku_State *T, const TValue *o,
+                                               const TValue *k,
+                                               SPtr res);
+TOKUI_FUNC void tokuV_rawget(toku_State *T, const TValue *o,
+                                            const TValue *k,
+                                            SPtr res);
+TOKUI_FUNC void tokuV_get(toku_State *T, const TValue *o,
+                                         const TValue *k,
+                                         SPtr res);
 
 #endif

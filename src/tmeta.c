@@ -39,10 +39,10 @@ void tokuTM_init(toku_State *T) {
         "__pow", "__shl", "__shr", "__band", "__bor", "__bxor", "__concat",
         "__unm", "__bnot", "__lt", "__le", "__close"
     };
-    toku_assert(FIRST_TM + TM_NUM <= TOKU_MAXUBYTE);
-    for (int i = 0; i < TM_NUM; i++) {
+    toku_assert(FIRST_TM + TM_NUM <= UINT8_MAX);
+    for (int32_t i = 0; i < TM_NUM; i++) {
         OString *s = tokuS_new(T, tmnames[i]);
-        s->extra = cast_ubyte(i + FIRST_TM);
+        s->extra = cast_u8(i + FIRST_TM);
         G(T)->tmnames[i] = s;
         tokuG_fix(T, obj2gco(G(T)->tmnames[i]));
     }
@@ -71,7 +71,7 @@ Instance *tokuTM_newinstance(toku_State *T, OClass *cls) {
 }
 
 
-UserData *tokuTM_newuserdata(toku_State *T, size_t size, t_ushort nuv) {
+UserData *tokuTM_newuserdata(toku_State *T, size_t size, uint16_t nuv) {
     GCObject *o;
     UserData *ud;
     if (t_unlikely(size > TOKU_MAXSIZE - udmemoffset(nuv)))
@@ -81,13 +81,14 @@ UserData *tokuTM_newuserdata(toku_State *T, size_t size, t_ushort nuv) {
     ud->metatable = NULL;
     ud->nuv = nuv;
     ud->size = size;
-    for (t_ushort i = 0; i < nuv; i++)
+    for (uint16_t i = 0; i < nuv; i++)
         setnilval(&ud->uv[i].val);
     return ud;
 }
 
 
-IMethod *tokuTM_newinsmethod(toku_State *T, Instance *ins, const TValue *method) {
+IMethod *tokuTM_newinsmethod(toku_State *T, Instance *ins,
+                                            const TValue *method) {
     GCObject *o = tokuG_new(T, sizeof(IMethod), TOKU_VIMETHOD);
     IMethod *im = gco2im(o);
     im->ins = ins;
@@ -96,14 +97,15 @@ IMethod *tokuTM_newinsmethod(toku_State *T, Instance *ins, const TValue *method)
 }
 
 
-int tokuTM_eqim(const IMethod *v1, const IMethod *v2) {
+int32_t tokuTM_eqim(const IMethod *v1, const IMethod *v2) {
     return (v1 == v2) || /* same instance... */
         (v1->ins == v2->ins && /* ...or equal instances */
          tokuV_raweq(&v1->method, &v2->method)); /* ...and equal methods */
 }
 
 
-UMethod *tokuTM_newudmethod(toku_State *T, UserData *ud, const TValue *method) {
+UMethod *tokuTM_newudmethod(toku_State *T, UserData *ud,
+                                           const TValue *method) {
     GCObject *o = tokuG_new(T, sizeof(UMethod), TOKU_VUMETHOD);
     UMethod *um = gco2um(o);
     um->ud = ud;
@@ -112,7 +114,7 @@ UMethod *tokuTM_newudmethod(toku_State *T, UserData *ud, const TValue *method) {
 }
 
 
-int tokuTM_equm(const UMethod *v1, const UMethod *v2) {
+int32_t tokuTM_equm(const UMethod *v1, const UMethod *v2) {
     return (v1 == v2) || /* same instance... */
         (v1->ud == v2->ud && /* ...or equal userdata */
          tokuV_raweq(&v1->method, &v2->method)); /* ...and equal methods */
@@ -135,7 +137,7 @@ const TValue *tokuTM_get(Table *events, TM event, OString *ename) {
     const TValue *tm = tokuH_Hgetshortstr(events, ename);
     toku_assert(event <= TM_NUM);
     if (notm(tm)) { /* no tag method? */
-        events->flags |= cast_ubyte(1u<<event); /* cache this fact */
+        events->flags |= cast_u8(1u<<event); /* cache this fact */
         return NULL;
     } else
         return tm;
@@ -201,9 +203,9 @@ void tokuTM_callbinres(toku_State *T, const TValue *f, const TValue *o1,
 }
 
 
-static int callbinTM(toku_State *T, const TValue *v1, const TValue *v2,
-                                                      SPtr res, TM event) {
-    int t1 = ttypetag(v1);
+static int32_t callbinTM(toku_State *T, const TValue *v1, const TValue *v2,
+                                        SPtr res, TM event) {
+    int32_t t1 = ttypetag(v1);
     if (t1 != TOKU_VINSTANCE || t1 != ttypetag(v2))
         return 0; /* error is invoked by caller */
     else if (insval(v1)->oclass != insval(v2)->oclass) {
@@ -246,7 +248,7 @@ void tokuTM_callunaryres(toku_State *T, const TValue *fn,
 }
 
 
-static int callunMT(toku_State *T, const TValue *o, SPtr res, TM event) {
+static int32_t callunMT(toku_State *T, const TValue *o, SPtr res, TM event) {
     const TValue *fn = tokuTM_objget(T, o, event);
     if (t_likely(!notm(fn))) {
         tokuTM_callunaryres(T, fn, o, res);
@@ -273,7 +275,8 @@ void tokuTM_tryconcat(toku_State *T) {
 
 
 /* call order method */
-int tokuTM_order(toku_State *T, const TValue *v1, const TValue *v2, TM event) {
+int32_t tokuTM_order(toku_State *T, const TValue *v1, const TValue *v2,
+                                                            TM event) {
     if (t_likely(callbinTM(T, v1, v2, T->sp.p, event)))
         return !t_isfalse(s2v(T->sp.p));
     tokuD_ordererror(T, v1, v2);

@@ -1142,6 +1142,15 @@ assert(getmetatable(Example).__init);</pre>
         To execute a chunk, Tokudae first <em>loads</em> it, precompiling the
         chunk's code into instructions for a virtual machine, and then Tokudae
         executes the compiled code with an interpreter for the virtual machine.
+        <br/><br/>
+        Chunks can also be precompiled into binary form;
+        see the program <code>tokuc</code> and the function
+        <a href="#string.dump"><code>string.dump</code></a> for details.
+        Programs in source and compiled forms are interchangeable;
+        Tokudae automatically detects the file type and acts accordingly
+        (see <a href="#load"><code>load</code></a>).
+        Be aware that, unlike source code,
+        maliciously crafted binary chunks can crash the interpreter.
         </p>
 
 
@@ -2318,8 +2327,9 @@ assert(!st and string.find(err, "class instance has no superclass"));</pre>
         unless class has <code>__init</code> which might return something
         else other than the instance (see <a href="#2.4">&sect;2.4</a>).
         Instances can call the methods the class defines and can set/get
-        <em>fields</em>. <em>fields</em> are identical to <em>fields</em> in a
-        table. Instances are the combination of data and functionality.
+        <em>fields</em> where <em>fields</em> are identical to 
+        the <em>fields</em> in a table.
+        Therefore instances are the combination of data and functionality.
         They derive the functionality from metafields and methods of their
         class and store data in their <em>fields</em>.
         <br/><br/>
@@ -2856,7 +2866,7 @@ assert(player.lol == "lol");</pre>
 
         <!-- toku_CFunction -->
         <hr><h3><a name="toku_CFunction"><code>toku_CFunction</code></a></h3>
-        <pre>typedef int (*toku_CFunction) (toku_State *T);</pre>
+        <pre>typedef int32_t (*toku_CFunction) (toku_State *T);</pre>
         <p>
         Type for C&nbsp;functions.
         <br/><br/>
@@ -2882,10 +2892,10 @@ assert(player.lol == "lol");</pre>
         arguments and returns their average and their sum.
             </summary>
             <pre>
-static int foo (toku_State *T) {
-    int n = toku_gettop(T);         /* index of last argument */
+static int32_t foo (toku_State *T) {
+    int32_t n = toku_gettop(T);         /* index of last argument */
     toku_Number sum = 0.0;
-    int i;
+    int32_t i;
     for (i = 0; i &lt;= n; i++) {
         if (!toku_is_number(T, i)) {
             toku_push_literal(T, "incorrect argument");
@@ -2983,7 +2993,7 @@ static void *allocator (void *ptr, void *ud, size_t osz, size_t nsz) {
 
         <!-- toku_Writer -->
         <hr><h3><a name="toku_Writer"><code>toku_Writer</code></a></h3>
-        <pre>typedef int (*toku_Writer) (toku_State *T, const void *b, size_t sz, void *data);</pre>
+        <pre>typedef int32_t (*toku_Writer) (toku_State *T, const void *b, size_t sz, void *data);</pre>
         <p>
         The type of the writer function used by
         <a href="#toku_dump"><code>toku_dump</code></a>.
@@ -3006,7 +3016,7 @@ static void *allocator (void *ptr, void *ud, size_t osz, size_t nsz) {
 
         <!-- toku_WarnFunction -->
         <hr><h3><a name="toku_WarnFunction"><code>toku_WarnFunction</code></a></h3>
-        <pre>typedef void (*toku_WarnFunction) (void *ud, const char *msg, int tocont);</pre>
+        <pre>typedef void (*toku_WarnFunction) (void *ud, const char *msg, int32_t tocont);</pre>
         <p>
         The type of warning functions, called by Tokudae to emit warnings.
         The first parameter is an opaque pointer set by
@@ -3028,14 +3038,14 @@ typedef struct toku_Debug {
     const char *what;               /* (s) */
     const char *source;             /* (s) */
     size_t srclen;                  /* (s) */
-    int currline;                   /* (l) */
-    int defline;                    /* (s) */
-    int lastdefline;                /* (s) */
-    int nupvals;                    /* (u) number of upvalues */
-    int nparams;                    /* (u) number of parameters */
-    unsigned char isvararg;         /* (u) */
-    int ftransfer;                  /* (r) */
-    int ntransfer;                  /* (r) */
+    int32_t currline;               /* (l) */
+    int32_t defline;                /* (s) */
+    int32_t lastdefline;            /* (s) */
+    int32_t nupvals;                /* (u) */
+    int32_t nparams;                /* (u) */
+    uint8_t isvararg;               /* (u) */
+    int32_t ftransfer;              /* (r) */
+    int32_t ntransfer;              /* (r) */
     char shortsrc[TOKU_IDSIZE];     /* (s) */
     /* private part */
     <em>other fields</em>
@@ -3181,17 +3191,17 @@ typedef struct toku_Debug {
         <hr><h3><a name="toku_Opcode"><code>toku_Opcode</code></a></h3>
         <pre>
 typedef struct toku_Opcode {
-    int args[TOKU_OPARGS];
-    int line;
-    int offset;
-    int op;
+    int32_t args[TOKU_OPARGS];
+    int32_t line;
+    int32_t offset;
+    int32_t op;
     char name[TOKU_OPCNAMESIZE];
     /* private part */
     <em>other fields</em>
 } toku_Opcode;</pre>
         <p>
-        A structure used to carry opcode information. Each Tokudae function
-        has code array associated with it.
+        A structure used to carry opcode information.
+        Each Tokudae function has code array associated with it.
         The code is called bytecode,
         it is a sequence of byte sized numbers,
         which the Tokudae virtual machine understands and executes.
@@ -3200,6 +3210,12 @@ typedef struct toku_Opcode {
         <br/><br/>
         The function <a href="#toku_getopcode"><code>toku_getopcode</code></a>
         fills all of the structure fields with appropriate information.
+        <br/>
+        <b>Beware</b>,
+        similarly to the <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>,
+        the garbage collector can still collect the function that filled
+        this structure, if that happens, this structure would reference
+        freed memory.
         <br/><br/>
         The fields of <a href="#toku_Opcode"><code>toku_Opcode</code></a>
         have the following meaning:
@@ -3254,9 +3270,9 @@ typedef struct toku_Opcode {
         <pre>
 typedef struct toku_Opdesc {
     struct {
-        int type;
+        int32_t type;
         union {
-            int b;
+            int32_t b;
             toku_Number n;
             const char *s;
         } value;
@@ -3267,15 +3283,23 @@ typedef struct toku_Opdesc {
         Structure that holds the description of the <code>toku_Opcode</code>
         (see <a href="#toku_Opcode"><code>toku_Opcode</code></a>) and it's
         associated value (if any).
+        This structure is filled by a call to
+        <a href="#toku_getopdesc"><code>toku_getopdesc</code></a>.
+        <b>Beware</b>,
+        if the call to 
+        <a href="#toku_getopdesc"><code>toku_getopdesc</code></a>
+        filled the <code>extra.value.s</code> field (a string constant),
+        and the function that holds the constant value is collected,
+        then <code>extra.value.s</code> would reference freed memory.
         <br/><br/>
         The fields of <a href="#toku_Opdesc"><code>toku_Opdesc</code></a>
         have the following meaning:
         <ul>
             <li>
                 <b><code>desc</code>: </b>
-                description of the opcode, it is a
-                C&nbsp;&lsquo;<em>code</em>&rsquo; with made up variables and
-                functions which describes what the opcode does.
+                description of the opcode is a
+                C&nbsp;<em>code</em> with made up variables and
+                functions which describe what the opcode does.
                 The description is just a simplification and not what
                 actually happens when the opcode is executed.
                 Maximum size of the description is
@@ -3291,6 +3315,10 @@ typedef struct toku_Opdesc {
                 then <code>extra.type</code> is set to the type of that
                 constant (see <a href="#toku_type"><code>toku_type</code></a>),
                 and <code>extra.value</code> to the value of that constant.
+                Otherwise,
+                <code>extra.type</code> is set to
+                <a href="#TOKU_T_NONE"><code>TOKU_T_NONE</code></a>
+                and <code>extra.value</code> is zeroed out.
             </li>
         </ul>
         </p>
@@ -3307,24 +3335,24 @@ typedef struct toku_Cinfo {
     size_t srclen;
     union {
         struct {
-            int startoff;
-            int endoff;
+            int32_t startoff;
+            int32_t endoff;
         } l;
         struct {
-            int instack;
-            int idx;
+            int32_t instack;
+            int32_t idx;
         } u;
     } info;
-    int defline;
-    int lastdefline;
-    int nupvals;
-    int nlocals;
-    int nparams;
-    int nconstants;
-    int nfunctions;
-    int ncode;
-    int nslots;
-    unsigned char isvararg;
+    int32_t defline;
+    int32_t lastdefline;
+    int32_t nupvals;
+    int32_t nlocals;
+    int32_t nparams;
+    int32_t nconstants;
+    int32_t nfunctions;
+    int32_t ncode;
+    int32_t nslots;
+    uint8_t isvararg;
     /* private part */
     <em>other fields</em>
 } toku_Cinfo;</pre>
@@ -3333,10 +3361,15 @@ typedef struct toku_Cinfo {
         function. The structure is filled by calling
         <a href="#toku_getcompinfo"><code>toku_getcompinfo</code></a>.
         <br/>
+        <b>Beware</b>,
+        the garbage collector is still able to collect the function
+        that filled this structure, if that happens, the structure would
+        reference freed memory.
+        <br/><br/>
         Some fields are identical to the fields in
         <a href="#toku_Debug"><code>toku_Debug</code></a>
         and won't be explained here.
-        <br/><br/>
+        <br/>
         The fields of <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>
         have the following meaning:
         <ul>
@@ -3416,7 +3449,7 @@ typedef struct toku_Cinfo {
 
         <hr><h3><a name="toku_upvalueindex"><code>toku_upvalueindex</code></a></h3><p>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_upvalueindex (unsigned short i);</pre>
+        <pre>int32_t toku_upvalueindex (int32_t i);</pre>
         <p>
         Returns the pseudo-index that represents the upvalue at index
         <code>i</code> (starting from 0) of the running function
@@ -3426,7 +3459,7 @@ typedef struct toku_Cinfo {
         <!-- toku_newstate -->
         <hr><h3><a name="toku_newstate"><code>toku_newstate</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void toku_newstate (toku_Alloc f, void *ud, unsigned int seed);</pre>
+        <pre>void toku_newstate (toku_Alloc f, void *ud, uint32_t seed);</pre>
         <p>
         Creates a new independent state and returns its main thread.
         Returns <code>NULL</code> if it cannot create the state
@@ -3474,7 +3507,7 @@ typedef struct toku_Cinfo {
         <!-- toku_resetthread -->
         <hr><h3><a name="toku_resetthread"><code>toku_resetthread</code></a></h3>
         <span class="apii">[-0, +?, &ndash;]</span>
-        <pre>int toku_resetthread (toku_State *T);</pre>
+        <pre>int32_t toku_resetthread (toku_State *T);</pre>
         <p>
         Resets a thread, cleaning its call stack and closing all pending
         to-be-closed variables.
@@ -3516,7 +3549,7 @@ typedef struct toku_Cinfo {
         <!-- toku_setntop -->
         <hr><h3><a name="toku_setntop"><code>toku_setntop</code></a></h3>
         <span class="apii">[-?, +?, <em>e</em>]</span>
-        <pre>void toku_setntop (toku_State *T, int n);</pre>
+        <pre>void toku_setntop (toku_State *T, int32_t n);</pre>
         <p>
         Sets the stack top to hold <code>n</code> values on the stack.
         If the new top is greater than the old one, then the new elements are
@@ -3530,7 +3563,7 @@ typedef struct toku_Cinfo {
         <!-- toku_gettop -->
         <hr><h3><a name="toku_gettop"><code>toku_gettop</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_gettop (toku_State *T);</pre>
+        <pre>int32_t toku_gettop (toku_State *T);</pre>
         <p>
         Returns the index of the top element in the stack.
         This result is equal to the number of elements in the stack - 1;
@@ -3540,7 +3573,7 @@ typedef struct toku_Cinfo {
         <!-- toku_absindex -->
         <hr><h3><a name="toku_absindex"><code>toku_absindex</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_absindex (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_absindex (toku_State *T, int32_t idx);</pre>
         <p>
         Converts the acceptable index <code>idx</code> into an equivalent
         absolute index (that is, one that does not depend on the stack size).
@@ -3549,7 +3582,7 @@ typedef struct toku_Cinfo {
         <!-- toku_rotate -->
         <hr><h3><a name="toku_rotate"><code>toku_rotate</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void toku_rotate (toku_State *T, int idx, int n);</pre>
+        <pre>void toku_rotate (toku_State *T, int32_t idx, int32_t n);</pre>
         <p>
         Rotates the stack elements between the valid index <code>idx</code>
         and the top of the stack.
@@ -3565,7 +3598,7 @@ typedef struct toku_Cinfo {
         <!-- toku_copy -->
         <hr><h3><a name="toku_copy"><code>toku_copy</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void toku_copy (toku_State *T, int src, int dest);</pre>
+        <pre>void toku_copy (toku_State *T, int32_t src, int32_t dest);</pre>
         <p>
         Copies the element at index <code>src</code> into the valid
         index <code>dest</code>, replacing the value at that position.
@@ -3575,7 +3608,7 @@ typedef struct toku_Cinfo {
         <!-- toku_checkstack -->
         <hr><h3><a name="toku_checkstack"><code>toku_checkstack</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_checkstack (toku_State *T, int n);</pre>
+        <pre>int32_t toku_checkstack (toku_State *T, int32_t n);</pre>
         <p>
         Ensures that the stack has space for at least <code>n</code> extra
         elements, that is, that you can safely push up to <code>n</code>
@@ -3591,7 +3624,7 @@ typedef struct toku_Cinfo {
         <!-- toku_push -->
         <hr><h3><a name="toku_push"><code>toku_push</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>void toku_push (toku_State *T, int idx);</pre>
+        <pre>void toku_push (toku_State *T, int32_t idx);</pre>
         <p>
         Pushes a copy of the element at the given index onto the stack.
         </p>
@@ -3599,7 +3632,7 @@ typedef struct toku_Cinfo {
         <!-- toku_xmove -->
         <hr><h3><a name="toku_xmove"><code>toku_xmove</code></a></h3>
         <span class="apii">[-?, +?, &ndash;]</span>
-        <pre>void toku_xmove (toku_State *src, toku_State *dest, int n);</pre>
+        <pre>void toku_xmove (toku_State *src, toku_State *dest, int32_t n);</pre>
         <p>
         Exchange values between different threads of the same state.
         <br/><br/>
@@ -3610,7 +3643,7 @@ typedef struct toku_Cinfo {
         <!-- toku_is_number -->
         <hr><h3><a name="toku_is_number"><code>toku_is_number</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_number (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_number (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a number, and
         0&nbsp;otherwise.
@@ -3619,7 +3652,7 @@ typedef struct toku_Cinfo {
         <!-- toku_is_integer -->
         <hr><h3><a name="toku_is_integer"><code>toku_is_integer</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_integer (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_integer (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is an integer
         (that is, the value is a number and is represented as an integer),
@@ -3629,14 +3662,14 @@ typedef struct toku_Cinfo {
         <!-- toku_is_string -->
         <hr><h3><a name="toku_is_string"><code>toku_is_string</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_string (toku_State *T);</pre>
+        <pre>int32_t toku_is_string (toku_State *T);</pre>
         <p>
         </p>
 
         <!-- toku_is_cfunction -->
         <hr><h3><a name="toku_is_cfunction"><code>toku_is_cfunction</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void toku_is_cfunction (toku_State *T, int idx);</pre>
+        <pre>void toku_is_cfunction (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a C&nbsp;function,
         and 0&nbsp;otherwise.
@@ -3645,7 +3678,7 @@ typedef struct toku_Cinfo {
         <!-- toku_is_udatamethod -->
         <hr><h3><a name="toku_is_udatamethod"><code>toku_is_udatamethod</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void toku_is_udatamethod (toku_State *T, int idx);</pre>
+        <pre>void toku_is_udatamethod (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a userdata bound method,
         and 0&nbsp;otherwise.
@@ -3654,7 +3687,7 @@ typedef struct toku_Cinfo {
         <!-- toku_is_userdata -->
         <hr><h3><a name="toku_is_userdata"><code>toku_is_userdata</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_userdata (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_userdata (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a userdata
         (either full or light), and 0&nbsp;otherwise.
@@ -3663,7 +3696,7 @@ typedef struct toku_Cinfo {
         <!-- toku_type -->
         <hr><h3><a name="toku_type"><code>toku_type</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_type (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_type (toku_State *T, int32_t idx);</pre>
         <p>
         Returns the type of the value in the given valid index <code>idx</code>,
         or <a href="#TOKU_T_NONE"><code>TOKU_T_NONE</code></a> for a
@@ -3688,7 +3721,7 @@ typedef struct toku_Cinfo {
         <!-- toku_typename -->
         <hr><h3><a name="toku_typename"><code>toku_typename</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>const char *toku_typename (toku_State *T, int type);</pre>
+        <pre>const char *toku_typename (toku_State *T, int32_t type);</pre>
         <p>
         Returns the name of the type encoded by the value <code>type</code>,
         which must be one the values returned by
@@ -3698,7 +3731,7 @@ typedef struct toku_Cinfo {
         <!-- toku_to_numberx -->
         <hr><h3><a name="toku_to_numberx"><code>toku_to_numberx</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>toku_Number toku_to_numberx (toku_State *T, int idx, int *isnum);</pre>
+        <pre>toku_Number toku_to_numberx (toku_State *T, int32_t idx, int32_t *isnum);</pre>
         <p>
         Converts the Tokudae value at the given index to the C&nbsp;type
         <a href="#toku_Number"><code>toku_Number</code></a>
@@ -3716,7 +3749,7 @@ typedef struct toku_Cinfo {
         <!-- toku_to_integerx -->
         <hr><h3><a name="toku_to_integerx"><code>toku_to_integerx</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>toku_Integer toku_to_integerx (toku_State *T, int idx, int *isnum);</pre>
+        <pre>toku_Integer toku_to_integerx (toku_State *T, int32_t idx, int32_t *isnum);</pre>
         <p>
         Converts the Tokudae value at the given index to the signed
         integral type <a href="#toku_Integer"><code>toku_Integer</code></a>.
@@ -3734,7 +3767,7 @@ typedef struct toku_Cinfo {
         <!-- toku_to_bool -->
         <hr><h3><a name="toku_to_bool"><code>toku_to_bool</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_to_bool (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_to_bool (toku_State *T, int32_t idx);</pre>
         <p>
         Converts the Tokudae value at the given index to a C&nbsp;boolean
         value (0&nbsp;or&nbsp;1).
@@ -3750,7 +3783,7 @@ typedef struct toku_Cinfo {
         <!-- toku_to_lstring -->
         <hr><h3><a name="toku_to_lstring"><code>toku_to_lstring</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>const char *toku_to_lstring (toku_State *T, int idx, size_t *len);</pre>
+        <pre>const char *toku_to_lstring (toku_State *T, int32_t idx, size_t *len);</pre>
         <p>
         Converts the Tokudae value at the given index to a C&nbsp;string.
         If <code>len</code> is not <code>NULL</code>,
@@ -3768,7 +3801,7 @@ typedef struct toku_Cinfo {
         <!-- toku_to_cfunction -->
         <hr><h3><a name="toku_to_cfunction"><code>toku_to_cfunction</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>toku_CFunction toku_to_cfunction (toku_State *T, int idx);</pre>
+        <pre>toku_CFunction toku_to_cfunction (toku_State *T, int32_t idx);</pre>
         <p>
         Converts a value at the given index to a C&nbsp;function.
         That value must be a C&nbsp;function; otherwise, returns <code>NULL</code>.
@@ -3777,7 +3810,7 @@ typedef struct toku_Cinfo {
         <!-- toku_to_userdata -->
         <hr><h3><a name="toku_to_userdata"><code>toku_to_userdata</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void *toku_to_userdata (toku_State *T, int idx);</pre>
+        <pre>void *toku_to_userdata (toku_State *T, int32_t idx);</pre>
         <p>
         If the value at the given index is a full userdata, returns its
         memory-block address.
@@ -3788,7 +3821,7 @@ typedef struct toku_Cinfo {
         <!-- toku_to_pointer -->
         <hr><h3><a name="toku_to_pointer"><code>toku_to_pointer</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>const void *toku_to_pointer (toku_State *T, int idx);</pre>
+        <pre>const void *toku_to_pointer (toku_State *T, int32_t idx);</pre>
         <p>
         Converts the value at the given index to a generic C&nbsp;pointer
         (<code>void*</code>).
@@ -3804,7 +3837,7 @@ typedef struct toku_Cinfo {
         <!-- toku_to_thread -->
         <hr><h3><a name="toku_to_thread"><code>toku_to_thread</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>toku_State *toku_to_thread (toku_State *T, int idx);</pre>
+        <pre>toku_State *toku_to_thread (toku_State *T, int32_t idx);</pre>
         <p>
         Converts the value at the given index to a Tokudae thread
         (represented as <code>toku_State*</code>).
@@ -3815,7 +3848,7 @@ typedef struct toku_Cinfo {
         <!-- toku_arith -->
         <hr><h3><a name="toku_arith"><code>toku_arith</code></a></h3>
         <span class="apii">[-(2|1), +1, <em>e</em>]</span>
-        <pre>void toku_arith (toku_State *T, int op);</pre>
+        <pre>void toku_arith (toku_State *T, int32_t op);</pre>
         <p>
         Performs an arithmetic or bitwise operation over the two values
         (or one, in the case of negations or bitwise NOT) at the top of
@@ -3888,7 +3921,7 @@ typedef struct toku_Cinfo {
         <!-- toku_rawequal -->
         <hr><h3><a name="toku_rawequal"><code>toku_rawequal</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_rawequal (toku_State *T, int idx1, int idx2);</pre>
+        <pre>int32_t toku_rawequal (toku_State *T, int32_t idx1, int32_t idx2);</pre>
         <p>
         Checks whether <code>idx1</code> is equal to <code>idx2</code>,
         without invoking the <code>__eq</code> metamethod.
@@ -3898,7 +3931,7 @@ typedef struct toku_Cinfo {
         <!-- toku_compare -->
         <hr><h3><a name="toku_compare"><code>toku_compare</code></a></h3>
         <span class="apii">[-0, +0, <em>e</em>]</span>
-        <pre>int toku_compare (toku_State *T, int idx1, int idx2, int op);</pre>
+        <pre>int32_t toku_compare (toku_State *T, int32_t idx1, int32_t idx2, int32_t op);</pre>
         <p>
         Compares two Tokudae values.
         Returns 1 if the value at index <code>idx1</code> satisfies
@@ -4046,7 +4079,7 @@ typedef struct toku_Cinfo {
         <!-- toku_push_cclosure -->
         <hr><h3><a name="toku_push_cclosure"><code>toku_push_cclosure</code></a></h3>
         <span class="apii">[-n, +1, <em>m</em>]</span>
-        <pre>void toku_push_cclosure (toku_State *T, toku_CFunction f, int n);</pre>
+        <pre>void toku_push_cclosure (toku_State *T, toku_CFunction f, int32_t n);</pre>
         <p>
         Pushes a new C&nbsp;closure onto the stack.
         This function receives a pointer to a C&nbsp;function and pushes onto
@@ -4083,7 +4116,7 @@ typedef struct toku_Cinfo {
         <!-- toku_push_bool -->
         <hr><h3><a name="toku_push_bool"><code>toku_push_bool</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>void toku_push_bool (toku_State *T, int b);</pre>
+        <pre>void toku_push_bool (toku_State *T, int32_t b);</pre>
         <p>
         Pushes a boolean value with value <code>b</code> onto the stack.
         </p>
@@ -4106,7 +4139,7 @@ typedef struct toku_Cinfo {
         <!-- toku_push_userdata -->
         <hr><h3><a name="toku_push_userdata"><code>toku_push_userdata</code></a></h3>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>void *toku_push_userdata (toku_State *T, size_t size, unsigned short nuv);</pre>
+        <pre>void *toku_push_userdata (toku_State *T, size_t size, uint16_t nuv);</pre>
         <p>
         This function creates and pushes on the stack a new full userdata,
         with <code>nuv</code> associated Tokudae values, called
@@ -4127,7 +4160,7 @@ typedef struct toku_Cinfo {
         <!-- toku_push_list -->
         <hr><h3><a name="toku_push_list"><code>toku_push_list</code></a></h3>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>void toku_push_list (toku_State *T, int size);</pre>
+        <pre>void toku_push_list (toku_State *T, int32_t size);</pre>
         <p>
         Creates a new empty list and pushes it on the stack.
         Parameter <code>size</code> is a hint for how many elements the
@@ -4140,7 +4173,7 @@ typedef struct toku_Cinfo {
         <!-- toku_push_table -->
         <hr><h3><a name="toku_push_table"><code>toku_push_table</code></a></h3>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>void toku_push_table (toku_State *T, int size);</pre>
+        <pre>void toku_push_table (toku_State *T, int32_t size);</pre>
         <p>
         Creates a new empty table and pushes it on the stack.
         Parameter <code>size</code> is a hint for how many fields the
@@ -4151,7 +4184,7 @@ typedef struct toku_Cinfo {
         <!-- toku_push_thread -->
         <hr><h3><a name="toku_push_thread"><code>toku_push_thread</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_push_thread (toku_State *T);</pre>
+        <pre>int32_t toku_push_thread (toku_State *T);</pre>
         <p>
         Pushes the thread represented by <code>T</code> onto the stack.
         Returns 1 if this thread is the main thread of its state.
@@ -4173,7 +4206,7 @@ typedef struct toku_Cinfo {
         <!-- toku_push_instance -->
         <hr><h3><a name="toku_push_instance"><code>toku_push_instance</code></a></h3>
         <span class="apii">[-0, +1, <em>e</em>]</span>
-        <pre>void toku_push_instance (toku_State *T, int idx);</pre>
+        <pre>void toku_push_instance (toku_State *T, int32_t idx);</pre>
         <p>
         Creates a new instance of the class at the given index and pushes
         it on the stack.
@@ -4188,7 +4221,7 @@ typedef struct toku_Cinfo {
         <!-- toku_push_boundmethod -->
         <hr><h3><a name="toku_push_boundmethod"><code>toku_push_boundmethod</code></a></h3>
         <span class="apii">[-1, +1, <em>m</em>]</span>
-        <pre>void toku_push_boundmethod (toku_State *T, int idx);</pre>
+        <pre>void toku_push_boundmethod (toku_State *T, int32_t idx);</pre>
         <p>
         Creates a new bound method object and pushes it on the stack.
         The receiver, <em>self</em> object, is at the given index, and the
@@ -4203,7 +4236,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get -->
         <hr><h3><a name="toku_get"><code>toku_get</code></a></h3>
         <span class="apii">[-1, +1, <em>e</em>]</span>
-        <pre>int toku_get (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_get (toku_State *T, int32_t idx);</pre>
         <p>
         Pushes on the stack the value <code>obj[k]</code>, where
         <code>obj</code> is the value at the given index and <code>k</code>
@@ -4220,7 +4253,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_raw -->
         <hr><h3><a name="toku_get_raw"><code>toku_get_raw</code></a></h3>
         <span class="apii">[-1, +1, &ndash;]</span>
-        <pre>int toku_get_raw (toku_State *T, int index);</pre>
+        <pre>int32_t toku_get_raw (toku_State *T, int32_t index);</pre>
         <p>
         Similar to <a href="#toku_get"><code>toku_get</code></a>, but does a
         raw access (i.e., without metamethods).
@@ -4230,7 +4263,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_global_str -->
         <hr><h3><a name="toku_get_global_str"><code>toku_get_global_str</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_get_global_str (toku_State *T, const char *name);</pre>
+        <pre>int32_t toku_get_global_str (toku_State *T, const char *name);</pre>
         <p>
         Pushes onto the stack the value of the global <code>name</code>.
         Returns the type of that value.
@@ -4239,7 +4272,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_index -->
         <hr><h3><a name="toku_get_index"><code>toku_get_index</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_get_index (toku_State *T, int idx, toku_Integer i);</pre>
+        <pre>int32_t toku_get_index (toku_State *T, int32_t idx, toku_Integer i);</pre>
         <p>
         Pushes onto the stack the value <code>l[i]</code>,
         where <code>l</code> is the list at the given index.
@@ -4250,7 +4283,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_cindex -->
         <hr><h3><a name="toku_get_cindex"><code>toku_get_cindex</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_get_cindex (toku_State *T, toku_Integer i);</pre>
+        <pre>int32_t toku_get_cindex (toku_State *T, toku_Integer i);</pre>
         <p>
         Similar to <a href="#toku_get_index"><code>toku_get_index</code></a>,
         except the list is at the pseudo-index
@@ -4260,7 +4293,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_field -->
         <hr><h3><a name="toku_get_field"><code>toku_get_field</code></a></h3>
         <span class="apii">[-1, +1, &ndash;]</span>
-        <pre>int toku_get_field (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_get_field (toku_State *T, int32_t idx);</pre>
         <p>
         Similar to <a href="#toku_get_raw"><code>toku_get_raw</code></a>,
         except that the value at <code>idx</code> can only be a table or an
@@ -4275,7 +4308,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_field_str -->
         <hr><h3><a name="toku_get_field_str"><code>toku_get_field_str</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_get_field_str (toku_State *T, int index, const char *s);</pre>
+        <pre>int32_t toku_get_field_str (toku_State *T, int32_t index, const char *s);</pre>
         <p>
         Similar to <a href="#toku_get_field"><code>toku_get_field</code></a>
         but instead of using the value on top of the stack as key, it instead
@@ -4288,7 +4321,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_field_int -->
         <hr><h3><a name="toku_get_field_int"><code>toku_get_field_int</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_get_field_int (toku_State *T, int index, toku_Integer i);</pre>
+        <pre>int32_t toku_get_field_int (toku_State *T, int32_t index, toku_Integer i);</pre>
         <p>
         Identical to <a href="#toku_get_field_str"><code>toku_get_field_str</code></a>
         except the key is argument <code>i</code> which is a
@@ -4300,7 +4333,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_cfield_str -->
         <hr><h3><a name="toku_get_cfield_str"><code>toku_get_cfield_str</code></a></h3><p>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_get_cfield_str (toku_State *T, const char *s);</pre>
+        <pre>int32_t toku_get_cfield_str (toku_State *T, const char *s);</pre>
         <p>
         Equivalent to <code>t[s]</code> where <code>t</code> is the
         <em>C table</em> located at the pseudo-index
@@ -4313,7 +4346,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_class -->
         <hr><h3><a name="toku_get_class"><code>toku_get_class</code></a></h3>
         <span class="apii">[-0, +0|1, &ndash;]</span>
-        <pre>int toku_get_class (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_get_class (toku_State *T, int32_t idx);</pre>
         <p>
         Pushes the class of the object at the given index on the stack.
         <br/><br/>
@@ -4325,7 +4358,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_superclass -->
         <hr><h3><a name="toku_get_superclass"><code>toku_get_superclass</code></a></h3>
         <span class="apii">[-0, +(0|1), &ndash;]</span>
-        <pre>int toku_get_superclass (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_get_superclass (toku_State *T, int32_t idx);</pre>
         <p>
         Pushes the superclass of the value at the given index on the stack.
         The value at the given index must be either a class or an instance.
@@ -4337,7 +4370,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_method -->
         <hr><h3><a name="toku_get_method"><code>toku_get_method</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_get_method (toku_State *T, int index);</pre>
+        <pre>int32_t toku_get_method (toku_State *T, int32_t index);</pre>
         <p>
         Pushes a method object of the bound method at the given index onto
         the stack.
@@ -4348,7 +4381,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_self -->
         <hr><h3><a name="toku_get_self"><code>toku_get_self</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_get_self (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_get_self (toku_State *T, int32_t idx);</pre>
         <p>
         Pushes a <em>self</em> object of the bound method at the given index
         onto the stack.
@@ -4359,7 +4392,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_uservalue -->
         <hr><h3><a name="toku_get_uservalue"><code>toku_get_uservalue</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_get_uservalue (toku_State *T, int idx, unsigned short n);</pre>
+        <pre>int32_t toku_get_uservalue (toku_State *T, int32_t idx, uint16_t n);</pre>
         <p>
         Pushes onto the stack the user value at index <code>n</code>
         associated with the full userdata at the given index and returns
@@ -4372,7 +4405,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_methodtable -->
         <hr><h3><a name="toku_get_methodtable"><code>toku_get_methodtable</code></a></h3>
         <span class="apii">[-0, +(0|1), &ndash;]</span>
-        <pre>int toku_get_methodtable (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_get_methodtable (toku_State *T, int32_t idx);</pre>
         <p>
         Checks if the class at the given index has a method table and pushes
         it onto the stack.
@@ -4384,7 +4417,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_metatable -->
         <hr><h3><a name="toku_get_metatable"><code>toku_get_metatable</code></a></h3>
         <span class="apii">[-0, +(0|1), &ndash;]</span>
-        <pre>int toku_get_metatable (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_get_metatable (toku_State *T, int32_t idx);</pre>
         <p>
         Pushes the metatable of the value at the given index onto the stack.
         Only <em>full userdata</em>, <em>class</em> and transitively
@@ -4398,7 +4431,7 @@ typedef struct toku_Cinfo {
         <!-- toku_get_fieldtable -->
         <hr><h3><a name="toku_get_fieldtable"><code>toku_get_fieldtable</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>void toku_get_fieldtable (toku_State *T, int idx);</pre>
+        <pre>void toku_get_fieldtable (toku_State *T, int32_t idx);</pre>
         <p>
         Pushes the fields table of the instance at the given index onto the
         stack. Instances always have a table to store fields (state) so
@@ -4408,7 +4441,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set -->
         <hr><h3><a name="toku_set"><code>toku_set</code></a></h3>
         <span class="apii">[-2, +0, <em>e</em>]</span>
-        <pre>void toku_set (toku_State *T, int idx);</pre>
+        <pre>void toku_set (toku_State *T, int32_t idx);</pre>
         <p>
         Does the equivalent to <code>obj[k]&nbsp;=&nbsp;v;</code>, where <code>obj</code>
         is the value at the given index, <code>v</code> is the value on top of
@@ -4423,7 +4456,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_raw -->
         <hr><h3><a name="toku_set_raw"><code>toku_set_raw</code></a></h3>
         <span class="apii">[-2, +0, <em>v</em>]</span>
-        <pre>void toku_set_raw (toku_State *T, int index);</pre>
+        <pre>void toku_set_raw (toku_State *T, int32_t index);</pre>
         <p>
         Similar to <a href="#toku_set"><code>toku_set</code></a> except that
         it performs a raw set, meaning it wont invoke a metamethod.
@@ -4446,7 +4479,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_index -->
         <hr><h3><a name="toku_set_index"><code>toku_set_index</code></a></h3>
         <span class="apii">[-1, +0, <em>v</em>]</span>
-        <pre>void toku_set_index (toku_State *T, int idx, toku_Integer i);</pre>
+        <pre>void toku_set_index (toku_State *T, int32_t idx, toku_Integer i);</pre>
         <p>
         Does the equivalent of <code>l[i]&nbsp;=&nbsp;v</code>, where <code>l</code>
         is the list at the given index, <code>i</code> is index into the
@@ -4479,7 +4512,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_field -->
         <hr><h3><a name="toku_set_field"><code>toku_set_field</code></a></h3>
         <span class="apii">[-2, +0, <em>m</em>]</span>
-        <pre>void toku_set_field (toku_State *T, int index);</pre>
+        <pre>void toku_set_field (toku_State *T, int32_t index);</pre>
         <p>
         Similar to <a href="#toku_set_raw"><code>toku_set_raw</code></a> but
         the value at <code>index</code> must be a table or an instance
@@ -4494,7 +4527,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_field_str -->
         <hr><h3><a name="toku_set_field_str"><code>toku_set_field_str</code></a></h3>
         <span class="apii">[-1, +0, <em>m</em>]</span>
-        <pre>void toku_set_field_str (toku_State *T, int index, const char *s);</pre>
+        <pre>void toku_set_field_str (toku_State *T, int32_t index, const char *s);</pre>
         <p>
         Similar to <a href="#toku_set_field"><code>toku_set_field</code></a>
         but instead of using the value on stack as the key, it instead uses
@@ -4510,7 +4543,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_field_int -->
         <hr><h3><a name="toku_set_field_int"><code>toku_set_field_int</code></a></h3>
         <span class="apii">[-0, +0, <em>m</em>]</span>
-        <pre>void toku_set_field_int (toku_State *T, int index, toku_Integer i);</pre>
+        <pre>void toku_set_field_int (toku_State *T, int32_t index, toku_Integer i);</pre>
         <p>
         Similar to
         <a href="#toku_set_field_str"><code>toku_set_field_str</code></a>
@@ -4537,7 +4570,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_superclass -->
         <hr><h3><a name="toku_set_superclass"><code>toku_set_superclass</code></a></h3>
         <span class="apii">[-1, +0, &ndash;]</span>
-        <pre>void toku_set_superclass (toku_State *T, int idx);</pre>
+        <pre>void toku_set_superclass (toku_State *T, int32_t idx);</pre>
         <p>
         The value on top of the stack is set as the superclass of the value
         at the given index. Both of the values need to be classes.
@@ -4548,7 +4581,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_metatable -->
         <hr><h3><a name="toku_set_metatable"><code>toku_set_metatable</code></a></h3>
         <span class="apii">[-1, +0, &ndash;]</span>
-        <pre>int toku_set_metatable (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_set_metatable (toku_State *T, int32_t idx);</pre>
         <p>
         Sets the value on top of the stack as the new <em>metatable</em> of the
         value at the given index. If the value on top of the stack is
@@ -4570,7 +4603,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_uservalue -->
         <hr><h3><a name="toku_set_uservalue"><code>toku_set_uservalue</code></a></h3>
         <span class="apii">[-1, +0, &ndash;]</span>
-        <pre>int toku_set_uservalue (toku_State *T, int idx, unsigned short n);</pre>
+        <pre>int32_t toku_set_uservalue (toku_State *T, int32_t idx, uint16_t n);</pre>
         <p>
         Pops a value from the stack and sets it as the new user value at index
         <code>n</code> associated to the full userdata at the given index.
@@ -4581,7 +4614,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_methodtable -->
         <hr><h3><a name="toku_set_methodtable"><code>toku_set_methodtable</code></a></h3>
         <span class="apii">[-1, +0, &ndash;]</span>
-        <pre>int toku_set_methodtable (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_set_methodtable (toku_State *T, int32_t idx);</pre>
         <p>
         Pops a value on top of the stack, which must be a table,
         and sets it as the method table of the value at the given index,
@@ -4591,7 +4624,7 @@ typedef struct toku_Cinfo {
         <!-- toku_set_fieldtable -->
         <hr><h3><a name="toku_set_fieldtable"><code>toku_set_fieldtable</code></a></h3>
         <span class="apii">[-1, +0, &ndash;]</span>
-        <pre>void toku_set_fieldtable (toku_State *T, int idx);</pre>
+        <pre>void toku_set_fieldtable (toku_State *T, int32_t idx);</pre>
         <p>
         Pops a value on top of the stack, which must be a table,
         and sets it as the fields table of the value at the given index,
@@ -4601,7 +4634,7 @@ typedef struct toku_Cinfo {
         <!-- toku_status -->
         <hr><h3><a name="toku_status"><code>toku_status</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_status (toku_State *T);</pre>
+        <pre>int32_t toku_status (toku_State *T);</pre>
         <p>
         Returns the status of the thread <code>C</code>.
         <br/><br/>
@@ -4616,7 +4649,7 @@ typedef struct toku_Cinfo {
         <!-- toku_error -->
         <hr><h3><a name="toku_error"><code>toku_error</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_error (toku_State *T);</pre>
+        <pre>int32_t toku_error (toku_State *T);</pre>
         <p>
         Raises a Tokudae error, using the value on the top of the stack as
         the error object.
@@ -4627,7 +4660,7 @@ typedef struct toku_Cinfo {
         <!-- toku_call -->
         <hr><h3><a name="toku_call"><code>toku_call</code></a></h3>
         <span class="apii">[-(nargs+1), +nresults, <em>e</em>]</span>
-        <pre>void toku_call (toku_State *T, int nargs, int nresults);</pre>
+        <pre>void toku_call (toku_State *T, int32_t nargs, int32_t nresults);</pre>
         <p>
         Calls a function.
         Like regular Tokudae calls, <code>toku_call</code> respects the
@@ -4682,7 +4715,10 @@ typedef struct toku_Cinfo {
         <!-- toku_pcall -->
         <hr><h3><a name="toku_pcall"><code>toku_pcall</code></a></h3>
         <span class="apii">[-(nargs + 1), +(nresults|1), &ndash;]</span>
-        <pre>int toku_pcall (toku_State *T, int nargs, int nresults, int absmsgh);</pre>
+        <pre>int32_t toku_pcall (toku_State *T,
+                    int32_t nargs,
+                    int32_t nresults,
+                    int32_t absmsgh);</pre>
         <p>
         Calls a function (or a callable object) in protected mode.
         <br/><br/>
@@ -4724,15 +4760,15 @@ typedef struct toku_Cinfo {
         <!-- toku_load -->
         <hr><h3><a name="toku_load"><code>toku_load</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int toku_load (toku_State *T,
-               toku_Reader reader,
-               void *userdata,
-               const char *chunkname,
-               const char *mode);</pre>
+        <pre>int32_t toku_load (toku_State *T,
+                   toku_Reader reader,
+                   void *userdata,
+                   const char *chunkname,
+                   const char *mode);</pre>
         <p>
         Loads a Tokudae chunk without running it.
-        If there are no errors, <code>toku_load</code> pushes the compiled chunk
-        as a Tokudae function on top of the stack.
+        If there are no errors, <code>toku_load</code> pushes the compiled
+        chunk as a Tokudae function on top of the stack.
         Otherwise, it pushes an error message.
         <br/><br/>
         The <code>toku_load</code> function uses a user-supplied
@@ -4746,7 +4782,8 @@ typedef struct toku_Cinfo {
         (see <a href="#toku_Debug"><code>toku_Debug</code></a>).
         <br/><br/>
         <code>toku_load</code> automatically detects whether the chunk
-        is text or binary and loads it accordingly.
+        is text or binary and loads it accordingly
+        (see program <code>tokuc</code>).
         The string <code>mode</code> works as in function
         <a href="#load"><code>load</code></a>, with the addition that a
         <code>NULL</code> value is equivalent to the string "<code>bt</code>".
@@ -4756,8 +4793,8 @@ typedef struct toku_Cinfo {
         <br/><br/>
         <code>toku_load</code> can return
         <a href="#TOKU_STATUS_OK"><code>TOKU_STATUS_OK</code></a>,
-        <a href="#TOKU_STATUS_ESYNTAX"><code>TOKU_STATUS_ESYNTAX</code></a>, or
-        <a href="#TOKU_STATUS_EMEM"><code>TOKU_STATUS_EMEM</code></a>.
+        <a href="#TOKU_STATUS_ESYNTAX"><code>TOKU_STATUS_ESYNTAX</code></a>,
+        or <a href="#TOKU_STATUS_EMEM"><code>TOKU_STATUS_EMEM</code></a>.
         The function may also return other values corresponding to errors
         raised by the read function (see <a href="#4.4.1">&sect;4.4.1</a>).
         <br/><br/>
@@ -4771,13 +4808,40 @@ typedef struct toku_Cinfo {
         Other upvalues are initialized with <b>nil</b>.
         </p>
 
+        <!-- toku_combine -->
+        <hr><h3><a name="toku_combine"><code>toku_combine</code></a></h3>
+        <span class="apii">[-0, +1, &ndash;]</span>
+        <pre>int32_t toku_combine (toku_State *T, const char *chunkname, int32_t n);</pre>
+        <p>
+        Combines <code>n</code> Tokudae functions on top of the stack into
+        a single function and pushes it on top of the stack.
+        The resulting function is compiled as if it is calling every
+        function that was combined in the order they were pushed onto the
+        stack.
+        <br/><br/>
+        The debug information for the <code>n</code> functions on the stack
+        and the ones in the new combined function stays the same,
+        meaning it is now referenced by both the new combined function
+        and the Tokudae closures on the stack.
+        <br/><br/>
+        <code>chunkname</code> is the same as in
+        <a href="#toku_load"><code>toku_load</code></a>,
+        except if not provided (is NULL),
+        it is set to the string <code>"=(combined)"</code>.
+        <br/><br/>
+        <code>toku_combine</code> can return
+        <a href="#TOKU_STATUS_OK"><code>TOKU_STATUS_OK</code></a>,
+        <a href="#TOKU_STATUS_ESYNTAX"><code>TOKU_STATUS_ESYNTAX</code></a>,
+        or <a href="#TOKU_STATUS_EMEM"><code>TOKU_STATUS_EMEM</code></a>.
+        </p>
+
         <!-- toku_dump -->
         <hr><h3><a name="toku_dump"><code>toku_dump</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_load (toku_State *T,
-               toku_Writer writer,
-               void *data,
-               int strip);</pre>
+        <pre>int32_t toku_dump (toku_State *T,
+                   toku_Writer writer,
+                   void *data,
+                   int32_t strip);</pre>
         <p>
         Dumps a function as a binary chunk.
         Receives a Tokudae function on the top of the stack and produces
@@ -4805,7 +4869,7 @@ typedef struct toku_Cinfo {
         <!-- toku_gc -->
         <hr><h3><a name="toku_gc"><code>toku_gc</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_gc (toku_State *T, int what, ...);</pre>
+        <pre>int32_t toku_gc (toku_State *T, int32_t what, ...);</pre>
         <p>
         Controls the garbage collector.
         <br/><br/>
@@ -4844,12 +4908,12 @@ typedef struct toku_Cinfo {
                 of memory in use by Tokudae by 1024.
             </li>
             <li>
-                <b><a name="TOKU_GC_STEP"><code>TOKU_GC_STEP</code></a> (int stepsize): </b>
+                <b><a name="TOKU_GC_STEP"><code>TOKU_GC_STEP</code></a> (int32_t stepsize): </b>
                 Performs a step of garbage collection, corresponding to the
                 allocation of <code>stepsize</code> Kbytes.
             </li>
             <li>
-                <b><a name="TOKU_GC_PARAM"><code>TOKU_GC_PARAM</code></a> (int param, int value): </b>
+                <b><a name="TOKU_GC_PARAM"><code>TOKU_GC_PARAM</code></a> (int32_t param, int32_t value): </b>
                 Changes and/or returns the value of a parameter of the
                 collector. If <code>value</code> is -1, the call only returns
                 the current value. The argument <code>param</code> must be
@@ -4895,7 +4959,7 @@ typedef struct toku_Cinfo {
         <!-- toku_warning -->
         <hr><h3><a name="toku_warning"><code>toku_warning</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void toku_warning (toku_State *T, const char *msg, int cont);</pre>
+        <pre>void toku_warning (toku_State *T, const char *msg, int32_t cont);</pre>
         <p>
         Emits a warning with the given message.
         A message in a call with <code>tocont</code> true should be continued
@@ -4907,7 +4971,7 @@ typedef struct toku_Cinfo {
         <!-- toku_numbertocstring -->
         <hr><h3><a name="toku_numbertocstring"><code>toku_numbertocstring</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>unsigned toku_numbertocstring (toku_State *T, int idx, char *buff);</pre>
+        <pre>uint32_t toku_numbertocstring (toku_State *T, int32_t idx, char *buff);</pre>
         <p>
         Converts the number at acceptable index <code>idx</code> to a string
         and puts the result in <code>buff</code>.
@@ -4923,7 +4987,7 @@ typedef struct toku_Cinfo {
         <!-- toku_stringtonumber -->
         <hr><h3><a name="toku_stringtonumber"><code>toku_stringtonumber</code></a></h3>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>size_t toku_stringtonumber (toku_State *T, const char *s, int *f);</pre>
+        <pre>size_t toku_stringtonumber (toku_State *T, const char *s, int32_t *f);</pre>
         <p>
         Converts the zero-terminated string <code>s</code> to a number,
         pushes that number into the stack,
@@ -4956,7 +5020,7 @@ typedef struct toku_Cinfo {
         <!-- toku_len -->
         <hr><h3><a name="toku_len"><code>toku_len</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>toku_Unsigned toku_len (toku_State *T, int idx);</pre>
+        <pre>toku_Unsigned toku_len (toku_State *T, int32_t idx);</pre>
         <p>
         Returns the "length" of the value at the given index.
         For strings, this is the string length;
@@ -4969,7 +5033,7 @@ typedef struct toku_Cinfo {
         <!-- toku_lenudata -->
         <hr><h3><a name="toku_lenudata"><code>toku_lenudata</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>size_t toku_len (toku_State *T, int idx);</pre>
+        <pre>size_t toku_len (toku_State *T, int32_t idx);</pre>
         <p>
         Returns the size of the block of memory allocated for the userdata
         at the given index.
@@ -4978,7 +5042,7 @@ typedef struct toku_Cinfo {
         <!-- toku_nextfield -->
         <hr><h3><a name="toku_nextfield"><code>toku_nextfield</code></a></h3>
         <span class="apii">[-1, +(2|0), <em>v</em>]</span>
-        <pre>int toku_nextfield (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_nextfield (toku_State *T, int32_t idx);</pre>
         <p>
         Pops a key from the stack,
         and pushes a key&ndash;value pair (a field) from the table or instance
@@ -5010,7 +5074,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_concat -->
         <hr><h3><a name="toku_concat"><code>toku_concat</code></a></h3>
         <span class="apii">[-n, +1, <em>e</em>]</span>
-        <pre>void toku_concat (toku_State *T,  int n);</pre>
+        <pre>void toku_concat (toku_State *T,  int32_t n);</pre>
         <p>
         Concatenates the <code>n</code> values at the top of the stack,
         pops them, and leaves the result on the top.
@@ -5024,7 +5088,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_toclose -->
         <hr><h3><a name="toku_toclose"><code>toku_toclose</code></a></h3>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>void toku_toclose (toku_State *T, int idx);</pre>
+        <pre>void toku_toclose (toku_State *T, int32_t idx);</pre>
         <p>
         Marks the given index in the stack as a to-be-closed slot
         (see <a href="#3.3.8">&sect;3.3.8</a>).
@@ -5060,7 +5124,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_closeslot -->
         <hr><h3><a name="toku_closeslot"><code>toku_closeslot</code></a></h3>
         <span class="apii">[-0, +0, <em>e</em>]</span>
-        <pre>void toku_closeslot (toku_State *T, int idx);</pre>
+        <pre>void toku_closeslot (toku_State *T, int32_t idx);</pre>
         <p>
         Close the to-be-closed slot at the given index and set its value to
         <b>nil</b>.
@@ -5072,7 +5136,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_shrinklist -->
         <hr><h3><a name="toku_shrinklist"><code>toku_shrinklist</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_shrinklist (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_shrinklist (toku_State *T, int32_t idx);</pre>
         <p>
         Shrinks the size of the list at the given index to the list length
         if the length is a power of two, or to the nearest power of two
@@ -5085,7 +5149,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_numuservalues -->
         <hr><h3><a name="toku_numuservalues"><code>toku_numuservalues</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>unsigned short toku_numuservalues (toku_State *T, int idx);</pre>
+        <pre>uint16_t toku_numuservalues (toku_State *T, int32_t idx);</pre>
         <p>
         Returns the total number of user values of the full userdata at the
         given index.
@@ -5105,7 +5169,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_function -->
         <hr><h3><a name="toku_is_function"><code>toku_is_function</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_function (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_function (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a function,
         and 0&nbsp;otherwise.
@@ -5114,7 +5178,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_boundmethod -->
         <hr><h3><a name="toku_is_boundmethod"><code>toku_is_boundmethod</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_boundmethod (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_boundmethod (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a bound method,
         and 0&nbsp;otherwise.
@@ -5123,7 +5187,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_list -->
         <hr><h3><a name="toku_is_list"><code>toku_is_list</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_list (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_list (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is the list,
         and 0&nbsp;otherwise.
@@ -5132,7 +5196,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_table -->
         <hr><h3><a name="toku_is_table"><code>toku_is_table</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_table (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_table (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a table,
         and 0&nbsp;otherwise.
@@ -5141,7 +5205,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_class -->
         <hr><h3><a name="toku_is_class"><code>toku_is_class</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_class (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_class (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a class,
         and 0&nbsp;otherwise.
@@ -5150,7 +5214,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_instance -->
         <hr><h3><a name="toku_is_instance"><code>toku_is_instance</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_instance (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_instance (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is an instance,
         and 0&nbsp;otherwise.
@@ -5159,7 +5223,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_lightuserdata -->
         <hr><h3><a name="toku_is_lightuserdata"><code>toku_is_lightuserdata</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_lightuserdata (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_lightuserdata (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a light userdata,
         and 0&nbsp;otherwise.
@@ -5168,7 +5232,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_fulluserdata -->
         <hr><h3><a name="toku_is_fulluserdata"><code>toku_is_fulluserdata</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_fulluserdata (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_fulluserdata (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a full userdata,
         and 0&nbsp;otherwise.
@@ -5177,7 +5241,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_nil -->
         <hr><h3><a name="toku_is_nil"><code>toku_is_nil</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_nil (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_nil (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is <b>nil</b>,
         and 0&nbsp;otherwise.
@@ -5186,7 +5250,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_boolean -->
         <hr><h3><a name="toku_is_bool"><code>toku_is_bool</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_bool (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_bool (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a boolean,
         and 0&nbsp;otherwise.
@@ -5195,7 +5259,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_thread -->
         <hr><h3><a name="toku_is_thread"><code>toku_is_thread</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_thread (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_thread (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the value at the given index is a thread,
         and 0&nbsp;otherwise.
@@ -5204,7 +5268,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_none -->
         <hr><h3><a name="toku_is_none"><code>toku_is_none</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_none (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_none (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the given index is not valid, and 0&nbsp;otherwise.
         </p>
@@ -5212,7 +5276,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_is_noneornil -->
         <hr><h3><a name="toku_is_noneornil"><code>toku_is_noneornil</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_is_noneornil (toku_State *T, int idx);</pre>
+        <pre>int32_t toku_is_noneornil (toku_State *T, int32_t idx);</pre>
         <p>
         Returns 1 if the given index is not valid or if the value at this
         index is <b>nil</b>, and 0&nbsp;otherwise.
@@ -5221,7 +5285,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_to_string -->
         <hr><h3><a name="toku_to_string"><code>toku_to_string</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>const char *toku_to_string (toku_State *T, int idx);</pre>
+        <pre>const char *toku_to_string (toku_State *T, int32_t idx);</pre>
         <p>
         Equivalent to <a href="#toku_to_lstring"><code>toku_to_lstring</code></a>
         with <code>len</code> equal to <code>NULL</code>.
@@ -5230,7 +5294,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_to_number -->
         <hr><h3><a name="toku_to_number"><code>toku_to_number</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>toku_Number toku_to_number (toku_State *T, int idx);</pre>
+        <pre>toku_Number toku_to_number (toku_State *T, int32_t idx);</pre>
         <p>
         Equivalent to <a href="#toku_to_numberx"><code>toku_to_numberx</code></a>
         with <code>isnum</code> equal to <code>NULL</code>.
@@ -5239,7 +5303,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_to_integer -->
         <hr><h3><a name="toku_to_integer"><code>toku_to_integer</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>toku_Integer toku_to_integer (toku_State *T, int index);</pre>
+        <pre>toku_Integer toku_to_integer (toku_State *T, int32_t index);</pre>
         <p>
         Equivalent to <a href="#toku_to_integerx"><code>toku_to_integerx</code></a>
         with <code>isnum</code> equal to <code>NULL</code>.
@@ -5304,7 +5368,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_insert -->
         <hr><h3><a name="toku_insert"><code>toku_insert</code></a></h3>
         <span class="apii">[-1, +1, &ndash;]</span>
-        <pre>void toku_insert (toku_State *T, int index);</pre>
+        <pre>void toku_insert (toku_State *T, int32_t index);</pre>
         <p>
         Moves the top element into the given valid index, shifting up the
         elements above this index to open space.
@@ -5315,7 +5379,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_pop -->
         <hr><h3><a name="toku_pop"><code>toku_pop</code></a></h3>
         <span class="apii">[-n, +0, &ndash;]</span>
-        <pre>void toku_pop (toku_State *T, int n);</pre>
+        <pre>void toku_pop (toku_State *T, int32_t n);</pre>
         <p>
         Pops <code>n</code> elements from the stack.
         It is implemented as a macro over
@@ -5325,7 +5389,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_remove -->
         <hr><h3><a name="toku_remove"><code>toku_remove</code></a></h3>
         <span class="apii">[-1, +0, &ndash;]</span>
-        <pre>void toku_remove (toku_State *T, int index);</pre>
+        <pre>void toku_remove (toku_State *T, int32_t index);</pre>
         <p>
         Removes the element at the given valid index, shifting down the
         elements above this index to fill the gap.
@@ -5336,7 +5400,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_replace -->
         <hr><h3><a name="toku_replace"><code>toku_replace</code></a></h3>
         <span class="apii">[-1, +0, &ndash;]</span>
-        <pre>void toku_replace (toku_State *T, int index);</pre>
+        <pre>void toku_replace (toku_State *T, int32_t index);</pre>
         <p>
         Moves the top element into the given valid index without shifting any
         element (therefore replacing the value at that given index), and then
@@ -5365,7 +5429,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_getntop -->
         <hr><h3><a name="toku_getntop"><code>toku_getntop</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_getntop (toku_State *T);</pre>
+        <pre>int32_t toku_getntop (toku_State *T);</pre>
         <p>
         Similar to <a href="#toku_gettop"><code>toku_gettop</code></a> except
         this returns the actual number of the values on the stack.
@@ -5377,7 +5441,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_getstack -->
         <hr><h3><a name="toku_getstack"><code>toku_getstack</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_getstack (toku_State *T, int level, toku_Debug *ar);</pre>
+        <pre>int32_t toku_getstack (toku_State *T, int32_t level, toku_Debug *ar);</pre>
         <p>
         Gets information about the interpreter runtime stack.
         <br/><br/>
@@ -5395,7 +5459,7 @@ while (toku_nextfield(T, t) != 0) {
         <!-- toku_getinfo -->
         <hr><h3><a name="toku_getinfo"><code>toku_getinfo</code></a></h3>
         <span class="apii">[-(0|1), +(0|1|2), <em>m</em>]</span>
-        <pre>int toku_getinfo (toku_State *T, const char *what, toku_Debug *ar);</pre>
+        <pre>int32_t toku_getinfo (toku_State *T, const char *what, toku_Debug *ar);</pre>
         <p>
         Gets information about a specific function or function invocation.
         <br/><br/>
@@ -5479,7 +5543,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_stackinuse -->
         <hr><h3><a name="toku_stackinuse"><code>toku_stackinuse</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_stackinuse (toku_State *T);</pre>
+        <pre>int32_t toku_stackinuse (toku_State *T);</pre>
         <p>
         Returns the total number of stack slots that are in use by the entire
         call stack (all of the currently active functions).
@@ -5488,7 +5552,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_getlocal -->
         <hr><h3><a name="toku_getlocal"><code>toku_getlocal</code></a></h3>
         <span class="apii">[-0, +(0|1), &ndash;]</span>
-        <pre>const char *toku_getlocal (toku_State *T, const toku_Debug *ar, int n);</pre>
+        <pre>const char *toku_getlocal (toku_State *T, const toku_Debug *ar, int32_t n);</pre>
         <p>
         Gets information about a local variable or a temporary value of a
         given activation record or a given function.
@@ -5518,7 +5582,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_setlocal -->
         <hr><h3><a name="toku_setlocal"><code>toku_setlocal</code></a></h3>
         <span class="apii">[-(0|1), +0, &ndash;]</span>
-        <pre>const char *toku_setlocal (toku_State *T, const toku_Debug *ar, int n);</pre>
+        <pre>const char *toku_setlocal (toku_State *T, const toku_Debug *ar, int32_t n);</pre>
         <p>
         Sets the value of a local variable of a given activation record.
         It assigns the value on the top of the stack to the variable and
@@ -5535,7 +5599,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_getupvalue -->
         <hr><h3><a name="toku_getupvalue"><code>toku_getupvalue</code></a></h3>
         <span class="apii">[-0, +(0|1), &ndash;]</span>
-        <pre>const char *toku_getupvalue (toku_State *T, int idx, int n);</pre>
+        <pre>const char *toku_getupvalue (toku_State *T, int32_t idx, int32_t n);</pre>
         <p>
         Gets information about the <code>n</code>-th upvalue
         (first upvalue located at <code>n</code>&nbsp;==&nbsp;0) of the
@@ -5548,7 +5612,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_setupvalue -->
         <hr><h3><a name="toku_setupvalue"><code>toku_setupvalue</code></a></h3>
         <span class="apii">[-(0|1), +0, &ndash;]</span>
-        <pre>const char *toku_setupvalue (toku_State *T, int idx, int n);</pre>
+        <pre>const char *toku_setupvalue (toku_State *T, int32_t idx, int32_t n);</pre>
         <p>
         Sets the value of a closure's upvalue.
         It assigns the value on the top of the stack to the upvalue and
@@ -5565,7 +5629,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_upvalueid -->
         <hr><h3><a name="toku_upvalueid"><code>toku_upvalueid</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void *toku_upvalueid (toku_State *T, int idx, int n);</pre>
+        <pre>void *toku_upvalueid (toku_State *T, int32_t idx, int32_t n);</pre>
         <p>
         Returns a unique identifier for the upvalue numbered <code>n</code>
         from the closure at the given index.
@@ -5584,8 +5648,8 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_upvaluejoin -->
         <hr><h3><a name="toku_upvaluejoin"><code>toku_upvaluejoin</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void toku_upvaluejoin (toku_State *T, int idx1, int n1,
-                                      int idx2, int n2);</pre>
+        <pre>void toku_upvaluejoin (toku_State *T, int32_t idx1, int32_t n1,
+                                      int32_t idx2, int32_t n2);</pre>
         <p>
         Make the <code>n1</code>-th upvalue of the Tokudae closure at index
         <code>idx1</code> refer to the <code>n2</code>-th upvalue of the
@@ -5595,7 +5659,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_sethook -->
         <hr><h3><a name="toku_sethook"><code>toku_sethook</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void toku_sethook (toku_State *T, toku_Hook f, int mask, int count);</pre>
+        <pre>void toku_sethook (toku_State *T, toku_Hook f, int32_t mask, int32_t count);</pre>
         <p>
         Sets the debugging hook function.
         <br/><br/>
@@ -5627,7 +5691,7 @@ printf("%d\n", ar.defline);</pre>
             </li>
             <li><b>The count hook</b>:
                 is called after the interpreter executes every
-                <code>count</code> instructions.
+                <code>count</code> opcodes.
                 This event only happens while Tokudae is executing a Tokudae
                 function.
             </li>
@@ -5638,7 +5702,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_gethook -->
         <hr><h3><a name="toku_gethook"><code>toku_gethook</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>toku_Hook toku_gethook (toku_State *T, toku_Hook f, int mask, int count);</pre>
+        <pre>toku_Hook toku_gethook (toku_State *T, toku_Hook f, int32_t mask, int32_t count);</pre>
         <p>
         Returns the current hook function.
         </p>
@@ -5646,7 +5710,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_gethookmask -->
         <hr><h3><a name="toku_gethookmask"><code>toku_gethookmask</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_gethookmask (toku_State *T, toku_Hook f, int mask, int count);</pre>
+        <pre>int32_t toku_gethookmask (toku_State *T, toku_Hook f, int32_t mask, int32_t count);</pre>
         <p>
         Returns the current hook mask.
         </p>
@@ -5654,7 +5718,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_gethookcount -->
         <hr><h3><a name="toku_gethookcount"><code>toku_gethookcount</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_gethookcount (toku_State *T, toku_Hook f, int mask, int count);</pre>
+        <pre>int32_t toku_gethookcount (toku_State *T, toku_Hook f, int32_t mask, int32_t count);</pre>
         <p>
         Returns the current hook count.
         </p>
@@ -5662,11 +5726,14 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_getopcode -->
         <hr><h3><a name="toku_getopcode"><code>toku_getopcode</code></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_getopcode (toku_State *T, const toku_Cinfo *ci, int n, toku_Opcode *opc);</pre>
+        <pre>int32_t toku_getopcode (toku_State *T,
+                        const toku_Cinfo *ci,
+                        int32_t n,
+                        toku_Opcode *opc);</pre>
         <p>
         Fills out the <code>opc</code> structure
         (see <a href="#toku_Opcode"><code>toku_Opcode</code></a>)
-        with the <code>n</code>-th opcode from the function previously loaded
+        with the <code>n</code>-th opcode from the function currently loaded
         into <code>ci</code>
         (see <a href="#toku_getcompinfo"><code>toku_getcompinfo</code></a>).
         The <code>n</code>, if positive, starts from 0,
@@ -5677,6 +5744,42 @@ printf("%d\n", ar.defline);</pre>
         For example, if <code>n</code> is -1, the last opcode is returned.
         <br/><br/>
         If opcode is found, this returns 1, otherwise 0 is returned.
+        </p>
+
+        <!-- toku_getopcodeoff -->
+        <hr><h3><a name="toku_getopcodeoff"><code>toku_getopcodeoff</code></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>void toku_getopcodeoff (toku_State *T,
+                        const toku_Cinfo *ci,
+                        int32_t offset,
+                        toku_Opcode *opc);</pre>
+        <p>
+        Similar to <a href="#toku_getopcode"><code>toku_getopcode</code></a>,
+        except this fills out <code>opc</code> with the opcode located at
+        the provided byte offset in the function currently loaded into
+        <code>ci</code>
+        (see <a href="#toku_getcompinfo"><code>toku_getcompinfo</code></a>).
+        </p>
+
+        <!-- toku_getopcode_next -->
+        <hr><h3><a name="toku_getopcode_next"><code>toku_getopcode_next</code></a></h3>
+        <span class="apii">[-0, +0, &ndash;]</span>
+        <pre>int32_t toku_getopcode_next (toku_State *T, toku_Opcode *opc);</pre>
+        <p>
+        This function fills out the <code>opc</code> by advancing to the
+        next opcode (the opcode after <code>opc</code>) and returns 1,
+        otherwise if <code>opc</code> is the last opcode,
+        0 is returned.
+        <br/><br/>
+        The opcode <code>opc</code> should already be pre-filled
+        (see <a href="#toku_getopcode"><code>toku_getopcode</code></a> or
+        <a href="#toku_getopcodeoff"><code>toku_getopcodeoff</code></a>.)
+        <br/><br/>
+        <b>Beware</b>,
+        the garbage collector can still collect the function associated with
+        the filled in opcode,
+        resulting in the call to this function being invalid,
+        as it would reference freed memory.
         </p>
 
         <!-- toku_getopdesc -->
@@ -5694,7 +5797,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_getcompinfo -->
         <hr><h3><a name="toku_getcompinfo"><desc>toku_getcompinfo</desc></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_getcompinfo (toku_State *T, int idx, toku_Cinfo *ci);</pre>
+        <pre>int32_t toku_getcompinfo (toku_State *T, int32_t idx, toku_Cinfo *ci);</pre>
         <p>
         If the function at the given index is a Tokudae function,
         this returns 1 and fills the structure <code>ci</code>
@@ -5705,7 +5808,7 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_getconstant -->
         <hr><h3><a name="toku_getconstant"><desc>toku_getconstant</desc></a></h3>
         <span class="apii">[-0, +(0|1), &ndash;]</span>
-        <pre>int toku_getconstant (toku_State *T, const toku_Cinfo *ci, int n);</pre>
+        <pre>int32_t toku_getconstant (toku_State *T, const toku_Cinfo *ci, int32_t n);</pre>
         <p>
         Pushes onto the stack the <code>n</code>'th constant (starting from 0)
         of the function in the compile information <code>ci</code>
@@ -5725,15 +5828,16 @@ printf("%d\n", ar.defline);</pre>
         <pre>void toku_getshortsrc (toku_State *T, const toku_Cinfo *ci, char *out);</pre>
         <p>
         Fills the <code>out</code> buffer with a "printable" version of
-        <code>source</code> in <code>ci</code>.
+        <code>source</code> in <code>ci</code>
+        (see <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>).
         The size of the <code>out</code> buffer should be at least of size
-        <a href="TOKU_IDSIZE"><code>TOKU_IDSIZE</code></a>.
+        <a href="#TOKU_IDSIZE"><code>TOKU_IDSIZE</code></a>.
         </p>
 
         <!-- toku_getlocalinfo -->
         <hr><h3><a name="toku_getlocalinfo"><desc>toku_getlocalinfo</desc></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>const char *toku_getlocalinfo (toku_State *T, toku_Cinfo *ci, int n);</pre>
+        <pre>const char *toku_getlocalinfo (toku_State *T, toku_Cinfo *ci, int32_t n);</pre>
         <p>
         Fills out the <code>ci-&gt;info.l</code> structure
         (see <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>)
@@ -5746,12 +5850,12 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_getupvalueinfo -->
         <hr><h3><a name="toku_getupvalueinfo"><desc>toku_getupvalueinfo</desc></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>const char *toku_getupvalueinfo (toku_State *T, toku_Cinfo *ci, int n);</pre>
+        <pre>const char *toku_getupvalueinfo (toku_State *T, toku_Cinfo *ci, int32_t n);</pre>
         <p>
         Fills out the <code>ci-&gt;info.u</code> structure
         (see <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>)
         with the debug information of the <code>n</code>'th (starting from 0)
-        upvalue and returns the name of the of the upvalue or string
+        upvalue and returns the name of the upvalue or the string
         <code>"-"</code> if there is no debug information.
         If there is no <code>n</code>'th upvalue, this returns NULL.
         </p>
@@ -5759,10 +5863,10 @@ printf("%d\n", ar.defline);</pre>
         <!-- toku_getfunction -->
         <hr><h3><a name="toku_getfunction"><desc>toku_getfunction</desc></a></h3>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>int toku_getfunction (toku_State *T,
-                      const toku_Cinfo *src,
-                      toku_Cinfo *dest,
-                      int n);</pre>
+        <pre>int32_t toku_getfunction (toku_State *T,
+                          const toku_Cinfo *src,
+                          toku_Cinfo *dest,
+                          int32_t n);</pre>
         <p>
         Fills out the compile information <code>dest</code>
         (see <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>)
@@ -5770,8 +5874,8 @@ printf("%d\n", ar.defline);</pre>
         (the <code>src</code> should already be filled by call to
         <a href="#toku_getcompinfo"><code>toku_getcompinfo</code></a>)
         and returns 1.
-        If there is no <code>n</code>'th function in <code>src</code> this
-        returns 0.
+        If there is no <code>n</code>'th function in <code>src</code>,
+        this returns 0.
         </p>
 
 
@@ -5896,7 +6000,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_error"><code>tokuL_error</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>int tokuL_error (toku_State *T, const char *fmt, ...);</pre>
+        <pre>int32_t tokuL_error (toku_State *T, const char *fmt, ...);</pre>
         <p>
         Raises an error.
         The error message format is given by <code>fmt</code> plus any extra
@@ -5912,7 +6016,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_error_arg"><code>tokuL_error_arg</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>int tokuL_error_arg (toku_State *T, int idx, const char *extra);</pre>
+        <pre>int32_t tokuL_error_arg (toku_State *T, int32_t idx, const char *extra);</pre>
         <p>
         Raises an error reporting a problem with argument at given index,
         of the C&nbsp;function that called it, using a standard message
@@ -5927,7 +6031,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_error_type"><code>tokuL_error_type</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>int tokuL_error_type (toku_State *T, int idx, const char *tname);</pre>
+        <pre>int32_t tokuL_error_type (toku_State *T, int32_t idx, const char *tname);</pre>
         <p>
         Raises a type error for the argument at the given index of the
         C&nbsp;function that called it, using a standard message;
@@ -5937,7 +6041,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_check_number"><code>tokuL_check_number</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>toku_Number tokuL_check_number (toku_State *T, int idx);</pre>
+        <pre>toku_Number tokuL_check_number (toku_State *T, int32_t idx);</pre>
         <p>
         Checks whether the function argument at the given index is a number
         and returns this number converted to a <code>toku_Number</code>.
@@ -5945,7 +6049,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_check_integer"><code>tokuL_check_integer</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>toku_Integer tokuL_check_integer (toku_State *T, int idx);</pre>
+        <pre>toku_Integer tokuL_check_integer (toku_State *T, int32_t idx);</pre>
         <p>
         Checks whether the function argument at the given index is an integer
         and returns this integer.
@@ -5953,7 +6057,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_check_lstring"><code>tokuL_check_lstring</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>const char *tokuL_check_lstring (toku_State *T, int idx, size_t *l);</pre>
+        <pre>const char *tokuL_check_lstring (toku_State *T, int32_t idx, size_t *l);</pre>
         <p>
         Checks whether the function argument at the given index is a string
         and returns this string;
@@ -5967,7 +6071,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_check_type"><code>tokuL_check_type</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>void tokuL_check_type (toku_State *T, int idx, int t);</pre>
+        <pre>void tokuL_check_type (toku_State *T, int32_t idx, int32_t t);</pre>
         <p>
         Checks whether the function argument at the given index has type
         <code>t</code>.
@@ -5977,7 +6081,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_check_any"><code>tokuL_check_any</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>void tokuL_check_any (toku_State *T, int idx);</pre>
+        <pre>void tokuL_check_any (toku_State *T, int32_t idx);</pre>
         <p>
         Checks whether the function has an argument of any type
         (including <b>nil</b>) at the given index.
@@ -5985,7 +6089,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_check_stack"><code>tokuL_check_stack</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>void tokuL_check_stack (toku_State *T, int sz, const char *msg);</pre>
+        <pre>void tokuL_check_stack (toku_State *T, int32_t sz, const char *msg);</pre>
         <p>
         Grows the stack size to <code>top + sz</code> elements,
         raising an error if the stack cannot grow to that size.
@@ -6003,7 +6107,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_check_userdata"><code>tokuL_check_userdata</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>void *tokuL_check_userdata (toku_State *T, int idx, const char *tname);</pre>
+        <pre>void *tokuL_check_userdata (toku_State *T, int32_t idx, const char *tname);</pre>
         <p>
         Checks whether the function argument at the given index is a userdata
         of the type <code>tname</code>
@@ -6014,10 +6118,10 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_check_option"><code>tokuL_check_option</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>int tokuL_check_option (toku_State *T
-                        int idx,
-                        const char *dfl,
-                        const char *const opts[]);</pre>
+        <pre>int32_t tokuL_check_option (toku_State *T
+                            int32_t idx,
+                            const char *dfl,
+                            const char *const opts[]);</pre>
         <p>
         Checks whether the function argument at the given index is a string and
         searches for this string in the array <code>opts</code>
@@ -6037,7 +6141,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_opt_number"><code>tokuL_opt_number</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>toku_Number tokuL_opt_number (toku_State *T, int idx, toku_Number dfl);</pre>
+        <pre>toku_Number tokuL_opt_number (toku_State *T, int32_t idx, toku_Number dfl);</pre>
         <p>
         If the function argument at the given index is a number, returns this
         number as a <a href="#toku_Number"><code>toku_Number</code></a>.
@@ -6047,7 +6151,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_opt_integer"><code>tokuL_opt_integer</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>toku_Integer tokuL_opt_integer (toku_State *T, int idx, toku_Integer dfl);</pre>
+        <pre>toku_Integer tokuL_opt_integer (toku_State *T, int32_t idx, toku_Integer dfl);</pre>
         <p>
         If the function argument at the given index is an integer, returns this
         integer.
@@ -6058,7 +6162,7 @@ typedef struct tokuL_Entry {
         <hr><h3><a name="tokuL_opt_lstring"><code>tokuL_opt_lstring</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
         <pre>const char *tokuL_opt_lstring (toku_State *T,
-                               int idx,
+                               int32_t idx,
                                const char *dfl,
                                size_t *l);</pre>
         <p>
@@ -6080,8 +6184,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_loadfilex"><code>tokuL_loadfilex</code></a></h3><p>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>int tokuL_loadfilex (toku_State *T, const char *filename,
-                                    const char *mode);</pre>
+        <pre>int32_t tokuL_loadfilex (toku_State *T, const char *filename, const char *mode);</pre>
         <p>
         Loads a file as a Tokudae chunk.
         This function uses <a href="#toku_load"><code>toku_load</code></a> to
@@ -6103,7 +6206,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_loadstring"><code>tokuL_loadstring</code></a></h3><p>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int tokuL_loadstring (toku_State *T, const char *s);</pre>
+        <pre>int32_t tokuL_loadstring (toku_State *T, const char *s);</pre>
         <p>
         Loads a string as a Tokudae chunk.
         This function uses <a href="#toku_load"><code>toku_load</code></a> to
@@ -6118,7 +6221,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_loadbufferx"><code>tokuL_loadbufferx</code></a></h3><p>
         <span class="apii">[-0, +1, &ndash;]</span>
-        <pre>int tokuL_loadbufferx (toku_State *T,
+        <pre>int32_t tokuL_loadbufferx (toku_State *T,
                        const char *buff,
                        size_t sz,
                        const char *name,
@@ -6139,7 +6242,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_new_metatable"><code>tokuL_new_metatable</code></a></h3><p>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>int tokuL_new_metatable (toku_State *T, const char *tname);</pre>
+        <pre>int32_t tokuL_new_metatable (toku_State *T, const char *tname);</pre>
         <p>
         If the C table already has the key <code>tname</code>, returns 0.
         Otherwise, creates a new table to be used as a metatable for userdata,
@@ -6162,7 +6265,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_get_metafield"><code>tokuL_get_metafield</code></a></h3><p>
         <span class="apii">[-0, +(0|1), <em>m</em>]</span>
-        <pre>int tokuL_get_metafield (toku_State *T, int idx, const char *event);</pre>
+        <pre>int32_t tokuL_get_metafield (toku_State *T, int32_t idx, const char *event);</pre>
         <p>
         Pushes onto the stack the field <code>event</code> from the metatable
         of the object at the given index and returns the type of the puhsed
@@ -6172,7 +6275,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_callmeta"><code>tokuL_callmeta</code></a></h3><p>
         <span class="apii">[-0, +(0|1), <em>e</em>]</span>
-        <pre>int tokuL_callmeta (toku_State *T, int idx, const char *event);</pre>
+        <pre>int32_t tokuL_callmeta (toku_State *T, int32_t idx, const char *event);</pre>
         <p>
         Calls a metamethod.
         <br/><br/>
@@ -6187,7 +6290,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_test_userdata"><code>tokuL_test_userdata</code></a></h3><p>
         <span class="apii">[-0, +0, <em>m</em>]</span>
-        <pre>void *tokuL_test_userdata (toku_State *T, int idx, const char *tname);</pre>
+        <pre>void *tokuL_test_userdata (toku_State *T, int32_t idx, const char *tname);</pre>
         <p>
         This function works like
         <a href="#tokuL_check_userdata"><code>tokuL_check_userdata</code></a>,
@@ -6197,7 +6300,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_fileresult"><code>tokuL_fileresult</code></a></h3><p>
         <span class="apii">[-0, +(1|3), <em>m</em>]</span>
-        <pre>int tokuL_fileresult (toku_State *T, int stat, const char *fname);</pre>
+        <pre>int32_t tokuL_fileresult (toku_State *T, int32_t stat, const char *fname);</pre>
         <p>
         This function produces the return values for file-related functions
         in the standard library
@@ -6214,7 +6317,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_execresult"><code>tokuL_execresult</code></a></h3><p>
         <span class="apii">[-0, +3, <em>m</em>]</span>
-        <pre>int tokuL_execresult (toku_State *T, int stat);</pre>
+        <pre>int32_t tokuL_execresult (toku_State *T, int32_t stat);</pre>
         <p>
         This function produces the return values for process-related
         function in the standard library
@@ -6224,7 +6327,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_to_lstring"><code>tokuL_to_lstring</code></a></h3><p>
         <span class="apii">[-0, +1, <em>e</em>]</span>
-        <pre>const char *tokuL_to_lstring (toku_State *T, int idx, size_t *len);</pre>
+        <pre>const char *tokuL_to_lstring (toku_State *T, int32_t idx, size_t *len);</pre>
         <p>
         Converts any Tokudae value at the given index to a C&nbsp;string
         in a reasonable format.
@@ -6241,7 +6344,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_to_fulluserdata"><code>tokuL_to_fulluserdata</code></a></h3><p>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void *tokuL_to_fulluserdata (toku_State *T, int index);</pre>
+        <pre>void *tokuL_to_fulluserdata (toku_State *T, int32_t index);</pre>
         <p>
         Returns pointer to the memory block of the full userdata value at the
         given index. If the value is not a full userdata this returns NULL.
@@ -6249,7 +6352,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_where"><code>tokuL_where</code></a></h3><p>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>void tokuL_where (toku_State *T, int lvl);</pre>
+        <pre>void tokuL_where (toku_State *T, int32_t lvl);</pre>
         <p>
         Pushes onto the stack a string identifying the current position
         of the control at level <code>lvl</code> in the call stack.
@@ -6281,7 +6384,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_get_subtable"><code>tokuL_get_subtable</code></a></h3><p>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>int tokuL_get_subtable (toku_State *T, int idx, const char *field);</pre>
+        <pre>int32_t tokuL_get_subtable (toku_State *T, int32_t idx, const char *field);</pre>
         <p>
         Ensures that the value <code>obj[field]</code>, where <code>obj</code>
         is the value at the given index, is a table, and pushes that table
@@ -6298,7 +6401,7 @@ typedef struct tokuL_Entry {
         <hr><h3><a name="tokuL_importf"><code>tokuL_importf</code></a></h3><p>
         <span class="apii">[-0, +1, <em>e</em>]</span>
         <pre>void tokuL_importf (toku_State *T, const char *modname,
-                    toku_CFunction openf, int global);</pre>
+                    toku_CFunction openf, int32_t global);</pre>
         <p>
         If <code>package.loaded[modname]</code> is not true,
         calls the function <code>openf</code> with the string
@@ -6315,7 +6418,7 @@ typedef struct tokuL_Entry {
         <hr><h3><a name="tokuL_traceback"><code>tokuL_traceback</code></a></h3><p>
         <span class="apii">[-0, +1, <em>m</em>]</span>
         <pre>void tokuL_traceback (toku_State *T, toku_State *T1,
-                      int lvl, const char *msg);</pre>
+                      int32_t lvl, const char *msg);</pre>
         <p>
         Creates and pushes a traceback of the stack <code>T1</code>.
         If <code>msg</code> is not <code>NULL</code>, it is appended
@@ -6338,7 +6441,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_makeseed"><code>tokuL_makeseed</code></a></h3><p>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>unsigned tokuL_makeseed (toku_State *T);</pre>
+        <pre>uint32_t tokuL_makeseed (toku_State *T);</pre>
         <p>
         Returns a value with a weak attempt for randomness.
         (It produces that value based on the current date and time and the
@@ -6348,7 +6451,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_set_funcs"><code>tokuL_set_funcs</code></a></h3><p>
         <span class="apii">[-nup, +0, <em>m</em>]</span>
-        <pre>void tokuL_set_funcs (toku_State *T, const tokuL_Entry *l, int nup);</pre>
+        <pre>void tokuL_set_funcs (toku_State *T, const tokuL_Entry *l, int32_t nup);</pre>
         <p>
         Registers all functions in the array <code>l</code>
         (see <a href="#tokuL_Entry"><code>tokuL_Entry</code></a>) into the
@@ -6367,7 +6470,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_ref"><code>tokuL_ref</code></a></h3><p>
         <span class="apii">[-1, +0, <em>m</em>]</span>
-        <pre>void tokuL_ref (toku_State *T, int l);</pre>
+        <pre>void tokuL_ref (toku_State *T, int32_t l);</pre>
         <p>
         Creates and returns a <em>reference</em>, in the list at index
         <code>l</code>, for the object on the top of the stack
@@ -6393,7 +6496,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_unref"><code>tokuL_unref</code></a></h3><p>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>void tokuL_unref (toku_State *T, int l, int ref);</pre>
+        <pre>void tokuL_unref (toku_State *T, int32_t l, int32_t ref);</pre>
         <p>
         Releases the reference <code>ref</code> from the list at index
         <code>l</code> (see <a href="#tokuL_ref"><code>tokuL_ref</code></a>).
@@ -6408,7 +6511,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_check_string"><code>tokuL_check_string</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>const char *tokuL_check_string (toku_State *T, int idx);</pre>
+        <pre>const char *tokuL_check_string (toku_State *T, int32_t idx);</pre>
         <p>
         Checks whether the function argument at the given index is a string
         and returns this string.
@@ -6422,8 +6525,8 @@ typedef struct tokuL_Entry {
         <hr><h3><a name="tokuL_check_arg"><code>tokuL_check_arg</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
         <pre>void tokuL_check_arg (toku_State *T,
-                      int cond,
-                      int idx,
+                      int32_t cond,
+                      int32_t idx,
                       const char *extramsg);</pre>
         <p>
         Checks whether <code>cond</code> is true.
@@ -6433,7 +6536,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_opt_string"><code>tokuL_opt_string</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
-        <pre>void tokuL_opt_string (toku_State *T, int idx, const char *dflt);</pre>
+        <pre>void tokuL_opt_string (toku_State *T, int32_t idx, const char *dflt);</pre>
         <p>
         If the function argument <code>idx</code> is a string, returns
         this string.
@@ -6462,8 +6565,8 @@ typedef struct tokuL_Entry {
         <hr><h3><a name="tokuL_expect_arg"><code>tokuL_expect_arg</code></a></h3><p>
         <span class="apii">[-0, +0, <em>v</em>]</span>
         <pre>void tokuL_expect_arg (toku_State *T
-                       int cond,
-                       int idx,
+                       int32_t cond,
+                       int32_t idx,
                        const char *tname);</pre>
         <p>
         Checks whether <code>cond</code> is true.
@@ -6474,7 +6577,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_typename"><code>tokuL_typename</code></a></h3><p>
         <span class="apii">[-0, +0, &ndash;]</span>
-        <pre>const char *tokuL_typename (toku_State *T, int idx);</pre>
+        <pre>const char *tokuL_typename (toku_State *T, int32_t idx);</pre>
         <p>
         Returns the name of the type of the value at the given index.
         </p>
@@ -6518,7 +6621,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_get_metatable"><code>tokuL_get_metatable</code></a></h3><p>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>int tokuL_get_metatable (toku_State *T, const char *tname);</pre>
+        <pre>int32_t tokuL_get_metatable (toku_State *T, const char *tname);</pre>
         <p>
         Pushes onto the stack the metatable aassociated with the name
         <code>tname</code> in the C table
@@ -6529,7 +6632,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_loadfile"><code>tokuL_loadfile</code></a></h3><p>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>int tokuL_loadfile (toku_State *T, const char *filename);</pre>
+        <pre>int32_t tokuL_loadfile (toku_State *T, const char *filename);</pre>
         <p>
         Equivalent to
         <a href="#tokuL_loadfilex"><code>tokuL_loadfilex</code></a>
@@ -6538,7 +6641,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_loadbuffer"><code>tokuL_loadbuffer</code></a></h3><p>
         <span class="apii">[-0, +1, <em>m</em>]</span>
-        <pre>int tokuL_loadbuffer (toku_State *T,
+        <pre>int32_t tokuL_loadbuffer (toku_State *T,
                       const char *buff,
                       size_t sz,
                       const char *name);</pre>
@@ -6591,7 +6694,7 @@ typedef struct tokuL_Entry {
 
         <hr><h3><a name="tokuL_buffsub"><code>tokuL_buffsub</code></a></h3><p>
         <span class="apii">[-?, +?, &ndash;]</span>
-        <pre>void tokuL_buffsub (tokuL_Buffer *B, int n);</pre>
+        <pre>void tokuL_buffsub (tokuL_Buffer *B, int32_t n);</pre>
         <p>
         Removes <code>n</code> bytes from the buffer <code>B</code>
         (see <a href="#tokuL_Buffer"><code>tokuL_Buffer</code></a>).
@@ -6806,7 +6909,7 @@ typedef struct tokuL_Stream {
 
         <hr><h3><a name="tokuL_openlibsx"><code>tokuL_openlibsx</code></a></h3><p>
         <span class="apii">[-0, +0, <em>e</em>]</span>
-        <pre>void tokuL_openlibsx (toku_State *T, int libload, int libpreload);</pre>
+        <pre>void tokuL_openlibsx (toku_State *T, int32_t libload, int32_t libpreload);</pre>
         <p>
         Opens (loads) and preloads selected standard libraries into the state
         <code>T</code>.
@@ -12475,7 +12578,7 @@ assert(a == nil and !b);</pre>
             </li>
         </ul>
         Moreover, with a <code>count</code> different from zero,
-        the hook is called also after every <code>count</code> instructions.
+        the hook is called also after every <code>count</code> opcodes.
         <br/><br/>
         When called without arguments,
         <a href="#debug.sethook"><code>debug.sethook</code></a>
@@ -12920,7 +13023,6 @@ assert(!res and err == l);</pre>
         (For operator precedences, see <a href="#3.4.7">&sect;3.4.7</a>;
         for a description of the comments and the terminals Name, Numeral,
         and LiteralString, see <a href="#3.1">&sect;3.1</a>.)
-        see <a href="#3.1">&sect;3.1</a>.)
         <br/><br/>
 
         <pre>

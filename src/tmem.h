@@ -37,15 +37,15 @@
 ** Computes the minimum between 'n' and 'TOKU_MAXSIZET/sizeof(t)', so that
 ** the result is not larger than 'n' and cannot overflow a 'size_t'
 ** when multiplied by the size of type 't'. (Assumes that 'n' is an
-** 'int' and that 'int' is not larger than 'size_t'.)
+** 'int32_t' and that 'int32_t' is not larger than 'size_t'.)
 */
 #define tokuM_limitN(n,t)  \
     ((cast_sizet(n) <= TOKU_MAXSIZET/sizeof(t)) ? (n) :  \
-        cast_int((TOKU_MAXSIZET/sizeof(t))))
+        cast_i32((TOKU_MAXSIZET/sizeof(t))))
 
 
 #define tokuM_new(T,t)              cast(t*, tokuM_malloc_(T, sizeof(t), 0u))
-#define tokuM_newobj(T,tag,sz)      tokuM_malloc_(T, sz, cast_ubyte(tag))
+#define tokuM_newobj(T,tag,sz)      tokuM_malloc_(T, sz, cast_u8(tag))
 #define tokuM_newarray(T,n,t) \
         cast(t*, tokuM_malloc_(T, cast_sizet(n)*sizeof(t), 0u))
 #define tokuM_newarraychecked(T,n,t) \
@@ -70,18 +70,21 @@
         ((p) = cast(t *, tokuM_shrinkarr_(T, p, &(size), f, sizeof(t))))
 
 
-TOKUI_FUNC void *tokuM_malloc_(toku_State *T, t_umem size, t_ubyte tag);
+TOKUI_FUNC void *tokuM_malloc_(toku_State *T, t_umem size, uint8_t tag);
 TOKUI_FUNC void *tokuM_realloc_(toku_State *T, void *ptr, t_umem osize,
                                 t_umem nsize);
 TOKUI_FUNC void *tokuM_saferealloc(toku_State *T, void *ptr, t_umem osize,
                                    t_umem nsize);
 TOKUI_FUNC t_noret tokuM_toobig(toku_State *T);
 TOKUI_FUNC void tokuM_free_(toku_State *T, void *ptr, t_umem osize);
-TOKUI_FUNC void *tokuM_growarr_(toku_State *T, void *ptr, int *sizep, int len,
-                                               int elemsz, int ensure,
-                                               int lim, const char *what);
-TOKUI_FUNC void *tokuM_shrinkarr_(toku_State *T, void *ptr, int *sizep,
-                                                 int final, int elemsz);
-TOKUI_FUNC int tokuM_growstack(toku_State *T, int n);
+TOKUI_FUNC void *tokuM_growarr_(toku_State *T, void *ptr, int32_t *sizep,
+                                               int32_t len, int32_t elemsz,
+                                               int32_t ensure, int32_t lim,
+                                               const char *what);
+TOKUI_FUNC void *tokuM_shrinkarr_(toku_State *T, void *ptr,
+                                                 int32_t *sizep,
+                                                 int32_t final,
+                                                 int32_t elemsz);
+TOKUI_FUNC int32_t tokuM_growstack(toku_State *T, int32_t n);
 
 #endif

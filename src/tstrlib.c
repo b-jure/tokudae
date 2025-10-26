@@ -79,17 +79,17 @@ static size_t posrelEnd(toku_Integer pos, size_t len) {
 }
 
 
-static const char *skipws(const char *s, size_t *pl, int rev) {
-    const unsigned char *p;
+static const char *skipws(const char *s, size_t *pl, int32_t rev) {
+    const uint8_t *p;
     size_t l = *pl;
     if (l == 0)
         return NULL;
     else if (!rev) { /* from 's'? */
-        p = (const t_ubyte *)s;
+        p = (const uint8_t *)s;
         while (l > 0 && isspace(*p))
             p++, l--;
     } else { /* reverse */
-        p = ((const t_ubyte *)s + l) - 1;
+        p = ((const uint8_t *)s + l) - 1;
         while (l > 0 && isspace(*p))
             p--, l--;
     }
@@ -98,12 +98,12 @@ static const char *skipws(const char *s, size_t *pl, int rev) {
 }
 
 
-static int split_into_list(toku_State *T, int rev) {
+static int32_t split_into_list(toku_State *T, int32_t rev) {
     size_t ls;
     const char *s = tokuL_check_lstring(T, 0, &ls); /* string */
     toku_Integer n = tokuL_opt_integer(T, 2, TOKU_INTEGER_MAX-1); /* maxsplit */
-    int arr = toku_getntop(T);
-    int i = 0;
+    int32_t arr = toku_getntop(T);
+    int32_t i = 0;
     const char *aux;
     if (toku_is_noneornil(T, 1)) { /* split by whitespace? */
         toku_push_list(T, 1);
@@ -169,17 +169,17 @@ pushs:
 }
 
 
-static int s_split(toku_State *T) {
+static int32_t s_split(toku_State *T) {
     return split_into_list(T, 0);
 }
 
 
-static int s_rsplit(toku_State *T) {
+static int32_t s_rsplit(toku_State *T) {
     return split_into_list(T, 1);
 }
 
 
-static int s_startswith(toku_State *T) {
+static int32_t s_startswith(toku_State *T) {
     size_t l1, l2, posi, posj;
     const char *s1 = tokuL_check_lstring(T, 0, &l1);
     const char *s2 = tokuL_check_lstring(T, 1, &l2);
@@ -211,7 +211,7 @@ static int s_startswith(toku_State *T) {
 }
 
 
-static int s_reverse(toku_State *T) {
+static int32_t s_reverse(toku_State *T) {
     size_t l;
     tokuL_Buffer B;
     const char *s = tokuL_check_lstring(T, 0, &l);
@@ -223,7 +223,7 @@ static int s_reverse(toku_State *T) {
 }
 
 
-static int s_repeat(toku_State *T) {
+static int32_t s_repeat(toku_State *T) {
     size_t l, lsep;
     const char *s = tokuL_check_lstring(T, 0, &l);
     toku_Integer n = tokuL_check_integer(T, 1);
@@ -251,7 +251,7 @@ static int s_repeat(toku_State *T) {
 
 
 static void auxjoinstr(tokuL_Buffer *B, const char *s, size_t l,
-                                      const char *sep, size_t lsep) {
+                                        const char *sep, size_t lsep) {
     tokuL_buff_push_lstring(B, s, l);
     if (lsep > 0) /* non empty separator? */
         tokuL_buff_push_lstring(B, sep, lsep);
@@ -264,7 +264,7 @@ static void joinfromtable(toku_State *T, tokuL_Buffer *B,
     while (toku_nextfield(T, 1) != 0) {
         size_t l;
         const char *s = toku_to_lstring(T, -1, &l);
-        int pop = 1; /* value */
+        int32_t pop = 1; /* value */
         if (s && l > 0) {
             toku_push(T, -3); /* push buffer */
             auxjoinstr(B, s, l, sep, lsep);
@@ -276,8 +276,8 @@ static void joinfromtable(toku_State *T, tokuL_Buffer *B,
 
 
 static void joinfromlist(toku_State *T, tokuL_Buffer *B,
-                         const char *sep, size_t lsep, int len) {
-    for (int i = 0; i < len; i++) {
+                         const char *sep, size_t lsep, int32_t len) {
+    for (int32_t i = 0; i < len; i++) {
         size_t l;
         const char *s;
         toku_get_index(T, 1, i);
@@ -289,15 +289,15 @@ static void joinfromlist(toku_State *T, tokuL_Buffer *B,
 }
 
 
-static int s_join(toku_State *T) {
+static int32_t s_join(toku_State *T) {
     tokuL_Buffer B;
     size_t lsep;
     const char *sep = tokuL_check_lstring(T, 0, &lsep);
-    int t = toku_type(T, 1);
+    int32_t t = toku_type(T, 1);
     tokuL_expect_arg(T, t == TOKU_T_LIST || t == TOKU_T_TABLE, 1, "list/table");
     tokuL_buff_init(T, &B);
     if (t == TOKU_T_LIST) {
-        int len = cast_int(t_castU2S(toku_len(T, 1)));
+        int32_t len = cast_i32(t_castU2S(toku_len(T, 1)));
         if (len > 0)
             joinfromlist(T, &B, sep, lsep, len);
     } else
@@ -375,9 +375,9 @@ static void addquoted(tokuL_Buffer *B, const char *s, size_t len) {
         else if (iscntrl(uchar(*s))) {
             char buff[10];
             if (!isdigit(uchar(*(s+1))))
-                snprintf(buff, sizeof(buff), "\\%d", cast_int(uchar(*s)));
+                snprintf(buff, sizeof(buff), "\\%d", cast_i32(uchar(*s)));
             else
-                snprintf(buff, sizeof(buff), "\\%03d", cast_int(uchar(*s)));
+                snprintf(buff, sizeof(buff), "\\%03d", cast_i32(uchar(*s)));
             tokuL_buff_push_string(B, buff);
         }
         else
@@ -394,7 +394,7 @@ static void addquoted(tokuL_Buffer *B, const char *s, size_t len) {
 ** (to preserve precision); inf, -inf, and NaN are handled separately.
 ** (NaN cannot be expressed as a numeral, so we write '(0/0)' for it.)
 */
-static int quotefloat(toku_State *T, char *buff, toku_Number n) {
+static int32_t quotefloat(toku_State *T, char *buff, toku_Number n) {
     const char *s; /* for the fixed representations */
     if (n == cast_num(HUGE_VAL)) /* inf? */
         s = "1e9999";
@@ -403,11 +403,11 @@ static int quotefloat(toku_State *T, char *buff, toku_Number n) {
     else if (n != n) /* NaN? */
         s = "(0/0)";
     else { /* format number as hexadecimal */
-        int nb = toku_number2strx(T, buff, MAX_ITEM, "%"TOKU_NUMBER_FMTLEN"a", n);
+        int32_t nb = toku_number2strx(T, buff, MAX_ITEM, "%"TOKU_NUMBER_FMTLEN"a", n);
         /* ensures that 'buff' string uses a dot as the radix character */
-        if (memchr(buff, '.', cast_uint(nb)) == NULL) { /* no dot? */
+        if (memchr(buff, '.', cast_u32(nb)) == NULL) { /* no dot? */
             char point = toku_getlocaledecpoint(); /* try locale point */
-            char *ppoint = cast_charp(memchr(buff, point, cast_uint(nb)));
+            char *ppoint = cast_charp(memchr(buff, point, cast_u32(nb)));
             if (ppoint) *ppoint = '.'; /* change it to a dot */
         }
         return nb;
@@ -417,7 +417,7 @@ static int quotefloat(toku_State *T, char *buff, toku_Number n) {
 }
 
 
-static void addliteral(toku_State *T, tokuL_Buffer *B, int arg) {
+static void addliteral(toku_State *T, tokuL_Buffer *B, int32_t arg) {
     switch (toku_type(T, arg)) {
         case TOKU_T_STRING: {
             size_t len;
@@ -427,7 +427,7 @@ static void addliteral(toku_State *T, tokuL_Buffer *B, int arg) {
         }
         case TOKU_T_NUMBER: {
             char *buff = tokuL_buff_ensure(B, MAX_ITEM);
-            int nb;
+            int32_t nb;
             if (!toku_is_integer(T, arg)) /* float? */
                 nb = quotefloat(T, buff, toku_to_number(T, arg));
             else { /* integers */
@@ -437,7 +437,7 @@ static void addliteral(toku_State *T, tokuL_Buffer *B, int arg) {
                     : TOKU_INTEGER_FMT; /* else use default format */
                 nb = snprintf(buff, MAX_ITEM, format, n);
             }
-            tokuL_buffadd(B, cast_uint(nb));
+            tokuL_buffadd(B, cast_u32(nb));
             break;
         }
         case TOKU_T_NIL: case TOKU_T_BOOL: {
@@ -484,7 +484,7 @@ static size_t szmods[] = {
 ** 'precision' signals whether to accept a precision.
 */
 static void checkformat(toku_State *T, const char *form, const char *flags,
-                        int precision, int imod) {
+                        int32_t precision, int32_t imod) {
     const char *spec = form + 1; /* skip '%' */
     spec += strspn(spec, flags); /* skip flags */
     if (*spec != '0') { /* a width cannot start with '0' */
@@ -506,7 +506,7 @@ static void checkformat(toku_State *T, const char *form, const char *flags,
 ** Return the address of hopefully conversion specifier character.
 */
 static const char *getformat(toku_State *T, const char *strfmt, char *form,
-                                                                 int *mod) {
+                                                                 int32_t *mod) {
     size_t len = strspn(strfmt, T_FMTFLAGSF "123456789.");
     switch (strfmt[len]) { /* check specifier */
         case 'u': *mod = 0; goto intcase;
@@ -554,9 +554,9 @@ static void addlenmod(char *form, const char *lenmod) {
 }
 
 
-static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
-    int top = toku_gettop(T);
-    int arg = 0;
+static int32_t formatstr(toku_State *T, const char *fmt, size_t lfmt) {
+    int32_t top = toku_gettop(T);
+    int32_t arg = 0;
     const char *efmt = fmt + lfmt;
     const char *flags;
     tokuL_Buffer B;
@@ -570,10 +570,10 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
             continue;
         } /* else '%' */
         char form[MAX_FORMAT]; /* to store the format ('%...') */
-        t_uint maxitem = MAX_ITEM; /* maximum length for the result */
+        uint32_t maxitem = MAX_ITEM; /* maximum length for the result */
         char *buff = tokuL_buff_ensure(&B, maxitem); /* to put result */
-        int nb = 0; /* number of bytes in result */
-        int imod = -1; /* no integer length modifier */
+        int32_t nb = 0; /* number of bytes in result */
+        int32_t imod = -1; /* no integer length modifier */
         if (++arg > top) /* too many format specifiers? */
             return tokuL_error_arg(T, arg, "missing format value");
         fmt = getformat(T, fmt, form, &imod);
@@ -581,7 +581,7 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
             case 'c': {
                 checkformat(T, form, T_FMTFLAGSC, 0, -1);
                 nb = snprintf(buff, maxitem, form,
-                              cast_int(tokuL_check_integer(T, arg)));
+                              cast_i32(tokuL_check_integer(T, arg)));
                 break;
             }
             case 'd': case 'i':
@@ -656,15 +656,15 @@ static int formatstr(toku_State *T, const char *fmt, size_t lfmt) {
                 return tokuL_error(T, "invalid conversion '%s' to 'format'", form);
             }
         }
-        toku_assert(cast_uint(nb) < maxitem);
-        tokuL_buffadd(&B, cast_uint(nb));
+        toku_assert(cast_u32(nb) < maxitem);
+        tokuL_buffadd(&B, cast_u32(nb));
     }
     tokuL_buff_end(&B);
     return 1; /* return formatted string */
 }
 
 
-static int s_fmt(toku_State *T) {
+static int32_t s_fmt(toku_State *T) {
     size_t lfmt;
     const char *fmt = tokuL_check_lstring(T, 0, &lfmt);
     if (lfmt == 0) {
@@ -677,7 +677,7 @@ static int s_fmt(toku_State *T) {
 /* }====================================================== */
 
 
-static int auxtocase(toku_State *T, int (*f)(int c)) {
+static int32_t auxtocase(toku_State *T, int32_t (*f)(int32_t c)) {
     size_t l, posi, posj, endpos;
     const char *s = tokuL_check_lstring(T, 0, &l);
     toku_Integer i = tokuL_opt_integer(T, 1, 0);
@@ -707,17 +707,17 @@ static int auxtocase(toku_State *T, int (*f)(int c)) {
 }
 
 
-static int s_toupper(toku_State *T) {
+static int32_t s_toupper(toku_State *T) {
     return auxtocase(T, toupper);
 }
 
 
-static int s_tolower(toku_State *T) {
+static int32_t s_tolower(toku_State *T) {
     return auxtocase(T, tolower);
 }
 
 
-static int auxfind(toku_State *T, int rev) {
+static int32_t auxfind(toku_State *T, int32_t rev) {
     size_t l, lpat, posi, posj;
     const char *s = tokuL_check_lstring(T, 0, &l);
     const char *pat = tokuL_check_lstring(T, 1, &lpat);
@@ -739,18 +739,18 @@ static int auxfind(toku_State *T, int rev) {
 }
 
 
-static int s_find(toku_State *T) {
+static int32_t s_find(toku_State *T) {
     return auxfind(T, 0);
 }
 
 
-static int s_rfind(toku_State *T) {
+static int32_t s_rfind(toku_State *T) {
     return auxfind(T, 1);
 }
 
 
 // TODO: optimize with bitmask
-static int aux_span(toku_State *T, int complement) {
+static int32_t aux_span(toku_State *T, int32_t complement) {
     size_t l, lb, posi, posj, startpos;
     const char *s = tokuL_check_lstring(T, 0, &l);
     const char *b = tokuL_check_lstring(T, 1, &lb);
@@ -795,17 +795,17 @@ done:
 }
 
 
-static int s_span(toku_State *T) {
+static int32_t s_span(toku_State *T) {
     return aux_span(T, 0);
 }
 
 
-static int s_cspan(toku_State *T) {
+static int32_t s_cspan(toku_State *T) {
     return aux_span(T, 1);
 }
 
 
-static int s_replace(toku_State *T) {
+static int32_t s_replace(toku_State *T) {
     size_t l, lpat, lv;
     const char *s = tokuL_check_lstring(T, 0, &l);
     const char *pat = tokuL_check_lstring(T, 1, &lpat);
@@ -834,7 +834,7 @@ static int s_replace(toku_State *T) {
 }
 
 
-static int s_substr(toku_State *T) {
+static int32_t s_substr(toku_State *T) {
     size_t l, posi, posj;
     const char *s = tokuL_check_lstring(T, 0, &l);
     toku_Integer i = tokuL_opt_integer(T, 1, 0);
@@ -867,7 +867,7 @@ static int s_substr(toku_State *T) {
 #define swaptoupper(c)      cast_char(islower(c) ? toupper(c) : (c))
 
 static void auxswapcase(char *d, const char *s, size_t posi, size_t posj) {
-    t_ubyte c;
+    uint8_t c;
     while (posi < posj) {
         c = uchar(s[posi]), d[posi++] = swapcase(c);
         c = uchar(s[posj]), d[posj--] = swapcase(c);
@@ -878,7 +878,7 @@ static void auxswapcase(char *d, const char *s, size_t posi, size_t posj) {
 
 
 static void auxuppercase(char *d, const char *s, size_t posi, size_t posj) {
-    t_ubyte c;
+    uint8_t c;
     while (posi < posj) {
         c = uchar(s[posi]), d[posi++] = swaptolower(c);
         c = uchar(s[posj]), d[posj--] = swaptolower(c);
@@ -888,7 +888,7 @@ static void auxuppercase(char *d, const char *s, size_t posi, size_t posj) {
 
 
 static void auxlowercase(char *d, const char *s, size_t posi, size_t posj) {
-    t_ubyte c;
+    uint8_t c;
     while (posi < posj) {
         c = uchar(s[posi]), d[posi++] = swaptoupper(c);
         c = uchar(s[posj]), d[posj--] = swaptoupper(c);
@@ -897,7 +897,8 @@ static void auxlowercase(char *d, const char *s, size_t posi, size_t posj) {
 }
 
 
-static int auxcase(toku_State *T, void (*f)(char*,const char*,size_t,size_t)) {
+static int32_t auxcase(toku_State *T,
+                       void (*f)(char*, const char*, size_t, size_t)) {
     size_t l;
     const char *s = tokuL_check_lstring(T, 0, &l);
     toku_Integer i = tokuL_opt_integer(T, 1, 0);
@@ -923,27 +924,30 @@ static int auxcase(toku_State *T, void (*f)(char*,const char*,size_t,size_t)) {
 }
 
 
-static int s_swapcase(toku_State *T) {
+static int32_t s_swapcase(toku_State *T) {
     return auxcase(T, auxswapcase);
 }
 
 
-static int s_swapupper(toku_State *T) {
+static int32_t s_swapupper(toku_State *T) {
     return auxcase(T, auxuppercase);
 }
 
 
-static int s_swaplower(toku_State *T) {
+static int32_t s_swaplower(toku_State *T) {
     return auxcase(T, auxlowercase);
 }
 
 
-#define pushbyte(T,s,i,k)   toku_push_integer(T, uchar((s)[(i) + cast_uint(k)]))
+#define pushbyte(T,s,i,k) \
+        toku_push_integer(T, uchar((s)[(i) + cast_u32(k)]))
 
-static int getbytes_list(toku_State *T, const char *s, size_t posi, size_t posj) {
-    int n = cast_int(posj - posi) + 1;
+
+static int32_t getbytes_list(toku_State *T, const char *s, size_t posi,
+                                                           size_t posj) {
+    int32_t n = cast_i32(posj - posi) + 1;
     toku_push_list(T, n);
-    for (int k = 0; k < n; k++) {
+    for (int32_t k = 0; k < n; k++) {
         pushbyte(T, s, posi, k);
         toku_set_index(T, -2, k);
     }
@@ -951,15 +955,16 @@ static int getbytes_list(toku_State *T, const char *s, size_t posi, size_t posj)
 }
 
 
-static int getbytes_bytes(toku_State *T, const char *s, size_t posi, size_t posj) {
-    int n = cast_int(posj - posi) + 1;
+static int32_t getbytes_bytes(toku_State *T, const char *s, size_t posi,
+                                                            size_t posj) {
+    int32_t n = cast_i32(posj - posi) + 1;
     tokuL_check_stack(T, n, strtoolong);
-    for (int k = 0; k < n; k++) pushbyte(T, s, posi, k);
+    for (int32_t k = 0; k < n; k++) pushbyte(T, s, posi, k);
     return n; /* return 'n' bytes */
 }
 
 
-static int auxgetbytes(toku_State *T, int pack) {
+static int32_t auxgetbytes(toku_State *T, int32_t pack) {
     size_t l;
     const char *s = tokuL_check_lstring(T, 0, &l);
     toku_Integer i = tokuL_opt_integer(T, 1, 0);
@@ -996,36 +1001,36 @@ static int auxgetbytes(toku_State *T, int pack) {
 }
 
 
-static int s_byte(toku_State *T) {
+static int32_t s_byte(toku_State *T) {
     return auxgetbytes(T, 0);
 }
 
 
-static int s_bytes(toku_State *T) {
+static int32_t s_bytes(toku_State *T) {
     return auxgetbytes(T, 1);
 }
 
 
-static int s_char(toku_State *T) {
-    int n = toku_getntop(T); /* number of arguments */
+static int32_t s_char(toku_State *T) {
+    int32_t n = toku_getntop(T); /* number of arguments */
     if (n > 0) { /* have at least 1 argument? */
         tokuL_Buffer B;
-        char *p = tokuL_buff_initsz(T, &B, cast_uint(n));
-        for (int i=0; i<n; i++) {
+        char *p = tokuL_buff_initsz(T, &B, cast_u32(n));
+        for (int32_t i=0; i<n; i++) {
             toku_Unsigned c = t_castS2U(tokuL_check_integer(T, i));
-            tokuL_check_arg(T, c <= cast_uint(UCHAR_MAX), i,
+            tokuL_check_arg(T, c <= cast_u32(UCHAR_MAX), i,
                                "value out of range");
             p[i] = cast_char(uchar(c));
         }
-        tokuL_buff_endsz(&B, cast_uint(n));
+        tokuL_buff_endsz(&B, cast_u32(n));
     } else /* otherwise no arguments were provided */
         toku_push_literal(T, ""); /* push empty string (a bit faster) */
     return 1;
 }
 
 
-static int s_cmp(toku_State *T) {
-    int res;
+static int32_t s_cmp(toku_State *T) {
+    int32_t res;
     size_t l1, l2;
     const char *s1 = tokuL_check_lstring(T, 0, &l1);
     const char *s2 = tokuL_check_lstring(T, 1, &l2);
@@ -1049,12 +1054,12 @@ static int s_cmp(toku_State *T) {
 ** push stuff.)
 */
 struct s_Writer {
-    int init; /* true if buffer has been initialized */
+    int32_t init; /* true if buffer has been initialized */
     tokuL_Buffer B;
 };
 
 
-static int writer(toku_State *T, const void *b, size_t size, void *ud) {
+static int32_t writer(toku_State *T, const void *b, size_t size, void *ud) {
     struct s_Writer *state = cast(struct s_Writer *, ud);
     if (!state->init) {
         state->init = 1;
@@ -1069,9 +1074,9 @@ static int writer(toku_State *T, const void *b, size_t size, void *ud) {
 }
 
 
-static int s_dump(toku_State *T) {
+static int32_t s_dump(toku_State *T) {
     struct s_Writer state;
-    int strip = toku_to_bool(T, 1);
+    int32_t strip = toku_to_bool(T, 1);
     tokuL_check_arg(T, toku_type(T, 0) == TOKU_T_FUNCTION &&
                        !toku_is_cfunction(T, 0), 0,
                        "Tokudae function expected");
@@ -1103,13 +1108,13 @@ static int s_dump(toku_State *T) {
 #define MC      ((1 << NB) - 1)
 
 /* size of a toku_Integer */
-#define SZINT   cast_int(sizeof(toku_Integer))
+#define SZINT   cast_i32(sizeof(toku_Integer))
 
 
 /* dummy union to get native endianness */
 static const union {
-    int dummy;
-    t_byte little; /* true iff machine is little endian */
+    int32_t dummy;
+    int8_t little; /* true iff machine is little endian */
 } nativeendian = {1};
 
 
@@ -1118,8 +1123,8 @@ static const union {
 */
 typedef struct Header {
     toku_State *T;
-    int islittle;
-    t_uint maxalign;
+    int32_t islittle;
+    uint32_t maxalign;
 } Header;
 
 
@@ -1151,7 +1156,7 @@ static size_t getnum(const char **fmt, size_t df) {
     else {
         size_t a = 0;
         do {
-            a = a*10 + cast_uint(*((*fmt)++) - '0');
+            a = a*10 + cast_u32(*((*fmt)++) - '0');
         } while (isdigit(**fmt) && a <= (TOKU_MAXSIZE - 9)/10);
         return a;
     }
@@ -1162,12 +1167,12 @@ static size_t getnum(const char **fmt, size_t df) {
 ** Read an integer numeral and raises an error if it is larger
 ** than the maximum size of integers.
 */
-static t_uint getnumlimit(Header *h, const char **fmt, size_t df) {
+static uint32_t getnumlimit(Header *h, const char **fmt, size_t df) {
     size_t sz = getnum(fmt, df);
     if (t_unlikely((sz - 1u) >= MAXINTSIZE))
-        return cast_uint(tokuL_error(h->T,
+        return cast_u32(tokuL_error(h->T,
                 "integral size (%d) out of limits [1,%d]", sz, MAXINTSIZE));
-    return cast_uint(sz);
+    return cast_u32(sz);
 }
 
 
@@ -1186,12 +1191,12 @@ static void initheader(toku_State *T, Header *h) {
 */
 static KOption getoption(Header *h, const char **fmt, size_t *size) {
     /* dummy structure to get native alignment requirements */
-    struct cD { t_byte c; union { TOKUI_MAXALIGN; } u; };
-    int opt = *((*fmt)++);
+    struct cD { int8_t c; union { TOKUI_MAXALIGN; } u; };
+    int32_t opt = *((*fmt)++);
     *size = 0; /* default */
     switch (opt) {
-        case 'b': *size = sizeof(t_byte); return Kint;
-        case 'B': *size = sizeof(t_byte); return Kuint;
+        case 'b': *size = sizeof(int8_t); return Kint;
+        case 'B': *size = sizeof(int8_t); return Kuint;
         case 'h': *size = sizeof(short); return Kint;
         case 'H': *size = sizeof(short); return Kuint;
         case 'l': *size = sizeof(long); return Kint;
@@ -1202,8 +1207,8 @@ static KOption getoption(Header *h, const char **fmt, size_t *size) {
         case 'f': *size = sizeof(float); return Kfloat;
         case 'n': *size = sizeof(toku_Number); return Knumber;
         case 'd': *size = sizeof(double); return Kdouble;
-        case 'i': *size = getnumlimit(h, fmt, sizeof(int)); return Kint;
-        case 'I': *size = getnumlimit(h, fmt, sizeof(int)); return Kuint;
+        case 'i': *size = getnumlimit(h, fmt, sizeof(int32_t)); return Kint;
+        case 'I': *size = getnumlimit(h, fmt, sizeof(int32_t)); return Kuint;
         case 's': *size = getnumlimit(h, fmt, sizeof(size_t)); return Kstring;
         case 'c':
             *size = getnum(fmt, cast_sizet(-1));
@@ -1238,7 +1243,7 @@ static KOption getoption(Header *h, const char **fmt, size_t *size) {
 ** despite its size.
 */
 static KOption getdetails(Header *h, size_t totalsize, const char **fmt,
-                          size_t *psize, t_uint *ntoalign) {
+                          size_t *psize, uint32_t *ntoalign) {
     KOption opt = getoption(h, fmt, psize);
     size_t align = *psize; /* usually, alignment follows size */
     if (opt == Kpaddalign) { /* 'X' gets alignment from following option */
@@ -1255,8 +1260,8 @@ static KOption getdetails(Header *h, size_t totalsize, const char **fmt,
             tokuL_error_arg(h->T, 0,
                     "format asks for alignment that is not a power of 2");
         } else {
-            t_uint alignrem = cast_uint(t_fastmod(totalsize, align));
-            *ntoalign = cast_uint(t_fastmod(align - alignrem, align));
+            uint32_t alignrem = cast_u32(t_fastmod(totalsize, align));
+            *ntoalign = cast_u32(t_fastmod(align - alignrem, align));
         }
     }
     return opt;
@@ -1270,17 +1275,17 @@ static KOption getdetails(Header *h, size_t totalsize, const char **fmt,
 ** bytes if necessary (by default they would be zeros for positive integer).
 */
 static void packint(tokuL_Buffer *B, toku_Unsigned n,
-                    int islittle, t_uint size, int neg) {
+                    int32_t islittle, uint32_t size, int32_t neg) {
     char *buff = tokuL_buff_ensure(B, size);
-    t_uint i;
-    buff[islittle ? 0 : size - 1] = cast_byte(n & MC); /* first byte */
+    uint32_t i;
+    buff[islittle ? 0 : size - 1] = cast_char(n & MC); /* first byte */
     for (i = 1; i < size; i++) {
         n >>= NB;
-        buff[islittle ? i : size - 1 - i] = cast_byte(n & MC);
+        buff[islittle ? i : size - 1 - i] = cast_char(n & MC);
     }
     if (neg && size > SZINT) {  /* negative number need sign extension? */
         for (i = SZINT; i < size; i++)  /* correct extra bytes */
-            buff[islittle ? i : size - 1 - i] = cast_byte(MC);
+            buff[islittle ? i : size - 1 - i] = cast_char(MC);
     }
     tokuL_buffadd(B, size); /* add result to buffer */
 }
@@ -1291,7 +1296,7 @@ static void packint(tokuL_Buffer *B, toku_Unsigned n,
 ** given 'islittle' is different from native endianness.
 */
 static void copywithendian(char *dest, const char *src,
-                           t_uint size, int islittle) {
+                           uint32_t size, int32_t islittle) {
     if (islittle == nativeendian.little)
         memcpy(dest, src, size);
     else {
@@ -1302,17 +1307,17 @@ static void copywithendian(char *dest, const char *src,
 }
 
 
-static int s_pack(toku_State *T) {
+static int32_t s_pack(toku_State *T) {
     tokuL_Buffer B;
     Header h;
     const char *fmt = tokuL_check_string(T, 0); /* format string */
-    int arg = 0; /* current argument to pack */
+    int32_t arg = 0; /* current argument to pack */
     size_t totalsize = 0; /* accumulate total size of result */
     initheader(T, &h);
     toku_push_nil(T); /* mark to separate arguments from string buffer */
     tokuL_buff_init(T, &B);
     while (*fmt != '\0') {
-        t_uint ntoalign;
+        uint32_t ntoalign;
         size_t size;
         KOption opt = getdetails(&h, totalsize, &fmt, &size, &ntoalign);
         tokuL_check_arg(T, size + ntoalign <= TOKU_MAXSIZE - totalsize, arg,
@@ -1329,7 +1334,7 @@ static int s_pack(toku_State *T) {
                     tokuL_check_arg(T, -lim <= n && n < lim, arg,
                             "integer overflow");
                 }
-                packint(&B, t_castS2U(n), h.islittle, cast_uint(size), (n<0));
+                packint(&B, t_castS2U(n), h.islittle, cast_u32(size), (n<0));
                 break;
             }
             case Kuint: { /* unsigned integers */
@@ -1339,11 +1344,11 @@ static int s_pack(toku_State *T) {
                             t_castS2U(n) < (cast_Unsigned(1) << (size * NB)),
                             arg, "unsigned overflow");
                 }
-                packint(&B, t_castS2U(n), h.islittle, cast_uint(size), 0);
+                packint(&B, t_castS2U(n), h.islittle, cast_u32(size), 0);
                 break;
             }
             case Kfloat: { /* C float */
-                float f = cast_float(tokuL_check_number(T, arg));
+                float f = cast(float, tokuL_check_number(T, arg));
                 char *buff = tokuL_buff_ensure(&B, sizeof(f));
                 /* move 'f' to final result, correcting endianness if needed */
                 copywithendian(buff, cast_charp(&f), sizeof(f), h.islittle);
@@ -1359,7 +1364,7 @@ static int s_pack(toku_State *T) {
                 break;
             }
             case Kdouble: { /* C double */
-                double f = cast_double(tokuL_check_number(T, arg));
+                double f = cast(double, tokuL_check_number(T, arg));
                 char *buff = tokuL_buff_ensure(&B, sizeof(f));
                 /* move 'f' to final result, correcting endianness if needed */
                 copywithendian(buff, cast_charp(&f), sizeof(f), h.islittle);
@@ -1387,7 +1392,7 @@ static int s_pack(toku_State *T) {
                         len < (cast_Unsigned(1) << (size*NB)), arg,
                         "string length does not fit in given size");
                 /* pack length */
-                packint(&B, cast_Unsigned(len), h.islittle, cast_uint(size), 0);
+                packint(&B, cast_Unsigned(len), h.islittle, cast_u32(size), 0);
                 tokuL_buff_push_lstring(&B, s, len);
                 totalsize += len;
                 break;
@@ -1414,13 +1419,13 @@ static int s_pack(toku_State *T) {
 }
 
 
-static int s_packsize(toku_State *T) {
+static int32_t s_packsize(toku_State *T) {
     const char *fmt = tokuL_check_string(T, 0); /* format string */
     size_t totalsize = 0; /* accumulate total size of result */
     Header h;
     initheader(T, &h);
     while (*fmt != '\0') {
-        t_uint ntoalign;
+        uint32_t ntoalign;
         size_t size;
         KOption opt = getdetails(&h, totalsize, &fmt, &size, &ntoalign);
         tokuL_check_arg(T, opt != Kstring && opt != Kzstr, 0,
@@ -1444,12 +1449,12 @@ static int s_packsize(toku_State *T) {
 ** overflow.
 */
 static toku_Integer unpackint(toku_State *T, const char *str,
-                              int islittle, int size, int issigned) {
+                              int32_t islittle, int32_t size, int32_t issigned) {
     toku_Unsigned res = 0;
-    int limit = (size  <= SZINT) ? size : SZINT;
-    for (int i = limit - 1; i >= 0; i--) {
+    int32_t limit = (size  <= SZINT) ? size : SZINT;
+    for (int32_t i = limit - 1; i >= 0; i--) {
         res <<= NB;
-        res |= cast_Unsigned(cast_ubyte(str[islittle ? i : size-1-i]));
+        res |= cast_Unsigned(cast_u8(str[islittle ? i : size-1-i]));
     }
     if (size < SZINT) { /* real size smaller than toku_Integer? */
         if (issigned) { /* needs sign extension? */
@@ -1458,27 +1463,29 @@ static toku_Integer unpackint(toku_State *T, const char *str,
         }
     }
     else if (size > SZINT) { /* must check unread bytes */
-        int mask = (!issigned || t_castU2S(res) >= 0) ? 0 : MC;
-        for (int i = limit; i < size; i++) {
-            if (t_unlikely(cast_ubyte(str[islittle ? i : size-1-i]) != mask))
-                tokuL_error(T, "%d-byte integer does not fit into Tokudae Integer", size);
+        int32_t mask = (!issigned || t_castU2S(res) >= 0) ? 0 : MC;
+        for (int32_t i = limit; i < size; i++) {
+            if (t_unlikely(cast_u8(str[islittle ? i : size-1-i]) != mask))
+                tokuL_error(T,
+                        "%d-byte integer does not fit into Tokudae Integer",
+                        size);
         }
     }
     return t_castU2S(res);
 }
 
 
-static int s_unpack(toku_State *T) {
+static int32_t s_unpack(toku_State *T) {
     const char *fmt = tokuL_check_string(T, 0);
     size_t ld;
     const char *data = tokuL_check_lstring(T, 1, &ld);
     size_t pos = posrelStart(tokuL_opt_integer(T, 2, 0), ld);
-    int n = 0; /* number of results */
+    int32_t n = 0; /* number of results */
     Header h;
     tokuL_check_arg(T, pos <= ld - 1, 2, "initial position out of string");
     initheader(T, &h);
     while (*fmt != '\0') {
-        t_uint ntoalign;
+        uint32_t ntoalign;
         size_t size;
         KOption opt = getdetails(&h, pos, &fmt, &size, &ntoalign);
         tokuL_check_arg(T, ntoalign + size <= ld - pos, 1,
@@ -1490,7 +1497,7 @@ static int s_unpack(toku_State *T) {
         switch (opt) {
             case Kint: case Kuint: {
                 toku_Integer res = unpackint(T, data + pos, h.islittle,
-                                                cast_int(size), (opt == Kint));
+                                                cast_i32(size), (opt == Kint));
                 toku_push_integer(T, res);
                 break;
             }
@@ -1518,7 +1525,7 @@ static int s_unpack(toku_State *T) {
             }
             case Kstring: {
                 toku_Unsigned len = t_castS2U(unpackint(T, data+pos,
-                                              h.islittle, cast_int(size), 0));
+                                              h.islittle, cast_i32(size), 0));
                 tokuL_check_arg(T, len <= ld - pos - size, 1,
                                    "data string too short");
                 toku_push_lstring(T, data + pos + size, cast_sizet(len));
@@ -1612,7 +1619,7 @@ static void set_string_bytes(toku_State *T) {
 }
 
 
-int tokuopen_string(toku_State *T) {
+int32_t tokuopen_string(toku_State *T) {
     tokuL_push_lib(T, strlib);
     set_string_bytes(T);
     return 1;

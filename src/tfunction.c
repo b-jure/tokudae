@@ -33,7 +33,7 @@ Proto *tokuF_newproto(toku_State *T) {
 }
 
 
-TClosure *tokuF_newTclosure(toku_State *T, int nup) {
+TClosure *tokuF_newTclosure(toku_State *T, int32_t nup) {
     GCObject *o = tokuG_new(T, sizeofTcl(nup), TOKU_VTCL);
     TClosure *cl = gco2clt(o);
     cl->p = NULL;
@@ -43,7 +43,7 @@ TClosure *tokuF_newTclosure(toku_State *T, int nup) {
 }
 
 
-CClosure *tokuF_newCclosure(toku_State *T, int nupvals) {
+CClosure *tokuF_newCclosure(toku_State *T, int32_t nupvals) {
     GCObject *o = tokuG_new(T, sizeofCcl(nupvals), TOKU_VCCL);
     CClosure *cl = gco2clc(o);
     cl->nupvals = nupvals;
@@ -57,14 +57,14 @@ CClosure *tokuF_newCclosure(toku_State *T, int nupvals) {
 ** function in front of the varargs. Additionally adjust new top for
 ** 'cf' and invalidates old named parameters (after they get moved).
 */
-void tokuF_adjustvarargs(toku_State *T, int arity, CallFrame *cf,
+void tokuF_adjustvarargs(toku_State *T, int32_t arity, CallFrame *cf,
                          SPtr *sp, const Proto *fn) {
-    int actual = cast_int(T->sp.p - cf->func.p) - 1;
-    int extra = actual - arity; /* number of varargs */
+    int32_t actual = cast_i32(T->sp.p - cf->func.p) - 1;
+    int32_t extra = actual - arity; /* number of varargs */
     cf->t.nvarargs = extra;
     checkstackp(T, fn->maxstack + 1, *sp);
     setobjs2s(T, T->sp.p++, cf->func.p); /* move function to the top */
-    for (int i = 1; i <= arity; i++) { /* move params to the top */
+    for (int32_t i = 1; i <= arity; i++) { /* move params to the top */
         setobjs2s(T, T->sp.p++, cf->func.p + i);
         setnilval(s2v(cf->func.p + i)); /* erase original (for GC) */
     }
@@ -75,13 +75,13 @@ void tokuF_adjustvarargs(toku_State *T, int arity, CallFrame *cf,
 }
 
 
-void tokuF_getvarargs(toku_State *T, CallFrame *cf, SPtr *sp, int wanted) {
-    int have = cf->t.nvarargs;
+void tokuF_getvarargs(toku_State *T, CallFrame *cf, SPtr *sp, int32_t wanted) {
+    int32_t have = cf->t.nvarargs;
     if (wanted < 0) { /* TOKU_MULTRET? */
         wanted = have;
         checkstackGCp(T, wanted, *sp); /* check stack, maybe wanted>have */
     }
-    for (int i = 0; wanted > 0 && i < have; i++, wanted--)
+    for (int32_t i = 0; wanted > 0 && i < have; i++, wanted--)
         setobjs2s(T, T->sp.p++, cf->func.p - have + i);
     while (wanted-- > 0)
         setnilval(s2v(T->sp.p++));
@@ -91,7 +91,7 @@ void tokuF_getvarargs(toku_State *T, CallFrame *cf, SPtr *sp, int wanted) {
 
 /* Create and initialize all the upvalues in 'cl'. */
 void tokuF_initupvals(toku_State *T, TClosure *cl) {
-    for (int i = 0; i < cl->nupvals; i++) {
+    for (int32_t i = 0; i < cl->nupvals; i++) {
         GCObject *o = allocupval(T);
         UpVal *uv = gco2uv(o);
         uv->v.p = &uv->u.value; /* close it */
@@ -147,8 +147,8 @@ UpVal *tokuF_findupval(toku_State *T, SPtr level) {
 ** Find local variable name that must be alive for the given 'pc',
 ** and at the position 'lnum', meaning there are 'lnum' locals before it.
 */
-const char *tokuF_getlocalname(const Proto *f, int lnum, int pc) {
-    for (int i = 0; i < f->sizelocals && f->locals[i].startpc <= pc; i++) {
+const char *tokuF_getlocalname(const Proto *f, int32_t lnum, int32_t pc) {
+    for (int32_t i = 0; i < f->sizelocals && f->locals[i].startpc <= pc; i++) {
         if (pc < f->locals[i].endpc) { /* variable is active? */
             if (--lnum == 0)
                 return getstr(f->locals[i].name);
@@ -165,7 +165,7 @@ const char *tokuF_getlocalname(const Proto *f, int lnum, int pc) {
 static void checkclosetm(toku_State *T, SPtr level) {
     const TValue *tm = tokuTM_objget(T, s2v(level), TM_CLOSE);
     if (t_unlikely(notm(tm))) { /* missing __close? */
-        int vidx = cast_int(level - T->cf->func.p);
+        int32_t vidx = cast_i32(level - T->cf->func.p);
         const char *name = tokuD_findlocal(T, T->cf, vidx, NULL);
         if (name == NULL) name = "?";
         tokuD_runerror(T, "local variable %s got a non-closeable value", name);
@@ -189,11 +189,11 @@ void tokuF_newtbcvar(toku_State *T, SPtr level) {
     if (t_isfalse(s2v(level)))
         return; /* false doesn't need to be closed */
     checkclosetm(T, level);
-    while (cast_uint(level - T->tbclist.p) > MAXDELTA) {
+    while (cast_u32(level - T->tbclist.p) > MAXDELTA) {
         T->tbclist.p += MAXDELTA; /* create a dummy node at maximum delta */
         T->tbclist.p->tbc.delta = 0;
     }
-    level->tbc.delta = cast(t_ushort, level - T->tbclist.p);
+    level->tbc.delta = cast_u16(level - T->tbclist.p);
     T->tbclist.p = level;
 }
 
@@ -264,7 +264,7 @@ static void callclosemm(toku_State *T, TValue *obj, TValue *errobj) {
 ** the 'level' of the upvalue being closed, as everything after that
 ** won't be used again.
 */
-static void prepcallclose(toku_State *T, SPtr level, int status) {
+static void prepcallclose(toku_State *T, SPtr level, int32_t status) {
     TValue *uv = s2v(level); /* value being closed */
     TValue *errobj;
     if (status == CLOSEKTOP)
@@ -281,7 +281,7 @@ static void prepcallclose(toku_State *T, SPtr level, int status) {
 ** Close all up-values and to-be-closed variables up to (stack) 'level'.
 ** Returns (restored) level.
 */
-SPtr tokuF_close(toku_State *T, SPtr level, int status) {
+SPtr tokuF_close(toku_State *T, SPtr level, int32_t status) {
     ptrdiff_t levelrel = savestack(T, level);
     tokuF_closeupval(T, level);
     while (T->tbclist.p >= level) {
@@ -296,13 +296,13 @@ SPtr tokuF_close(toku_State *T, SPtr level, int status) {
 
 /* free function prototype */
 void tokuF_free(toku_State *T, Proto *p) {
-    tokuM_freearray(T, p->p, cast_uint(p->sizep));
-    tokuM_freearray(T, p->k, cast_uint(p->sizek));
-    tokuM_freearray(T, p->code, cast_uint(p->sizecode));
-    tokuM_freearray(T, p->lineinfo, cast_uint(p->sizelineinfo));
-    tokuM_freearray(T, p->abslineinfo, cast_uint(p->sizeabslineinfo));
-    tokuM_freearray(T, p->instpc, cast_uint(p->sizeinstpc));
-    tokuM_freearray(T, p->locals, cast_uint(p->sizelocals));
-    tokuM_freearray(T, p->upvals, cast_uint(p->sizeupvals));
+    tokuM_freearray(T, p->p, cast_u32(p->sizep));
+    tokuM_freearray(T, p->k, cast_u32(p->sizek));
+    tokuM_freearray(T, p->code, cast_u32(p->sizecode));
+    tokuM_freearray(T, p->lineinfo, cast_u32(p->sizelineinfo));
+    tokuM_freearray(T, p->abslineinfo, cast_u32(p->sizeabslineinfo));
+    tokuM_freearray(T, p->opcodepc, cast_u32(p->sizeopcodepc));
+    tokuM_freearray(T, p->locals, cast_u32(p->sizelocals));
+    tokuM_freearray(T, p->upvals, cast_u32(p->sizeupvals));
     tokuM_free(T, p);
 }

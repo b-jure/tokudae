@@ -17,7 +17,7 @@
 
 
 /* Return next char and progress the buffer or try fill the buffer. */
-#define zgetc(Z)    ((Z)->n-- > 0 ? cast_ubyte(*(Z)->p++) : tokuR_fill(Z))
+#define zgetc(Z)    ((Z)->n-- > 0 ? cast_u8(*(Z)->p++) : tokuR_fill(Z))
 
 
 typedef struct {
@@ -30,7 +30,7 @@ typedef struct {
 
 
 TOKUI_FUNC void tokuR_init(toku_State* T, BuffReader* Z, toku_Reader freader,
-                           void* userdata);
+                                          void* userdata);
 TOKUI_FUNC int tokuR_fill(BuffReader* Z);
 TOKUI_FUNC size_t tokuR_read(BuffReader *Z, void *b, size_t n);
 

@@ -43,7 +43,7 @@
 typedef union Value {
     struct GCObject *gc; /* collectable value */
     void *p; /* light userdata */
-    int b; /* boolean */
+    int32_t b; /* boolean */
     toku_Integer i; /* integer */
     toku_Number n; /* float */
     toku_CFunction cfn; /* T function */
@@ -51,7 +51,7 @@ typedef union Value {
 
 
 /* 'TValue' fields, defined for reuse and alignment purposes */
-#define TValueFields    Value val; t_ubyte tt
+#define TValueFields    Value val; uint8_t tt
 
 
 /* 'Value' with type */
@@ -129,7 +129,7 @@ typedef union {
     TValue val_;
     struct {
         TValueFields;
-        t_ushort delta;
+        uint16_t delta;
     } tbc;
 } SValue;
 
@@ -159,7 +159,7 @@ typedef struct {
 ** ===================================================================== */
 
 /* common header for objects */
-#define ObjectHeader    struct GCObject* next; t_ubyte tt_; t_ubyte mark
+#define ObjectHeader    struct GCObject* next; uint8_t tt_; uint8_t mark
 
 
 /* common type for collectable objects */
@@ -168,7 +168,7 @@ typedef struct GCObject {
 } GCObject;
 
 
-#define HEADEROFFSET    (offsetof(GCObject, mark) + sizeof(t_ubyte))
+#define HEADEROFFSET    (offsetof(GCObject, mark) + sizeof(uint8_t))
 
 #define objzero(o,sz) \
         memset(cast_charp(o) + HEADEROFFSET, 0, sz - HEADEROFFSET)
@@ -259,8 +259,8 @@ typedef struct List {
     ObjectHeader;
     GCObject *gclist;
     TValue *arr; /* memory */
-    int len; /* cached lenght of the list */
-    int size; /* size of the array 'arr' (capacity) */
+    int32_t len; /* cached lenght of the list */
+    int32_t size; /* size of the array 'arr' (capacity) */
 } List;
 
 /* }==================================================================== */
@@ -356,8 +356,8 @@ typedef struct List {
 typedef union Node {
     struct NodeKey {
         TValueFields; /* fields for value */
-        t_ubyte key_tt; /* key type tag */
-        int next; /* offset for next node */
+        uint8_t key_tt; /* key type tag */
+        int32_t next; /* offset for next node */
         Value key_val; /* key value */
     } s;
     TValue i_val; /* direct node value access as a proper 'TValue' */
@@ -380,8 +380,8 @@ typedef union Node {
 
 typedef struct Table {
     ObjectHeader; /* internal only object */
-    t_ubyte flags; /* 1<<p means tagmethod(p) is not present */
-    t_ubyte size; /* log2 of array size */
+    uint8_t flags; /* 1<<p means tagmethod(p) is not present */
+    uint8_t size; /* log2 of array size */
     Node *node; /* memory block */
     Node *lastfree; /* any free position is before this position */
     GCObject *gclist;
@@ -437,9 +437,9 @@ typedef struct OString {
     ObjectHeader;
     /* reserved words or tag names index for short strings;
      * flag for long strings indicating that it has hash */
-    t_ubyte extra;
-    t_ubyte shrlen; /* length for short strings, 0xFF for longs strings */
-    t_uint hash;
+    uint8_t extra;
+    uint8_t shrlen; /* length for short strings, 0xFF for longs strings */
+    uint32_t hash;
     union {
         size_t lnglen; /* length for long strings */
         struct OString *next; /* linked list for 'strtab' (hash table) */
@@ -505,9 +505,9 @@ typedef struct OClass {
 */
 typedef struct UpValInfo {
     OString *name; /* upvalue name (debug) */
-    int idx; /* index in stack or outer function local var list */
-    t_ubyte instack; /* is it on stack */
-    t_ubyte kind;
+    int32_t idx; /* index in stack or outer function local var list */
+    uint8_t instack; /* is it on stack */
+    uint8_t kind;
 } UpValInfo;
 
 
@@ -517,24 +517,24 @@ typedef struct UpValInfo {
 */
 typedef struct LVarInfo {
     OString *name; /* local name */
-    int startpc; /* point where variable is in scope */
-    int endpc; /* point where variable it out of scope */
+    int32_t startpc; /* point where variable is in scope */
+    int32_t endpc; /* point where variable it out of scope */
 } LVarInfo;
 
 
 /*
-** Associates the absolute line source for a given instruction ('pc').
-** The array 'lineinfo' gives, for each instruction, the difference in
-** lines from the previous instruction. When that difference does not
-** fit into a byte, Tokudae saves the absolute line for that instruction.
+** Associates the absolute line source for a given opcode ('pc').
+** The array 'lineinfo' gives, for each opcode, the difference in
+** lines from the previous opcode. When that difference does not
+** fit into a byte, Tokudae saves the absolute line for that opcode.
 ** (Tokudae also saves the absolute line periodically, to speed up the
 ** computation of a line number: we can use binary search in the
 ** absolute-line array, but we must traverse the 'lineinfo' array
 ** linearly to compute a line.)
 */
 typedef struct AbsLineInfo {
-    int pc;
-    int line;
+    int32_t pc;
+    int32_t line;
 } AbsLineInfo;
 
 
@@ -543,28 +543,28 @@ typedef struct AbsLineInfo {
 */
 typedef struct Proto {
     ObjectHeader;
-    t_ubyte isvararg;       /* true if this function accepts extra params */
-    int defline;            /* function definition line (debug) */
-    int deflastline;        /* function definition last line (debug) */
-    int arity;              /* number of fixed (named) function parameters */
-    int maxstack;           /* max stack size for this function */
-    int sizecode;           /* size of 'code' */
-    int sizek;              /* size of 'k' */
-    int sizeupvals;         /* size of 'upvals' */
-    int sizep;              /* size of 'p' */
-    int sizelineinfo;       /* size of 'lineinfo' */
-    int sizeabslineinfo;    /* size of 'abslineinfo' */
-    int sizeinstpc;         /* size of 'instpc' */
-    int sizelocals;         /* size of 'locals' */
-    Instruction *code;      /* bytecode */
+    uint8_t isvararg;       /* true if this function accepts extra params */
+    int32_t defline;        /* function definition line (debug) */
+    int32_t deflastline;    /* function definition last line (debug) */
+    int32_t arity;          /* number of fixed (named) function parameters */
+    int32_t maxstack;       /* max stack size for this function */
+    int32_t sizecode;       /* size of 'code' */
+    int32_t sizek;          /* size of 'k' */
+    int32_t sizeupvals;     /* size of 'upvals' */
+    int32_t sizep;          /* size of 'p' */
+    int32_t sizelineinfo;   /* size of 'lineinfo' */
+    int32_t sizeabslineinfo;/* size of 'abslineinfo' */
+    int32_t sizeopcodepc;   /* size of 'opcodepc' */
+    int32_t sizelocals;     /* size of 'locals' */
+    uint8_t *code;          /* bytecode */
     TValue *k;              /* constant values */
     UpValInfo *upvals;      /* debug information for upvalues */
     struct Proto **p;       /* list of funcs defined inside of this function */
     /* debug information (can be stripped away when dumping) */
     OString *source;            /* source name */
-    t_byte *lineinfo;           /* information about source lines */
+    int8_t *lineinfo;           /* information about source lines */
     AbsLineInfo *abslineinfo;   /* idem */
-    int *instpc;                /* list of pc's for each instruction */
+    int32_t *opcodepc;          /* list of pc's for each opcode */
     LVarInfo *locals;           /* information about local variables */
     /* (for garbage collector) */
     GCObject *gclist;
@@ -658,7 +658,7 @@ typedef struct UpVal {
 
 
 /* common closure header */
-#define ClosureHeader   ObjectHeader; int nupvals; GCObject *gclist
+#define ClosureHeader   ObjectHeader; int32_t nupvals; GCObject *gclist
 
 
 typedef struct TClosure {
@@ -771,7 +771,7 @@ typedef union UValue {
 
 typedef struct UserData {
     ObjectHeader;
-    t_ushort nuv; /* number of 'uservalues' */
+    uint16_t nuv; /* number of 'uservalues' */
     size_t size; /* size of 'UserData' memory in bytes */
     Table *metatable;
     GCObject *gclist;
@@ -790,7 +790,7 @@ typedef struct UserData {
 */
 typedef struct EmptyUserData {
     ObjectHeader;
-    t_ushort nuv;
+    uint16_t nuv;
     size_t size;
     Table *metatable;
     union {TOKUI_MAXALIGN;} bin;
@@ -845,14 +845,17 @@ typedef enum N2IMode {
 
 /* fast 'module' operation for hashing (sz is always power of 2) */
 #define tmod(h,sz) \
-        (check_exp(t_ispow2(sz), (cast_int((h) & ((sz)-1)))))
+        (check_exp(t_ispow2(sz), (cast_i32((h) & ((sz)-1)))))
 
 
-TOKUI_FUNC int tokuO_ceillog2(t_uint x);
-TOKUI_FUNC int tokuO_n2i(toku_Number n, toku_Integer *i, N2IMode mode);
-TOKUI_FUNC int tokuO_tointeger(const TValue *v, toku_Integer *i, int mode);
+TOKUI_FUNC int32_t tokuO_ceillog2(uint32_t x);
+TOKUI_FUNC int32_t tokuO_n2i(toku_Number n, toku_Integer *i, N2IMode mode);
+TOKUI_FUNC int32_t tokuO_tointeger(const TValue *v, toku_Integer *i,
+                                                    int32_t mode);
 TOKUI_FUNC toku_Integer tokuO_shiftl(toku_Integer x, toku_Integer y);
-TOKUI_FUNC int tokuO_arithmraw(toku_State *T, const TValue *a, const TValue *b,
-                               TValue *res, int op);
+TOKUI_FUNC int32_t tokuO_arithmraw(toku_State *T, const TValue *a,
+                                                  const TValue *b,
+                                                  TValue *res,
+                                                  int32_t op);
 
 #endif

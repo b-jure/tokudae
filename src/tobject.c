@@ -14,8 +14,8 @@
 #include "tvm.h"
 
 
-int tokuO_ceillog2 (t_uint x) {
-    static const t_ubyte log_2[256] = {  /* log_2[i] = ceil(log2(i - 1)) */
+int32_t tokuO_ceillog2 (uint32_t x) {
+    static const uint8_t log_2[256] = {  /* log_2[i] = ceil(log2(i - 1)) */
         0,1,2,2,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
         6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
         7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
@@ -25,7 +25,7 @@ int tokuO_ceillog2 (t_uint x) {
         8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
         8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8
     };
-    int l = 0;
+    int32_t l = 0;
     x--;
     while (256 <= x) { l += 8; x >>= 8; }
     return l + log_2[x];
@@ -33,7 +33,7 @@ int tokuO_ceillog2 (t_uint x) {
 
 
 /* number of bits in 'toku_Integer' */
-#define INTBITS         cast_int((sizeof(toku_Integer) * CHAR_BIT))
+#define INTBITS         cast_i32((sizeof(toku_Integer) * CHAR_BIT))
 
 
 /* shift 'x', 'y' times, to the left; in case of overflow return 0 */
@@ -48,22 +48,24 @@ toku_Integer tokuO_shiftl(toku_Integer x, toku_Integer y) {
 }
 
 
-static toku_Number numarithm(toku_State *T, toku_Number x, toku_Number y, int op) {
+static toku_Number numarithm(toku_State *T, toku_Number x, toku_Number y,
+                                                           int32_t op) {
     switch(op) {
-        case TOKU_OP_ADD: return t_numadd(T, x, y);
-        case TOKU_OP_SUB: return t_numsub(T, x, y);
-        case TOKU_OP_MUL: return t_nummul(T, x, y);
-        case TOKU_OP_DIV: return t_numdiv(T, x, y);
-        case TOKU_OP_IDIV: return t_numidiv(T, x, y);
+        case TOKU_OP_ADD: return tokui_numadd(T, x, y);
+        case TOKU_OP_SUB: return tokui_numsub(T, x, y);
+        case TOKU_OP_MUL: return tokui_nummul(T, x, y);
+        case TOKU_OP_DIV: return tokui_numdiv(T, x, y);
+        case TOKU_OP_IDIV: return tokui_numidiv(T, x, y);
         case TOKU_OP_MOD: return tokuV_modf(T, x, y);
-        case TOKU_OP_POW: return t_numpow(T, x, y);
-        case TOKU_OP_UNM: return t_numunm(T, x);
+        case TOKU_OP_POW: return tokui_numpow(T, x, y);
+        case TOKU_OP_UNM: return tokui_numunm(T, x);
         default: toku_assert(0); return 0.0;
     }
 }
 
 
-static toku_Integer intarithm(toku_State *T, toku_Integer x, toku_Integer y, int op) {
+static toku_Integer intarithm(toku_State *T, toku_Integer x, toku_Integer y,
+                                                             int32_t op) {
     switch(op) {
         case TOKU_OP_ADD: return intop(+, x, y);
         case TOKU_OP_SUB: return intop(-, x, y);
@@ -83,7 +85,7 @@ static toku_Integer intarithm(toku_State *T, toku_Integer x, toku_Integer y, int
 
 
 /* convert number 'n' to integer according to 'mode' */
-int tokuO_n2i(toku_Number n, toku_Integer *i, N2IMode mode) {
+int32_t tokuO_n2i(toku_Number n, toku_Integer *i, N2IMode mode) {
     toku_Number floored = t_floor(n);
     if (floored != n) {
         if (mode == N2IEQ) return 0;
@@ -94,7 +96,7 @@ int tokuO_n2i(toku_Number n, toku_Integer *i, N2IMode mode) {
 
 
 /* try to convert value to 'toku_Integer' */
-int tokuO_tointeger(const TValue *o, toku_Integer *i, int mode) {
+int32_t tokuO_tointeger(const TValue *o, toku_Integer *i, int32_t mode) {
     if (ttisflt(o))
         return tokuO_n2i(fval(o), i, cast(N2IMode, mode));
     else if (ttisint(o)) {
@@ -111,11 +113,11 @@ int tokuO_tointeger(const TValue *o, toku_Integer *i, int mode) {
 ** itself can't invoke runtime error, if the operation can't be
 ** done then return 0.
 */
-int tokuO_arithmraw(toku_State *T, const TValue *a, const TValue *b,
-                  TValue *res, int op) {
+int32_t tokuO_arithmraw(toku_State *T, const TValue *a, const TValue *b,
+                  TValue *res, int32_t op) {
     switch (op) {
         case TOKU_OP_BNOT: case TOKU_OP_BXOR: case TOKU_OP_BSHL:
-        case TOKU_OP_BSHR: case TOKU_OP_BOR: case TOKU_OP_BAND: { /* int. */
+        case TOKU_OP_BSHR: case TOKU_OP_BOR: case TOKU_OP_BAND: { /* integer */
             toku_Integer i1, i2;
             if (tointeger(a, &i1) && tointeger(b, &i2)) {
                 setival(res, intarithm(T, i1, i2, op));

@@ -14,16 +14,10 @@
 #include "tokudae.h"
 
 
+/* {{Constants============================================================ */
+
 /* global table */
 #define TOKU_GNAME      "__G"
-
-
-/* type for storing name:function fields or placeholders */
-typedef struct tokuL_Entry tokuL_Entry;
-
-
-/* type for buffering system */
-typedef struct tokuL_Buffer tokuL_Buffer;
 
 
 /* new status code for file-related errors in 'tokuL_loadfilex' */
@@ -33,115 +27,112 @@ typedef struct tokuL_Buffer tokuL_Buffer;
 /* key, in the C table, for table of loaded modules */
 #define TOKU_LOADED_TABLE       "__LOADED"
 
-
 /* key, in the C table, for table of preloaded loaders */
 #define TOKU_PRELOAD_TABLE      "__PRELOAD"
 
+/* }{Types================================================================ */
 
-/* {=======================================================================
-** Errors
-** ======================================================================== */
-TOKULIB_API int tokuL_error(toku_State *T, const char *fmt, ...);
-TOKULIB_API int tokuL_error_arg(toku_State *T, int idx, const char *extra);
-TOKULIB_API int tokuL_error_type(toku_State *T, int idx, const char *tname);
-/* }======================================================================= */
+/* type for storing name:function fields or placeholders */
+typedef struct tokuL_Entry tokuL_Entry;
 
-/* {=======================================================================
-** Required argument/option and other checks
-** ======================================================================== */
-TOKULIB_API toku_Number  tokuL_check_number(toku_State *T, int idx);
-TOKULIB_API toku_Integer tokuL_check_integer(toku_State *T, int idx);
-TOKULIB_API const char *tokuL_check_lstring(toku_State *T, int idx, size_t *l);
-TOKULIB_API void tokuL_check_type(toku_State *T, int idx, int t);
-TOKULIB_API void tokuL_check_any(toku_State *T, int idx);
-TOKULIB_API void tokuL_check_stack(toku_State *T, int sz, const char *msg);
+/* type for buffering system */
+typedef struct tokuL_Buffer tokuL_Buffer;
+
+/* }{Errors=============================================================== */
+
+TOKULIB_API int32_t tokuL_error(toku_State *T, const char *fmt, ...);
+TOKULIB_API int32_t tokuL_error_arg(toku_State *T, int32_t idx,
+                                                   const char *extra);
+TOKULIB_API int32_t tokuL_error_type(toku_State *T, int32_t idx,
+                                                    const char *tname);
+
+/* }{Required argument/option and other checks============================ */
+
+TOKULIB_API toku_Number  tokuL_check_number(toku_State *T, int32_t idx);
+TOKULIB_API toku_Integer tokuL_check_integer(toku_State *T, int32_t idx);
+TOKULIB_API const char  *tokuL_check_lstring(toku_State *T, int32_t idx,
+                                                            size_t *l);
+TOKULIB_API void tokuL_check_type(toku_State *T, int32_t idx, int32_t t);
+TOKULIB_API void tokuL_check_any(toku_State *T, int32_t idx);
+TOKULIB_API void tokuL_check_stack(toku_State *T, int32_t sz, const char *msg);
 
 TOKULIB_API void tokuL_check_version_(toku_State *T, toku_Number ver);
 #define tokuL_check_version(T)  tokuL_check_version_(T, TOKU_VERSION_NUM)
 
-TOKULIB_API void *tokuL_check_userdata(toku_State *T, int idx,
-                                       const char *tname);
-TOKULIB_API int   tokuL_check_option(toku_State *T, int idx, const char *dfl,
-                                     const char *const opts[]);
-/* }======================================================================= */
+TOKULIB_API void   *tokuL_check_userdata(toku_State *T, int32_t idx,
+                                                        const char *tname);
+TOKULIB_API int32_t tokuL_check_option(toku_State *T, int32_t idx,
+                                       const char *dfl,
+                                       const char *const opts[]);
+/* }{Optional argument==================================================== */
 
-/* {=======================================================================
-** Optional argument
-** ======================================================================== */
-TOKULIB_API toku_Number   tokuL_opt_number(toku_State *T, int idx,
-                                           toku_Number dfl);
-TOKULIB_API toku_Integer  tokuL_opt_integer(toku_State *T, int idx,
-                                            toku_Integer dfl);
-TOKULIB_API const char   *tokuL_opt_lstring(toku_State *T, int idx,
-                                            const char *dfl, size_t *l);
-/* }======================================================================= */
+TOKULIB_API toku_Number  tokuL_opt_number(toku_State *T, int32_t idx,
+                                          toku_Number dfl);
+TOKULIB_API toku_Integer tokuL_opt_integer(toku_State *T, int32_t idx,
+                                           toku_Integer dfl);
+TOKULIB_API const char  *tokuL_opt_lstring(toku_State *T, int32_t idx,
+                                           const char *dfl, size_t *l);
+/* }{Chunk loading======================================================== */
 
-/* {=======================================================================
-** Chunk loading
-** ======================================================================== */
-TOKULIB_API int tokuL_loadfilex(toku_State *T, const char *filename,
-                                const char *mode);
-TOKULIB_API int tokuL_loadstring(toku_State *T, const char *s);
-TOKULIB_API int tokuL_loadbufferx(toku_State *T, const char *buff, size_t sz,
-                                  const char *name, const char *mode);
-/* }======================================================================= */
+TOKULIB_API int32_t tokuL_loadfilex(toku_State *T, const char *filename,
+                                    const char *mode);
+TOKULIB_API int32_t tokuL_loadstring(toku_State *T, const char *s);
+TOKULIB_API int32_t tokuL_loadbufferx(toku_State *T, const char *buff,
+                                      size_t sz, const char *name,
+                                      const char *mode);
 
-/* {=======================================================================
-** Userdata and metatable functions
-** ======================================================================== */
-TOKULIB_API int   tokuL_new_metatable(toku_State *T, const char *tname);
-TOKULIB_API void  tokuL_set_metatable(toku_State *T, const char *tname);
-TOKULIB_API int   tokuL_get_metafield(toku_State *T, int idx,const char *event);
-TOKULIB_API int   tokuL_callmeta(toku_State *T, int idx, const char *event);
-TOKULIB_API void *tokuL_test_userdata(toku_State *T, int idx,
-                                      const char *tname);
-/* }======================================================================= */
+/* }{Userdata and metatable functions===================================== */
 
-/* {=======================================================================
-** File/Exec result process functions
-** ======================================================================== */
-TOKULIB_API int tokuL_fileresult(toku_State *T, int stat, const char *fname);
-TOKULIB_API int tokuL_execresult(toku_State *T, int stat);
-/* }======================================================================= */
+TOKULIB_API int32_t tokuL_new_metatable(toku_State *T, const char *tname);
+TOKULIB_API void    tokuL_set_metatable(toku_State *T, const char *tname);
+TOKULIB_API int32_t tokuL_get_metafield(toku_State *T, int32_t idx,
+                                                       const char *event);
+TOKULIB_API int32_t tokuL_callmeta(toku_State *T, int32_t idx,
+                                                  const char *event);
+TOKULIB_API void   *tokuL_test_userdata(toku_State *T, int32_t idx,
+                                                       const char *tname);
 
-/* {=======================================================================
-** Miscellaneous functions
-** ======================================================================== */
-TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int idx, size_t *len);
-TOKULIB_API void       *tokuL_to_fulluserdata(toku_State *T, int idx);
-TOKULIB_API void        tokuL_where(toku_State *T, int lvl);
+/* }{File/Exec result process functions=================================== */
+
+TOKULIB_API int32_t tokuL_fileresult(toku_State *T, int32_t stat,
+                                                    const char *fname);
+TOKULIB_API int32_t tokuL_execresult(toku_State *T, int32_t stat);
+
+/* }{Miscellaneous functions============================================== */
+
+TOKULIB_API const char *tokuL_to_lstring(toku_State *T, int32_t idx,
+                                                        size_t *len);
+TOKULIB_API void       *tokuL_to_fulluserdata(toku_State *T, int32_t idx);
+TOKULIB_API void        tokuL_where(toku_State *T, int32_t lvl);
 TOKULIB_API toku_State *tokuL_newstate(void);
-TOKULIB_API int         tokuL_get_subtable(toku_State *T, int idx,
+TOKULIB_API int32_t     tokuL_get_subtable(toku_State *T, int32_t idx,
                                            const char *k);
 TOKULIB_API void        tokuL_importf(toku_State *T, const char *modname,
-                                      toku_CFunction fopen, int global);
+                                      toku_CFunction fopen, int32_t global);
 TOKULIB_API void        tokuL_traceback(toku_State *T, toku_State *T1,
-                                        int level, const char *msg);
+                                        int32_t level, const char *msg);
 TOKULIB_API const char *tokuL_gsub(toku_State *T, const char *s,
                                    const char *p, const char *r);
-TOKULIB_API unsigned    tokuL_makeseed(toku_State *T);
+TOKULIB_API uint32_t    tokuL_makeseed(toku_State *T);
+
+TOKULIB_API void        tokuL_set_funcs(toku_State *T, const tokuL_Entry *l,
+                                                       int32_t nup);
 
 struct tokuL_Entry {
-    const char *name; /* NULL if sentinel entry */
+    const char *name;    /* NULL if sentinel entry */
     toku_CFunction func; /* NULL if placeholder or sentinel entry */
 };
 
-TOKULIB_API void tokuL_set_funcs(toku_State *T, const tokuL_Entry *l, int nup);
-/* }======================================================================= */
+/* }{Reference system==================================================== */
 
-/* {=======================================================================
-** Reference system
-** ======================================================================== */
 #define TOKU_NOREF      (-2)
 #define TOKU_REFNIL     (-1)
 
-TOKULIB_API int  tokuL_ref(toku_State *T, int l);
-TOKULIB_API void tokuL_unref(toku_State *T, int l, int ref);
-/* }======================================================================= */
+TOKULIB_API int32_t tokuL_ref(toku_State *T, int32_t l);
+TOKULIB_API void    tokuL_unref(toku_State *T, int32_t l, int32_t ref);
 
-/* {=======================================================================
-** Useful macros
-** ======================================================================== */
+/* }{Useful macros======================================================== */
+
 #define tokuL_check_string(T,idx)       tokuL_check_lstring(T, idx, NULL)
 
 #define tokuL_check_arg(T,cond,idx,extramsg) \
@@ -191,11 +182,9 @@ TOKULIB_API void tokuL_unref(toku_State *T, int l, int ref);
 #endif
 
 #endif
-/* }======================================================================= */
 
-/* {=======================================================================
-** Buffer manipulation
-** ======================================================================== */
+/* }{Buffer manipulation================================================== */
+
 struct tokuL_Buffer {
     char *b; /* buffer address */
     size_t n; /* buffer size */
@@ -230,11 +219,8 @@ TOKULIB_API void  tokuL_buff_end(tokuL_Buffer *B);
 TOKULIB_API void  tokuL_buff_endsz(tokuL_Buffer *B, size_t sz);
 
 #define tokuL_buff_prep(B)      tokuL_buff_ensure(B, TOKUL_BUFFERSIZE)
-/* }======================================================================= */
 
-/* {=======================================================================
-** File handles for IO library
-** ======================================================================== */
+/* }{File handles for IO library========================================== */
 
 /*
 ** A file handle is a userdata with 'TOKU_FILEHANDLE' metatable,
@@ -249,6 +235,6 @@ typedef struct tokuL_Stream {
     toku_CFunction closef; /* to close stream (NULL for closed streams) */
 } tokuL_Stream;
 
-/* }======================================================================= */
+/* }}EOF================================================================== */
 
 #endif

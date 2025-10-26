@@ -846,7 +846,7 @@ if !__opts or (__opts and __opts.run_isolated) {
             line = l;
         }, "l");
         assert(s() == 2); debug.sethook(nil);
-        assert(line == nil); /// hook called without debug info for 1st instruction
+        assert(line == nil); /// hook called without debug info for 1st opcode
     }
 
     {  /// tests for 'source' in binary dumps

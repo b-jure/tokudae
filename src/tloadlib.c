@@ -52,7 +52,7 @@ static const char *const CLIBS = "__CLIBS";
 ** In case of error, returns non-zero plus an error string
 ** in the stack.
 */
-static int csys_unloadlib(toku_State *T, void *lib);
+static int32_t csys_unloadlib(toku_State *T, void *lib);
 
 /*
 ** Load C library in file 'path'. If 'global', load with all names
@@ -60,7 +60,7 @@ static int csys_unloadlib(toku_State *T, void *lib);
 ** Returns the library; in case of error, returns NULL plus an error
 ** string in the stack.
 */
-static void *csys_load(toku_State *T, const char *path, int global);
+static void *csys_load(toku_State *T, const char *path, int32_t global);
 
 /*
 ** Try to find a function named 'sym' in library 'lib'.
@@ -75,15 +75,15 @@ static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym);
 #include <dlfcn.h>
 
 
-static int csys_unloadlib(toku_State *T, void *lib) {
-    int res = dlclose(lib);
+static int32_t csys_unloadlib(toku_State *T, void *lib) {
+    int32_t res = dlclose(lib);
     if (t_unlikely(res != 0))
         toku_push_fstring(T, dlerror());
     return res;
 }
 
 
-static void *csys_load(toku_State *T, const char *path, int global) {
+static void *csys_load(toku_State *T, const char *path, int32_t global) {
     void *lib = dlopen(path, RTLD_LAZY | (global ? RTLD_GLOBAL : RTLD_LOCAL));
     if (t_unlikely(lib == NULL))
         toku_push_fstring(T, dlerror());
@@ -138,7 +138,7 @@ static void setprogdir(toku_State *T) {
 
 
 static void pusherror(toku_State *T) {
-    int error = GetLastError();
+    int32_t error = GetLastError();
     char buff[128];
     if (FormatMessageA(FORMAT_MESSAGE_IGNORE_INSERTS|FORMAT_MESSAGE_FROM_SYSTEM,
                 NULL, error, 0, buff, t_arraysize(buff), NULL))
@@ -148,14 +148,14 @@ static void pusherror(toku_State *T) {
 }
 
 
-static int csys_unloadlib(toku_State *T, void *lib) {
-    int res = FreeLibrary(cast(HMODULE, lib));
+static int32_t csys_unloadlib(toku_State *T, void *lib) {
+    int32_t res = FreeLibrary(cast(HMODULE, lib));
     if (t_unlikely(res == 0)) pusherror(T);
     return res;
 }
 
 
-static void *csys_load(toku_State *T, const char *path, int global) {
+static void *csys_load(toku_State *T, const char *path, int32_t global) {
     HMODULE lib = LoadLibraryExA(path, NULL, TOKU_LLE_FLAGS);
     UNUSED(global); /* not used: symbols are 'global' by default */
     if (lib == NULL) pusherror(T);
@@ -176,14 +176,14 @@ static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym) {
 
 #define DLMSG "dynamic libraries not enabled; check your Tokudae installation"
 
-static int csys_unloadlib(toku_State *T, void *lib) {
+static int32_t csys_unloadlib(toku_State *T, void *lib) {
     UNUSED(lib);
     toku_push_literal(T, DLMSG);
     return 1;
 }
 
 
-static void *csys_load(toku_State *T, const char *path, int global) {
+static void *csys_load(toku_State *T, const char *path, int32_t global) {
     UNUSED(path); UNUSED(global);
     toku_push_literal(T, DLMSG);
     return NULL;
@@ -199,7 +199,7 @@ static toku_CFunction csys_symbolf(toku_State *T, void *lib, const char *sym) {
 #endif                      /* } */
 
 
-static int searcher_preload(toku_State *T) {
+static int32_t searcher_preload(toku_State *T) {
     const char *name = tokuL_check_string(T, 0);
     toku_get_cfield_str(T, TOKU_PRELOAD_TABLE); /* get ctable[__PRELOAD] */
     if (toku_get_field_str(T, -1, name) == TOKU_T_NIL) { /* 'name' not found? */
@@ -230,7 +230,8 @@ static void *check_clib(toku_State *T, const char *path) {
 /*
 ** Adds 'plib' (a library handle) to clibs userdata.
 */
-static void add_libhandle_to_clibs(toku_State *T, const char *path, void *plib) {
+static void add_libhandle_to_clibs(toku_State *T, const char *path,
+                                                        void *plib) {
     toku_get_cfield_str(T, CLIBS); /* get clibs userdata */
     toku_get_uservalue(T, -1, 0); /* get list uservalue */
     toku_get_index(T, -1, 0); /* get l[0] (query table) */
@@ -255,7 +256,8 @@ static void add_libhandle_to_clibs(toku_State *T, const char *path, void *plib) 
 ** Return 0 and 'true' or a function in the stack; in case of
 ** errors, return an error code and an error message in the stack.
 */
-static int look_for_func(toku_State *T, const char *path, const char *sym) {
+static int32_t look_for_func(toku_State *T, const char *path,
+                                            const char *sym) {
     void *reg = check_clib(T, path); /* check loaded C libraries */
     if (reg == NULL) { /* must load library? */
         reg = csys_load(T, path, *sym == '*'); /* global symbols if 'sym'=='*' */
@@ -273,10 +275,10 @@ static int look_for_func(toku_State *T, const char *path, const char *sym) {
 }
 
 
-static int pkg_loadlib(toku_State *T) {
+static int32_t pkg_loadlib(toku_State *T) {
     const char *path = tokuL_check_string(T, 0);
     const char *init = tokuL_check_string(T, 1);
-    int res = look_for_func(T, path, init);
+    int32_t res = look_for_func(T, path, init);
     if (t_likely(res == 0)) /* no errors? */
         return 1; /* return the loaded function */
     else { /* error; error message is on top of the stack */
@@ -311,7 +313,7 @@ static const char *get_next_filename (char **path, char *end) {
 }
 
 
-static int readable (const char *filename) {
+static int32_t readable (const char *filename) {
     FILE *f = fopen(filename, "r"); /* try to open file */
     if (f == NULL) return 0; /* open failed */
     fclose(f);
@@ -335,8 +337,9 @@ static void push_notfound_error(toku_State *T, const char *path) {
 }
 
 
-static const char *search_path(toku_State *T, const char *name, const char *path,
-                               const char *sep, const char *dirsep) {
+static const char *search_path(toku_State *T, const char *name,
+                               const char *path, const char *sep,
+                               const char *dirsep) {
     tokuL_Buffer buff;
     char *pathname; /* path with name inserted */
     char *endpathname; /* its end */
@@ -360,7 +363,7 @@ static const char *search_path(toku_State *T, const char *name, const char *path
 }
 
 
-static int pkg_searchpath(toku_State *T) {
+static int32_t pkg_searchpath(toku_State *T) {
     const char *fname = search_path(T, tokuL_check_string(T, 0),
                                        tokuL_check_string(T, 1),
                                        tokuL_opt_string(T, 2, "."),
@@ -387,7 +390,7 @@ static const char *find_file(toku_State *T, const char *name,
 }
 
 
-static int check_load(toku_State *T, int res, const char *filename) {
+static int32_t check_load(toku_State *T, int32_t res, const char *filename) {
     if (t_likely(res)) { /* module loaded successfully? */
         toku_push_string(T, filename); /* will be 2nd argument to module */
         return 2; /* return open function and file name */
@@ -398,12 +401,13 @@ static int check_load(toku_State *T, int res, const char *filename) {
 }
 
 
-static int searcher_Tokudae(toku_State *T) {
+static int32_t searcher_Tokudae(toku_State *T) {
     const char *filename;
     const char *name = tokuL_check_string(T, 0);
     filename = find_file(T, name, "path", TOKU_DIRSEP);
     if (filename == NULL) return 1; /* module not found in this path */
-    return check_load(T, (tokuL_loadfile(T, filename) == TOKU_STATUS_OK), filename);
+    return check_load(T, (tokuL_loadfile(T, filename) == TOKU_STATUS_OK),
+                         filename);
 }
 
 
@@ -422,10 +426,10 @@ static const tokuL_Entry pkg_funcs[] = {
 
 
 static void find_loader(toku_State *T, const char *name) {
-    int i;
+    int32_t i;
     tokuL_Buffer msg; /* to build error message */
     /* push 'package.searchers' list to index 2 in the stack */
-    if (toku_get_field_str(T, toku_upvalueindex(0), "searchers") != TOKU_T_LIST)
+    if (toku_get_field_str(T, toku_upvalueindex(0), "searchers")!=TOKU_T_LIST)
         tokuL_error(T, "'package.searchers' must be list");
     tokuL_buff_init(T, &msg);
     for (i = 0; ; i++) { /* iter over available searchers to find a loader */
@@ -434,7 +438,8 @@ static void find_loader(toku_State *T, const char *name) {
             toku_pop(T, 1); /* remove nil */
             tokuL_buffsub(&msg, PREFIX_LEN); /* remove prefix */
             tokuL_buff_end(&msg); /* create error message */
-            tokuL_error(T, "module '%s' not found:%s", name, toku_to_string(T,-1));
+            tokuL_error(T, "module '%s' not found:%s", name,
+                           toku_to_string(T,-1));
         }
         toku_push_string(T, name);
         toku_call(T, 1, 2); /* call it */
@@ -451,7 +456,7 @@ static void find_loader(toku_State *T, const char *name) {
 }
 
 
-static int l_import(toku_State *T) {
+static int32_t l_import(toku_State *T) {
     const char *name = tokuL_check_string(T, 0);
     toku_setntop(T, 1); /* __LOADED table will be at index 1 */
     toku_get_cfield_str(T, TOKU_LOADED_TABLE); /* get __LOADED table */
@@ -468,10 +473,11 @@ static int l_import(toku_State *T) {
     toku_call(T, 2, 1); /* run loader to load module */
     /* stack: ...; loader data; result from loader */
     if (!toku_is_nil(T, -1)) /* non-nil return? */
-        toku_set_field_str(T, 1, name); /* __LOADED[name] = result from loader */
+        toku_set_field_str(T, 1, name); /* __LOADED[name]=result from loader */
     else
         toku_pop(T, 1); /* remove nil */
-    if (toku_get_field_str(T, 1, name) == TOKU_T_NIL) { /* module set no value? */
+    if (toku_get_field_str(T, 1, name) == TOKU_T_NIL) {
+        /* module has not set a value */
         toku_push_bool(T, 1); /* use true as result */
         toku_copy(T, -1, -2); /* replace loader result */
         toku_set_field_str(T, 1, name); /* __LOADED[name] = true */
@@ -491,7 +497,7 @@ static const tokuL_Entry load_funcs[] = {
 ** Finalizer for clibs: calls 'csys_unloadlib' for all lib
 ** handles in clibs list upvalue in reverse order.
 */
-static int gcmm(toku_State *T) {
+static int32_t gcmm(toku_State *T) {
     toku_Integer i;
     toku_get_uservalue(T, -1, 0); /* get list upvalue */
     i = t_castU2S(toku_len(T, -1));
@@ -538,7 +544,8 @@ static void create_clibs_userdata(toku_State *T) {
 ** name "tokuopen_X" and look for it.
 ** If there is no ignore mark, look for a function named "tokuopen_modname".
 */
-static int load_func(toku_State *T, const char *filename, const char *modname) {
+static int32_t load_func(toku_State *T, const char *filename,
+                                        const char *modname) {
     const char *openfunc;
     const char *mark;
     modname = tokuL_gsub(T, modname, ".", TOKU_OFSEP);
@@ -552,7 +559,7 @@ static int load_func(toku_State *T, const char *filename, const char *modname) {
 }
 
 
-static int searcher_C(toku_State *T) {
+static int32_t searcher_C(toku_State *T) {
     const char *name = tokuL_check_string(T, 0);
     const char *filename = find_file(T, name, "cpath", TOKU_DIRSEP);
     if (filename == NULL) return 1;  /* module not found in this path */
@@ -560,11 +567,11 @@ static int searcher_C(toku_State *T) {
 }
 
 
-static int searcher_Croot(toku_State *T) {
+static int32_t searcher_Croot(toku_State *T) {
     const char *name = tokuL_check_string(T, 0);
     const char *p = strchr(name, '.');
     const char *filename;
-    int res;
+    int32_t res;
     if (p == NULL) return 0; /* is root */
     toku_push_lstring(T, name, cast_diff2sz(p - name));
     filename = find_file(T, toku_to_string(T, -1), "cpath", TOKU_DIRSEP);
@@ -573,7 +580,8 @@ static int searcher_Croot(toku_State *T) {
         if (res != ERRFUNC)
             return check_load(T, 0, filename); /* real error */
         else { /* open function not found */
-            toku_push_fstring(T, "no module '%s' in file '%s'", name, filename);
+            toku_push_fstring(T, "no module '%s' in file '%s'",
+                                 name, filename);
             return 1;
         }
     }
@@ -593,7 +601,7 @@ static void create_searchers_array(toku_State *T) {
     /* create 'searchers' list ('package' table is on stack top) */
     toku_push_list(T, t_arraysize(searchers));
     /* fill it with predefined searchers */
-    for (int i = 0; searchers[i] != NULL; i++) {
+    for (int32_t i = 0; searchers[i] != NULL; i++) {
         toku_push(T, -2); /* set 'package' as upvalue for all searchers */
         toku_push_cclosure(T, searchers[i], 1);
         toku_set_index(T, -2, i);
@@ -618,8 +626,8 @@ static void create_searchers_array(toku_State *T) {
 /*
 ** Return __G["TOKU_NOENV"] as a boolean.
 */
-static int noenv(toku_State *T) {
-    int b;
+static int32_t noenv(toku_State *T) {
+    int32_t b;
     toku_get_cfield_str(T, "TOKU_NOENV");
     b = toku_to_bool(T, -1);
     toku_pop(T, 1); /* remove value */
@@ -629,7 +637,7 @@ static int noenv(toku_State *T) {
 
 /* set a path */
 static void setpath(toku_State *T, const char *fieldname, const char *envname,
-                     const char *dflt) {
+                                   const char *dflt) {
     const char *dfltmark;
     const char *nver = toku_push_fstring(T, "%s%s", envname, TOKU_VERSUFFIX);
     const char *path = getenv(nver); /* try versioned name */
@@ -661,15 +669,17 @@ static void setpath(toku_State *T, const char *fieldname, const char *envname,
 }
 
 
-int tokuopen_package(toku_State *T) {
+int32_t tokuopen_package(toku_State *T) {
     create_clibs_userdata(T); /* create clibs userdata */
     tokuL_push_lib(T, pkg_funcs); /* create 'package' table */
     create_searchers_array(T); /* set 'package.searchers' */
-    setpath(T, "path", TOKU_PATH_VAR, TOKU_PATH_DEFAULT); /* 'package.path' */
-    setpath(T, "cpath", TOKU_CPATH_VAR, TOKU_CPATH_DEFAULT); /* 'package.cpath' */
+    /* 'package.path' */
+    setpath(T, "path", TOKU_PATH_VAR, TOKU_PATH_DEFAULT);
+    /* 'package.cpath' */
+    setpath(T, "cpath", TOKU_CPATH_VAR, TOKU_CPATH_DEFAULT);
     /* set 'package.config' */
-    toku_push_literal(T, TOKU_DIRSEP "\n" TOKU_PATH_SEP "\n" TOKU_PATH_MARK "\n"
-                         TOKU_EXEC_DIR "\n" TOKU_IGMARK "\n");
+    toku_push_literal(T, TOKU_DIRSEP "\n" TOKU_PATH_SEP "\n" TOKU_PATH_MARK
+                         "\n" TOKU_EXEC_DIR "\n" TOKU_IGMARK "\n");
     toku_set_field_str(T, -2, "config");
     /* ctable[__LOADED] = table */
     tokuL_get_subtable(T, TOKU_CTABLE_INDEX, TOKU_LOADED_TABLE);

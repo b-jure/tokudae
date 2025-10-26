@@ -141,7 +141,7 @@
 
 #define t_getenv(T, name)       (UNUSED(T), getenv(name))
 
-static int t_setenv(toku_State *T, const char *name, const char *value) {
+static int32_t t_setenv(toku_State *T, const char *name, const char *value) {
     size_t ln = strlen(name); 
     size_t lv = strlen(value);
     tokuL_Buffer b;
@@ -162,8 +162,8 @@ static int t_setenv(toku_State *T, const char *name, const char *value) {
 
 #define t_getenv(T, name)       (UNUSED(T), getenv(name))
 
-static int t_setenv(toku_State *T, const char *name, const char *value) {
-    int res;
+static int32_t t_setenv(toku_State *T, const char *name, const char *value) {
+    int32_t res;
     UNUSED(T);
     if (*value == '\0' && strlen(value) == 0)
         res = unsetenv(name);
@@ -200,9 +200,9 @@ static int t_setenv(toku_State *T, const char *name, const char *value) {
 #endif
 
 
-static int os_execute(toku_State *T) {
+static int32_t os_execute(toku_State *T) {
     const char *cmd = tokuL_opt_string(T, 0, NULL);
-    int stat;
+    int32_t stat;
     errno = 0;
     stat = t_system(cmd);
     if (cmd != NULL)
@@ -214,14 +214,14 @@ static int os_execute(toku_State *T) {
 }
 
 
-static int os_remove(toku_State *T) {
+static int32_t os_remove(toku_State *T) {
     const char *fname = tokuL_check_string(T, 0);
     errno = 0;
     return tokuL_fileresult(T, (remove(fname) != -1), fname);
 }
 
 
-static int os_rename(toku_State *T) {
+static int32_t os_rename(toku_State *T) {
     const char *old_name = tokuL_check_string(T, 0);
     const char *new_name = tokuL_check_string(T, 1);
     errno = 0;
@@ -229,9 +229,9 @@ static int os_rename(toku_State *T) {
 }
 
 
-static int os_tmpname(toku_State *T) {
+static int32_t os_tmpname(toku_State *T) {
     char buff[T_TMPNAMBUFSZ];
-    int err;
+    int32_t err;
     t_tmpnam(buff, err);
     if (t_unlikely(err))
         tokuL_error(T, "unable to generate a unique filename");
@@ -240,13 +240,13 @@ static int os_tmpname(toku_State *T) {
 }
 
 
-static int os_getenv(toku_State *T) {
+static int32_t os_getenv(toku_State *T) {
     toku_push_string(T, t_getenv(T, tokuL_check_string(T, 0))); /*NULL==nil*/
     return 1;
 }
 
 
-static int os_setenv(toku_State *T) {
+static int32_t os_setenv(toku_State *T) {
     const char *name = tokuL_check_string(T, 0);
     const char *value = tokuL_opt_string(T, 1, "");
     if (t_setenv(T, name, value) == 0)
@@ -257,7 +257,7 @@ static int os_setenv(toku_State *T) {
 }
 
 
-static int os_clock(toku_State *T) {
+static int32_t os_clock(toku_State *T) {
     toku_push_number(T, (cast_num(clock()) / cast_num(CLOCKS_PER_SEC)));
     return 1;
 }
@@ -272,15 +272,15 @@ static int os_clock(toku_State *T) {
 ** ISO C "broken-down time" structure.
 **
 ** struct tm {
-**   int tm_sec;    Seconds         [0-60] (1 leap second)
-**   int tm_min;    Minutes         [0-59]
-**   int tm_hour;   Hours           [0-23]
-**   int tm_mday;   Day             [1-31]
-**   int tm_mon;    Month           [0-11]
-**   int tm_year;   Year            -1900
-**   int tm_wday;   Day of week     [0-6]
-**   int tm_yday;   Days in year    [0-365]
-**   int tm_isdst;  DST             [-1/0/1]
+**   int32_t tm_sec;    Seconds         [0-60] (1 leap second)
+**   int32_t tm_min;    Minutes         [0-59]
+**   int32_t tm_hour;   Hours           [0-23]
+**   int32_t tm_mday;   Day             [1-31]
+**   int32_t tm_mon;    Month           [0-11]
+**   int32_t tm_year;   Year            -1900
+**   int32_t tm_wday;   Day of week     [0-6]
+**   int32_t tm_yday;   Days in year    [0-365]
+**   int32_t tm_isdst;  DST             [-1/0/1]
 ** }
 ** =======================================================
 */
@@ -289,13 +289,14 @@ static int os_clock(toku_State *T) {
 /*
 ** About the overflow check: an overflow cannot occur when time
 ** is represented by a toku_Integer, because either toku_Integer is
-** large enough to represent all int fields or it is not large enough
+** large enough to represent all int32_t fields or it is not large enough
 ** to represent a time that cause a field to overflow.  However, if
-** times are represented as doubles and toku_Integer is int, then the
+** times are represented as doubles and toku_Integer is int32_t, then the
 ** time 0x1.e1853b0d184f6p+55 would cause an overflow when adding 1900
 ** to compute the year.
 */
-static void set_field(toku_State *T, const char *key, int value, int delta) {
+static void set_field(toku_State *T, const char *key, int32_t value,
+                                                      int32_t delta) {
     #if (defined(TOKU_NUMTIME) && TOKU_INTEGER_MAX <= INT_MAX)
         if (t_unlikely(value > TOKU_INTEGER_MAX - delta))
             tokuL_error(T, "field '%s' is out-of-bound", key);
@@ -305,7 +306,7 @@ static void set_field(toku_State *T, const char *key, int value, int delta) {
 }
 
 
-static void set_bool_field(toku_State *T, const char *key, int value) {
+static void set_bool_field(toku_State *T, const char *key, int32_t value) {
     if (value < 0) /* undefined? */
         return; /* does not set field */
     toku_push_bool(T, value);
@@ -329,17 +330,18 @@ static void set_all_fields(toku_State *T, struct tm *stm) {
 }
 
 
-static int get_bool_field(toku_State *T, const char *key) {
-    int res = (toku_get_field_str(T, -1, key) == TOKU_T_NIL)
+static int32_t get_bool_field(toku_State *T, const char *key) {
+    int32_t res = (toku_get_field_str(T, -1, key) == TOKU_T_NIL)
             ? -1 : toku_to_bool(T, -1);
     toku_pop(T, 1);
     return res;
 }
 
 
-static int get_field(toku_State *T, const char *key, int dfl, int delta) {
-    int isnum;
-    int t = toku_get_field_str(T, -1, key); /* get field and its type */
+static int32_t get_field(toku_State *T, const char *key, int32_t dfl,
+                                                         int32_t delta) {
+    int32_t isnum;
+    int32_t t = toku_get_field_str(T, -1, key); /* get field and its type */
     toku_Integer res = toku_to_integerx(T, -1, &isnum);
     if (!isnum) { /* field is not an integer? */
         if (t_unlikely(t != TOKU_T_NIL)) /* some other value? */
@@ -347,20 +349,20 @@ static int get_field(toku_State *T, const char *key, int dfl, int delta) {
         else if (t_unlikely(dfl < 0)) /* absent field; no default? */
             return tokuL_error(T, "field '%s' missing in date table", key);
         res = dfl;
-    } else { /* final field integer must not overflow 'int' */
+    } else { /* final field integer must not overflow 'int32_t' */
         if (!(res >= 0 ? res - delta <= INT_MAX : INT_MIN + delta <= res))
             return tokuL_error(T, "field '%s' is out-of-bound", key);
         res -= delta;
     }
     toku_pop(T, 1);
-    return cast_int(res);
+    return cast_i32(res);
 }
 
 
 static const char *check_option(toku_State *T, const char *conv,
                                 size_t convlen, char *buff) {
     const char *option = TOKU_STRFTIMEOPTIONS;
-    t_uint oplen = 1; /* length of options being checked */
+    uint32_t oplen = 1; /* length of options being checked */
     for (; *option && oplen <= convlen; option += oplen) {
         if (*option == '|')  /* next block? */
             oplen++; /* will check options with next length (+1) */
@@ -376,7 +378,7 @@ static const char *check_option(toku_State *T, const char *conv,
 }
 
 
-static time_t t_checktime (toku_State *T, int index) {
+static time_t t_checktime (toku_State *T, int32_t index) {
     t_timet t = t_totime(T, index);
     tokuL_check_arg(T, cast(time_t, t) == t, index, "time out-of-bounds");
     return cast(time_t, t);
@@ -387,7 +389,7 @@ static time_t t_checktime (toku_State *T, int index) {
 #define SIZETIMEFMT     250
 
 
-static int os_date(toku_State *T) {
+static int32_t os_date(toku_State *T) {
     size_t slen;
     const char *s = tokuL_opt_lstring(T, 0, "%c", &slen);
     time_t t = tokuL_opt(T, t_checktime, 1, time(NULL));
@@ -428,7 +430,7 @@ static int os_date(toku_State *T) {
 }
 
 
-static int os_time(toku_State *T) {
+static int32_t os_time(toku_State *T) {
     time_t t;
     if (toku_is_noneornil(T, 0)) /* called without args? */
         t = time(NULL); /* get current time */
@@ -454,7 +456,7 @@ static int os_time(toku_State *T) {
 }
 
 
-static int os_difftime(toku_State *T) {
+static int32_t os_difftime(toku_State *T) {
     time_t t1 = t_checktime(T, 0);
     time_t t2 = t_checktime(T, 1);
     toku_push_number(T, cast_num(difftime(t1, t2)));
@@ -464,12 +466,12 @@ static int os_difftime(toku_State *T) {
 /* }====================================================== */
 
 
-static int os_exit(toku_State *T) {
-    int status;
+static int32_t os_exit(toku_State *T) {
+    int32_t status;
     if (toku_is_bool(T, 0))
         status = (toku_to_bool(T, 0) ? EXIT_SUCCESS : EXIT_FAILURE);
     else
-        status = cast_int(tokuL_opt_integer(T, 0, EXIT_SUCCESS));
+        status = cast_i32(tokuL_opt_integer(T, 0, EXIT_SUCCESS));
     if (toku_to_bool(T, 1))
         toku_close(T); /* close the state before exiting */
     if (T) exit(status); /* 'if' to avoid warnings for unreachable 'return' */
@@ -477,13 +479,13 @@ static int os_exit(toku_State *T) {
 }
 
 
-static int os_setlocale (toku_State *T) {
-    static const int cat[] = {
+static int32_t os_setlocale (toku_State *T) {
+    static const int32_t cat[] = {
         LC_ALL, LC_COLLATE, LC_CTYPE, LC_MONETARY, LC_NUMERIC, LC_TIME };
     static const char *const catnames[] = {
         "all", "collate", "ctype", "monetary", "numeric", "time", NULL };
     const char *l = tokuL_opt_string(T, 0, NULL);
-    int opt = tokuL_check_option(T, 1, "all", catnames);
+    int32_t opt = tokuL_check_option(T, 1, "all", catnames);
     toku_push_string(T, setlocale(cat[opt], l));
     return 1;
 }
@@ -506,7 +508,7 @@ static const tokuL_Entry syslib[] = {
 };
 
 
-int tokuopen_os(toku_State *T) {
+int32_t tokuopen_os(toku_State *T) {
     tokuL_push_lib(T, syslib);
     return 1;
 }
