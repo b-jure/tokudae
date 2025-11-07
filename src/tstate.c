@@ -380,7 +380,7 @@ int32_t tokuT_reallocstack(toku_State *T, int32_t newsize, int32_t raiseerr) {
 */
 int32_t tokuT_growstack(toku_State *T, int32_t n, int32_t raiseerr) {
     int32_t size = stacksize(T);
-    if (t_unlikely(size > TOKUI_MAXSTACK)) { /* overflowed already ? */
+    if (t_unlikely(size > TOKUI_MAXSTACK)) { /* overflown already ? */
         /* if stack is larger than maximum, thread is already using the
         ** extra space reserved for errors, that is, thread is handling
         ** a stack error; cannot grow further than that. */
@@ -397,8 +397,7 @@ int32_t tokuT_growstack(toku_State *T, int32_t n, int32_t raiseerr) {
             nsize = needed; /* grow to needed size */
         if (t_likely(nsize <= TOKUI_MAXSTACK)) /* new size is ok? */
             return tokuT_reallocstack(T, nsize, raiseerr);
-    }
-    /* else stack overflow */
+    } /* else stack overflow */
     /* add extra size to be able to handle the error message */
     tokuT_reallocstack(T, ERRORSTACKSIZE, raiseerr);
     if (raiseerr)

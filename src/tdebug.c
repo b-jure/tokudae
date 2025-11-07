@@ -261,7 +261,7 @@ static int32_t symbexec(const Proto *p, int32_t lastpc, int32_t sp) {
                 change = 0;
                 break;
             }
-            case OP_CALL: {
+            case OP_TAILCALL: case OP_CALL: {
                 int32_t stk = GET_ARG_L(i, 0);
                 int32_t nresults = GET_ARG_L(i, 1) - 1;
                 if (nresults == TOKU_MULTRET) nresults = 1;
@@ -486,7 +486,7 @@ static const char *funcnamefromcode(toku_State *T, const Proto *p, int32_t pc,
     int32_t event;
     uint8_t *i = &p->code[pc];
     switch (*i) {
-        case OP_CALL:
+        case OP_TAILCALL: case OP_CALL:
             return getobjname(p, pc, GET_ARG_L(i, 0), name);
         case OP_FORCALL:
             *name = "for iterator";
@@ -540,7 +540,7 @@ static const char *funcnamefromcall(toku_State *T, CallFrame *cf,
 
 static const char *getfuncname(toku_State *T, CallFrame *cf,
                                               const char **name) {
-    if (cf != NULL) /* function is active (running)? */
+    if (cf != NULL && !(cf->status & CFST_TAIL))
         return funcnamefromcall(T, cf->prev, name);
     else
         return NULL;
@@ -570,6 +570,14 @@ static int32_t auxgetinfo(toku_State *T, const char *options, Closure *cl,
             case 'l':
                 ar->currline = (cf && isTokudae(cf)) ? getcurrentline(cf) : -1;
                 break;
+            case 'r':
+                if (cf == NULL || !(cf->status & CFST_HOOKED))
+                    ar->ftransfer = ar->ntransfer = 0;
+                else {
+                    ar->ftransfer = T->transferinfo.ftransfer;
+                    ar->ntransfer = T->transferinfo.ntransfer;
+                }
+                break;
             case 'u':
                 ar->nupvals = (cl == NULL) ? 0 : cl->c.nupvals;
                 if (TokudaeClosure(cl)) {
@@ -580,12 +588,13 @@ static int32_t auxgetinfo(toku_State *T, const char *options, Closure *cl,
                     ar->isvararg = 1; /* always vararg */
                 }
                 break;
-            case 'r':
-                if (cf == NULL || !(cf->status & CFST_HOOKED))
-                    ar->ftransfer = ar->ntransfer = 0;
-                else {
-                    ar->ftransfer = T->transferinfo.ftransfer;
-                    ar->ntransfer = T->transferinfo.ntransfer;
+            case 't':
+                if (cf != NULL) {
+                    ar->istailcall = cf->status & CFST_TAIL;
+                    ar->extraargs = cast_i32(cf->extraargs);
+                } else {
+                    ar->istailcall = 0;
+                    ar->extraargs = 0;
                 }
                 break;
             case 'f':
@@ -841,7 +850,9 @@ static const char *varinfo(toku_State *T, const TValue *o) {
 static t_noret typeerror(toku_State *T, const TValue *o, const char *op,
                                                          const char *extra) {
     const char *t = tokuTM_objtypename(T, o);
-    tokuD_runerror(T, "attempt to %s a %s value%s", op, t, extra);
+    int n = !strcmp(t, typename(TOKU_T_INSTANCE)) ||
+            !strcmp(t, typename(TOKU_T_USERDATA));
+    tokuD_runerror(T, "attempt to %s a%s %s value%s", op, n?"n":"", t, extra);
 }
 
 
@@ -1030,8 +1041,8 @@ void tokuD_hook(toku_State *T, int32_t event, int32_t line,
         toku_lock(T);
         toku_assert(!T->allowhook);
         T->allowhook = 1; /* hook finished; once again enable hooks */
-        cf->top.p = restorestack(T, cf_top);
         T->sp.p = restorestack(T, sp);
+        cf->top.p = restorestack(T, cf_top);
         cf->status &= cast_u8(~CFST_HOOKED);
     }
 }
@@ -1045,9 +1056,11 @@ void tokuD_hook(toku_State *T, int32_t event, int32_t line,
 void tokuD_hookcall(toku_State *T, CallFrame *cf, int32_t delta) {
     T->oldpc = 0; /* set 'oldpc' for new function */
     if (T->hookmask & TOKU_MASK_CALL) { /* is call hook on? */
+        int32_t event = (cf->status & CFST_TAIL) ? TOKU_HOOK_TAILCALL
+                                                 : TOKU_HOOK_CALL;
         toku_assert(delta > 0);
         cf->t.pc += delta; /* hooks assume 'pc' is already incremented */
-        tokuD_hook(T, TOKU_HOOK_CALL, -1, 0, cf_func(cf)->p->arity);
+        tokuD_hook(T, event, -1, 0, cf_func(cf)->p->arity);
         cf->t.pc -= delta; /* correct 'pc' */
     }
 }
@@ -1090,24 +1103,22 @@ int32_t tokuD_traceexec(toku_State *T, const uint8_t *pc, ptrdiff_t stacksz) {
     CallFrame *cf = T->cf;
     const Proto *p = cf_func(cf)->p;
     uint8_t mask = cast_u8(T->hookmask);
-    int32_t isize, extra, counthook;
-    SPtr base;
+    int32_t isize, counthook;
     if (!(mask & (TOKU_MASK_LINE | TOKU_MASK_COUNT))) { /* no hooks? */
         cf->t.trap = 0; /* don't need to stop again */
         return 0; /* turn off 'trap' */
     }
-    base = cf->func.p + 1;
     isize = getopSize(*pc);
-    extra = (cast_i32((pc + isize) - p->code) < p->sizecode) * isize;
+    isize = (cast_i32((pc + isize) - p->code) < p->sizecode) * isize;
     /* reference is always the next (or last) opcode + SIZE_OPCODE */
-    cf->t.pc = pc + extra + SIZE_OPCODE;
+    cf->t.pc = pc + isize + SIZE_OPCODE;
     counthook = (mask & TOKU_MASK_COUNT) && (--T->hookcount == 0);
     if (counthook)
         resethookcount(T); /* reset count */
     else if (!(mask & TOKU_MASK_LINE))
         return 1; /* no line hook and count != 0; nothing to be done now */
     if (counthook) {
-        T->sp.p = base + stacksz; /* save 'sp' */
+        T->sp.p = cf->func.p + 1 + stacksz; /* save 'sp' */
         tokuD_hook(T, TOKU_HOOK_COUNT, -1, 0, 0); /* call count hook */
     }
     if (mask & TOKU_MASK_LINE) {
@@ -1117,7 +1128,7 @@ int32_t tokuD_traceexec(toku_State *T, const uint8_t *pc, ptrdiff_t stacksz) {
         if (npci <= oldpc || /* call hook when jump back (loop), */
                 changedline(p, oldpc, npci)) { /* or when enter new line */
             int32_t newline = tokuD_getfuncline(p, npci);
-            T->sp.p = base + stacksz; /* save 'sp' */
+            T->sp.p = cf->func.p + 1 + stacksz; /* save 'sp' */
             tokuD_hook(T, TOKU_HOOK_LINE, newline, 0, 0); /* call line hook */
         }
         T->oldpc = npci; /* 'pc' of last call to line hook */

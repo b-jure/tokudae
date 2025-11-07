@@ -222,7 +222,7 @@ TOKU_API int32_t toku_get_index(toku_State *T, int32_t idx, toku_Integer i);
 TOKU_API int32_t toku_get_cindex(toku_State *T, toku_Integer i); 
 TOKU_API int32_t toku_get_field(toku_State *T, int32_t idx); 
 TOKU_API int32_t toku_get_field_str(toku_State *T, int32_t idx, const char *s); 
-TOKU_API int32_t toku_get_field_int(toku_State *T, int32_t idx, toku_Integer i); 
+TOKU_API int32_t toku_get_field_int(toku_State *T, int32_t idx, toku_Integer i);
 TOKU_API int32_t toku_get_cfield_str(toku_State *T, const char *s); 
 TOKU_API int32_t toku_get_class(toku_State *T, int32_t idx); 
 TOKU_API int32_t toku_get_superclass(toku_State *T, int32_t idx); 
@@ -366,6 +366,7 @@ TOKU_API uint16_t       toku_numuservalues(toku_State *T, int32_t idx);
 #define TOKU_HOOK_RET       1
 #define TOKU_HOOK_LINE      2
 #define TOKU_HOOK_COUNT     3
+#define TOKU_HOOK_TAILCALL  4
 
 /* Event masks */
 #define TOKU_MASK_CALL      (1 << TOKU_HOOK_CALL)
@@ -391,6 +392,7 @@ TOKU_API int32_t     toku_gethookmask(toku_State *T);
 TOKU_API int32_t     toku_gethookcount(toku_State *T);
 TOKU_API int32_t     toku_stackinuse(toku_State *T);
 
+// TODO: update docs
 struct toku_Debug {
     int32_t event;
     const char *name;           /* (n) */
@@ -405,6 +407,8 @@ struct toku_Debug {
     int32_t ntransfer;          /* (r) */
     int32_t nupvals;            /* (u) */
     int32_t nparams;            /* (u) */
+    int32_t extraargs;          /* (t) */
+    uint8_t istailcall;         /* (t) */
     uint8_t isvararg;           /* (u) */
     char shortsrc[TOKU_IDSIZE]; /* (s) */
     /* private part */

@@ -137,7 +137,7 @@ static int32_t db_getinfo(toku_State *T) {
     int32_t arg;
     toku_Debug ar;
     toku_State *T1 = getthread(T, &arg);
-    const char *options = tokuL_opt_string(T, arg + 2, "flnsru");
+    const char *options = tokuL_opt_string(T, arg + 2, "flnsrut");
     checkstack(T, T1, 3);
     tokuL_check_arg(T, options[0] != '>', arg + 2, "invalid option '>'");
     if (toku_is_function(T, arg + 1)) { /* info about a function? */
@@ -175,6 +175,10 @@ static int32_t db_getinfo(toku_State *T) {
     if (strchr(options, 'r')) {
         settabsi(T, "ftransfer", ar.ftransfer);
         settabsi(T, "ntransfer", ar.ntransfer);
+    }
+    if (strchr(options, 't')) {
+        settabsb(T, "istailcall", ar.istailcall);
+        settabsi(T, "extraargs", ar.extraargs);
     }
     if (strchr(options, 'L'))
         treatstackoption(T, T1, "activelines");
@@ -301,15 +305,17 @@ static int32_t db_upvaluejoin(toku_State *T) {
 }
 
 
+#include "tstate.h"
 /*
 ** Call hook function registered at hook table for the current
 ** thread (if there is one).
 */
 static void hookf(toku_State *T, toku_Debug *ar) {
-    static const char *const hooknames[] = {"call","return","line","count"};
+    static const char *const hooknames[] =
+    {"call", "return", "line", "count", "tail call"};
     toku_get_cfield_str(T, HOOKKEY);
     toku_push_thread(T);
-    if (toku_get_raw(T, -2) == TOKU_T_FUNCTION) { /* is there a hook function? */
+    if (toku_get_raw(T, -2) == TOKU_T_FUNCTION) { /* is there a hook? */
         toku_push_string(T, hooknames[ar->event]); /* push event name */
         if (ar->currline >= 0)
             toku_push_integer(T, ar->currline); /* push current line */

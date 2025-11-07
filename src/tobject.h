@@ -607,7 +607,7 @@ typedef struct Instance {
 
 #define TOKU_VUPVALUE   makevariant(TOKU_TUPVALUE, 0)
 
-#define TOKU_VTCL      makevariant(TOKU_T_FUNCTION, 0) /* Tokudae cloture */
+#define TOKU_VTCL       makevariant(TOKU_T_FUNCTION, 0) /* Tokudae closure */
 #define TOKU_VLCF       makevariant(TOKU_T_FUNCTION, 1) /* light C function */
 #define TOKU_VCCL       makevariant(TOKU_T_FUNCTION, 2) /* C closure */
 

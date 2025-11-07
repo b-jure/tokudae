@@ -616,8 +616,70 @@ local fn eqseq(l1, l2) {
     debug.sethook();
 }
 
-/// testing local function information
-{
+{ /// tests for tail calls
+    local fn f(x) {
+        if x {
+            assert(debug.getinfo(1, "s").what == "Tokudae");
+            assert(debug.getinfo(1, "t").istailcall == true);
+            local tail = debug.getinfo(2);
+            assert(tail.func == g1 and tail.istailcall == true);
+            assert(debug.getinfo(3, "s").what == "main");
+        }
+    }
+
+    assert(debug.getinfo(print, "t").istailcall == false);
+    assert(debug.getinfo(print, "t").extraargs == 0);
+
+    (class { __call = || { assert(debug.getinfo(1, "t").extraargs == 1); };})()();
+
+    fn g(x)  :: return f(x);
+    fn g1(x) :: g(x);
+
+    local fn h(x) { local f=g1; return f(x); }
+
+    h(true);
+
+    local b = [];
+    debug.sethook(|e| { list.insert(b, e); }, "cr");
+    h(false);
+    debug.sethook();
+    local res = ["return",   /// first return (from sethook)
+          "call", "tail call", "call", "tail call",
+          "return", "return",
+          "call",    /// last call (to sethook)
+    ];
+    for (local i=0; i<res.len; i++)
+        assert(res[i] == list.remove(b, 0));
+
+    b = 0;
+    debug.sethook(fn (e) {
+        if e == "tail call" {
+            b++;
+            assert(debug.getinfo(2, "t").istailcall == true);
+        } else
+            assert(debug.getinfo(2, "t").istailcall == false);
+    }, "c");
+    h(false);
+    debug.sethook();
+    assert(b == 2);  /// two tail calls
+
+    g,g1 = nil;
+
+    local lim = __heavy and 30000 or 3000;
+    local fn foo(x) {
+        if x==0 {
+            assert(debug.getinfo(2).what == "main");
+            local info = debug.getinfo(1);
+            assert(info.istailcall == true and info.func == foo);
+        } else
+            return foo(x-1)
+    }
+
+    foo(lim);
+}
+
+
+{ /// testing local function information
     co = load([=[
         local x = 2;
         local A = 5
@@ -770,7 +832,7 @@ if !__opts or (__opts and __opts.run_isolated) {
         local s = deep(total, start);
         local rest = reg.match(s, "^message\nstack traceback:\n(.*)$");
         local cl = countlines(rest);
-        /// at most 10 lines in first part, 10 in second, plus '...'
+        # at most 10 lines in first part, 10 in second, plus '...'
         assert(cl <= 10 + 10 + 1);
         local brk = reg.find(rest, "%.%.%.\t%(skip");
         if (brk) { /// does message have '...'?

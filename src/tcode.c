@@ -89,7 +89,7 @@ TOKUI_DEF const OpProperties tokuC_opproperties[NUM_OPCODES] = {
     { FormatIS, 1, 0, 0 }, /* OP_NEWTABLE */
     { FormatIL, 0, 2, 0 }, /* OP_METHOD */
     { FormatIS, 0, 2, 0 }, /* OP_SETTM */
-    { FormatIS, 0, 2, 0 }, /* OP_SETMT */
+    { FormatIL, 0, 2, 0 }, /* OP_SETMT */
     { FormatIS, 0, 0, 0 }, /* OP_MBIN */
     { FormatIL, 0, 0, 1 }, /* OP_ADDK */
     { FormatIL, 0, 0, 1 }, /* OP_SUBK */
@@ -145,7 +145,8 @@ TOKUI_DEF const OpProperties tokuC_opproperties[NUM_OPCODES] = {
     { FormatIL, 0, 0, 0 }, /* OP_JMPS */
     { FormatIS, 0, 0, 0 }, /* OP_TEST */
     { FormatIS, 0, 1, 0 }, /* OP_TESTPOP */
-    { FormatILL, VD, 0, 1 }, /* OP_CALL */
+    { FormatILLS, VD, 0, 1 }, /* OP_CALL */
+    { FormatILLS, VD, 0, 1 }, /* OP_TAILCALL */
     { FormatIL, 0, 0, 0 }, /* OP_CLOSE */
     { FormatIL, 0, 0, 0 }, /* OP_TBC */
     { FormatILL, VD, 0, 0 }, /* OP_CHECKADJ */
@@ -186,26 +187,6 @@ TOKUI_DEF const uint8_t tokuC_opsize[FormatN] = { /* "ORDER OPFMT" */
     SIZE_OPCODE+SIZE_ARG_L*2,                /* FormatILL */
     SIZE_OPCODE+SIZE_ARG_L*2+SIZE_ARG_S,     /* FormatILLS */
     SIZE_OPCODE+SIZE_ARG_L*3,                /* FormatILLL */
-};
-
-
-/* 
-** Names of all opcodes.
-*/
-TOKUI_DEF const char *tokuC_opname[NUM_OPCODES] = { /* "ORDER OP" */
-"TRUE", "FALSE", "SUPER", "NIL", "POP", "LOAD", "CONST", "CONSTL",
-"CONSTI", "CONSTIL", "CONSTF", "CONSTFL", "VARARGPREP", "VARARG",
-"CLOSURE", "NEWLIST", "NEWCLASS", "NEWTABLE", "METHOD", "SETTM", "SETTMSTR",
-"MBIN", "ADDK", "SUBK", "MULK", "DIVK", "IDIVK", "MODK", "POWK", "BSHLK",
-"BSHRK", "BANDK", "BORK", "BXORK", "ADDI", "SUBI", "MULI", "DIVI", "IDIVI",
-"MODI", "POWI", "BSHLI", "BSHRI", "BANDI", "BORI", "BXORI", "ADD", "SUB",
-"MUL", "DIV", "IDIV", "MOD", "POW", "BSHL", "BSHR", "BAND", "BOR", "BXOR",
-"CONCAT", "EQK", "EQI", "LTI", "LEI", "GTI", "GEI", "EQ", "LT", "LE",
-"EQPRESERVE", "UNM", "BNOT", "NOT", "JMP", "JMPS", "TEST", "TESTPOP", "CALL",
-"CLOSE", "TBC", "CHECKADJ", "GETLOCAL", "SETLOCAL", "GETUVAL", "SETUVAL",
-"SETLIST", "SETPROPERTY", "GETPROPERTY", "GETINDEX", "SETINDEX", "GETINDEXSTR",
-"SETINDEXSTR", "GETINDEXINT", "GETINDEXINTL", "SETINDEXINT", "SETINDEXINTL",
-"GETSUP", "GETSUPIDX", "INHERIT", "FORPREP", "FORCALL", "FORLOOP", "RETURN",
 };
 
 
@@ -350,7 +331,7 @@ int32_t tokuC_emitI(FunctionState *fs, uint8_t i) {
 
 
 /* code short arg */
-static int32_t emitS(FunctionState *fs, int32_t arg) {
+int32_t tokuC_emitS(FunctionState *fs, int32_t arg) {
     toku_assert(0 <= arg && arg <= MAX_ARG_S);
     emitbyte(fs, arg);
     return currPC - cast_i32(SIZE_ARG_S);
@@ -368,7 +349,7 @@ static int32_t emitL(FunctionState *fs, int32_t arg) {
 /* code opcode with short arg */
 int32_t tokuC_emitIS(FunctionState *fs, uint8_t i, int32_t a) {
     int32_t offset = tokuC_emitI(fs, i);
-    emitS(fs, a);
+    tokuC_emitS(fs, a);
     return offset;
 }
 
@@ -407,11 +388,19 @@ t_sinline void freeslots(FunctionState *fs, int32_t n) {
 }
 
 
+static int32_t emitILLS(FunctionState *fs, uint8_t i, int32_t a, int32_t b,
+                                                                 int32_t c) {
+    int32_t offset = tokuC_emitILL(fs, i, a, b);
+    tokuC_emitS(fs, c);
+    return offset;
+}
+
+
 int32_t tokuC_call(FunctionState *fs, int32_t base, int32_t nres) {
     toku_assert(nres >= TOKU_MULTRET);
     freeslots(fs, fs->sp - base); /* call removes function and arguments */
     toku_assert(fs->sp == base);
-    return tokuC_emitILL(fs, OP_CALL, base, nres + 1);
+    return emitILLS(fs, OP_CALL, base, nres + 1, 0);
 }
 
 
@@ -608,10 +597,12 @@ void tokuC_setmulret(FunctionState *fs, ExpInfo *e) {
 }
 
 
-static int32_t canmerge(FunctionState *fs, OpCode op, uint8_t *pi) {
-    if (pi && *pi == op && fs->lasttarget != currPC) {
-        return op == OP_POP || (op == OP_NIL && !fs->nonilmerge);
-    } else /* otherwise differing opcodes or inside of a jump */
+#define istargetpc(fs)      ((fs)->lasttarget == currPC)
+
+static int32_t canmerge(FunctionState *fs, OpCode op, uint8_t *prev) {
+    if (prev && *prev == op && fs->pcdo != currPC && !istargetpc(fs)) {
+        return (op == OP_POP || (op == OP_NIL && !fs->nonilmerge));
+    } else /* otherwise differing opcodes, start of loop or in a jump */
         return 0; /* can't merge */
 }
 
@@ -659,18 +650,18 @@ int32_t tokuC_pop(FunctionState *fs, int32_t n) {
 }
 
 
-void tokuC_adjuststack(FunctionState *fs, int32_t left) {
-    if (0 < left)
-        tokuC_pop(fs, left);
-    else if (left < 0)
-        tokuC_nil(fs, -left);
-    /* else stack is already adjusted */
+void tokuC_adjuststack(FunctionState *fs, int32_t nextra) {
+    if (0 < nextra)
+        tokuC_pop(fs, nextra);
+    else if (nextra < 0)
+        tokuC_nil(fs, -nextra);
+    /* else; stack is already adjusted */
 }
 
 
-int32_t tokuC_return(FunctionState *fs, int32_t first, int32_t nret) {
-    int32_t offset = tokuC_emitILL(fs, OP_RETURN, first, nret + 1);
-    emitS(fs, 0); /* close flag */
+int32_t tokuC_return(FunctionState *fs, int32_t first, int32_t nres) {
+    int32_t offset = tokuC_emitILL(fs, OP_RETURN, first, nres + 1);
+    tokuC_emitS(fs, 0); /* close flag */
     return offset;
 }
 
@@ -1041,7 +1032,7 @@ int32_t tokuC_dischargevars(FunctionState *fs, ExpInfo *v) {
 /* code op with long and short args */
 int32_t tokuC_emitILS(FunctionState *fs, uint8_t op, int32_t a, int32_t b) {
     int32_t offset = tokuC_emitIL(fs, op, a);
-    emitS(fs, b);
+    tokuC_emitS(fs, b);
     return offset;
 }
 
@@ -1075,14 +1066,6 @@ void tokuC_setlistsize(FunctionState *fs, int32_t pc, int32_t lsz) {
     lsz = (lsz != 0 ? tokuO_ceillog2(cast_u32(lsz)) + 1 : 0);
     toku_assert(lsz <= MAX_ARG_S);
     SET_ARG_S(inst, 0, lsz); /* set size (log2 - 1) */
-}
-
-
-static int32_t emitILLS(FunctionState *fs, uint8_t i, int32_t a, int32_t b,
-                                                                 int32_t c) {
-    int32_t offset = tokuC_emitILL(fs, i, a, b);
-    emitS(fs, c);
-    return offset;
 }
 
 
@@ -1765,7 +1748,7 @@ void tokuC_finish(FunctionState *fs) {
     for (int32_t i = 0; i < currPC; i += getopSize(*pc)) {
         pc = &p->code[i];
         switch (*pc) {
-            case OP_RETURN: /* check if need to close variables */
+            case OP_RETURN: case OP_TAILCALL:
                 if (fs->needclose)
                     SET_ARG_LLS(pc, 1); /* set the flag */
                 break;

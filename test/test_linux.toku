@@ -48,8 +48,8 @@ __skipmsg = __G.__skipmsg or true; /* default is true */
 
 local script_name = "test_linux.toku";
 
-local make_target = "linux-readline";
-local make_threads = 6;
+local make_target = "linux_readline";
+local make_threads = 12;
 
 local dev_null = "/dev/null";
 local dev_null1 = " > " .. dev_null;
@@ -171,7 +171,7 @@ local find,runfile,typeof,error,indices = reg.find,runfile,typeof,error,indices;
 local output,sfind,substr,tostr = io.output,string.find,string.substr,tostr;
 local len,remove,byte,clock = len,list.remove,string.byte,os.clock;
 local tmpname,fields,gc,rm,flatten = os.tmpname,fields,gc,os.remove,list.flatten;
-local exit,getinfo,enumerate = os.exit,debug.getinfo,indices;
+local exit,getinfo = os.exit,debug.getinfo;
 local char,dbg,gmatch,repeat = string.char,debug.debug,reg.gmatch,string.repeat;
 local startswith,ostime = string.startswith,os.time;
 
@@ -449,16 +449,17 @@ local fn loginput(msg) :: if isatty() stdout.write(fmt("[%s]: %s\n", MAGENTA("IN
 local fn logcmd(msg)   :: if isatty() stdout.write(fmt("[%s]: %s\n", RED("CMD"), msg));
 
 
-/* temporary output file */
+/* class instance for temporary files */
 local tempfile = (class {
     __gc = || {
         assert(typeof(self) == "instance");
-        if self.file {
-            loginfo(fmt("removing temporary output file '%s'...", self.file));
-            rm(self.file);
+        foreach _,fname in indices(self.files) {
+            loginfo(fmt("removing temporary file '%s'...", fname));
+            rm(fname);
         }
     };
 })();
+tempfile.files = [];
 
 
 local fn print_test_result(stat, filepath, c) {
@@ -477,6 +478,7 @@ local prompt_run_failed_test;
 ** Runs individual test and outputs the result to 'stdout'.
 ** @filepath - string
 */
+local popen_file; /* temporary file when '-i' */
 local fn run_test(filepath) {
     if (__opts.memory) showmem();
     local oktc = __opts.termcodes and __opts.noprint and !__opts.warning;
@@ -484,10 +486,23 @@ local fn run_test(filepath) {
         stdout.write(fmt("Currently running '%s'...", YELLOW(filepath)));
         stdout.flush();
     }
-    local stat, msg, code, c;
-    if __opts.run_isolated
-        stat, msg, code = execute(prog .. " " .. filepath .. dev_null12);
-    else { /* otherwise run in the same global environment */
+    local stat, msg, code, c, f;
+    if __opts.run_isolated {
+        if (!popen_file) {
+            local files = tempfile.files;
+            popen_file = assert(tmpname());
+            files[files.len] = popen_file;
+        }
+        f, msg, code = popen(prog .. " " .. filepath .. "&>" .. popen_file);
+        stat = !!f;
+        if stat { /* popen had no errors? */
+            stat = getargs(2, f.close()) == 0;
+            local fpopen = assert(io.open(popen_file, "rb"));
+            msg = fpopen.read("a");
+            fpopen.close();
+        } else
+            f.close();
+    } else { /* otherwise run in the same global environment */
         stat, msg = xpcall(runfile, traceback, filepath);
         c = clock();
     }
@@ -502,14 +517,12 @@ local fn run_test(filepath) {
         time_in_dbg = clock() - c;
     }
     if !stat { /* test failed? */
-        if __opts.run_isolated and msg and code
-            msg = msg .. " (code " .. tostr(code) .. ")";
         failed_tests[failed_tests.len] = { /* add it to failed tests list */
             testname = filepath,
             errormsg = msg,
         };
         if __opts.errors /* print errors of failed tests? */
-            print(msg);
+            print(msg == "" and "<empty string>" or msg);
         if __opts.abort_on_fail { /* abort on first failed test? */
             prompt_run_failed_test();
             exit(1, true);
@@ -557,10 +570,10 @@ prompt_run_failed_test = || {
     /* re-run only if they were run in isolation and input is terminal */
     if failed_tests.len == 1 and __opts.run_isolated and isatty() {
         loginput("Would you like to run the failed test directly " ..
-                 "before exiting [yYnN] (default 'y'): ");
+                 "before exiting [yYnN] (default 'n'): ");
         loop { /* repeat until valid option */
             local opt = stdin.read("l");
-            opt = (opt == "") and "y" or opt;
+            opt = (opt == "") and "n" or opt;
             switch opt {
                 case "y": case "Y": { /* re-run failed tests */
                     local testname = failed_tests[0].testname;
@@ -1117,7 +1130,8 @@ local fn set_output_options() {
 
         /* file for redirecting 'stdout' and 'stderr' when running a test */
         local out = assert(tmpname());
-        tempfile.file = out;
+        local files = tempfile.files;
+        files[files.len] = out;
 
         /* replace 'print' while testing */
         __G.print = fn(...) {
@@ -1209,9 +1223,9 @@ else if !out_tests and __opts.rebuild { /* rebuild standalone interpreter? */
            execute(buildcmd(cp, prog, oldprog, dev_null1)));
     loginfo(fmt("%s backup executable '%s'", GREEN("created"), oldprog));
     have_oldprog = true;
-    local cmd = buildcmd("make -j",  make_threads);
+    local cmd = buildcmd("PLATFORM="..make_target, "make -j",  make_threads);
     local dir = startswith(prog, "./") and "." or "..";
-    cmd = buildcmd("cd", dir, "&&", cmd, "clean", dev_null1, "&&", cmd, make_target);
+    cmd = buildcmd("cd", dir, "&&", cmd, "clean", dev_null1, "&&", cmd);
     cmd = buildcmd(cmd, dev_null1); /* redirect 'stdout' to null */
     logcmd(cmd);
     if !report(false, msg, execute(cmd)) { /* rebuild failed? */

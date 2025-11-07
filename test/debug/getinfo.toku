@@ -17,6 +17,7 @@ local getinfo = db.getinfo;
     assert(t.defline == 7 and t.lastdefline == 13 and t.what == "Tokudae");
     assert(t.currline == -1);
     assert(t.nupvals == 2 and t.nparams == 3 and t.isvararg == false);
+    assert(t.extraargs == 0 and t.istailcall == false);
     assert(t.name == nil and t.namewhat == "");
     assert(t.ftransfer == 0 and t.ntransfer == 0); 
     assert(t.activelines == nil);
@@ -27,8 +28,10 @@ local getinfo = db.getinfo;
     assert(t.defline == 7 and t.lastdefline == 13 and t.what == "Tokudae");
     t = getinfo(f, "l"); /// get line
     assert(t.currline == -1);
-    t = getinfo(f, "u"); /// get upvalues and isvararg
+    t = getinfo(f, "u"); /// get upvalue and parameter count
     assert(t.nupvals == 2 and t.nparams == 3 and t.isvararg == false);
+    t = getinfo(f, "t"); /// get number of extraargs and tailcall flag
+    assert(t.extraargs == 0 and t.istailcall == false);
     t = getinfo(f, "n"); /// get name
     assert(t.name == nil and t.namewhat == "");
     t = getinfo(f, "r"); /// get return transfers
@@ -55,20 +58,21 @@ local getinfo = db.getinfo;
     checkerr("number expected", getinfo, true);
     checkerr("number expected", getinfo, []);
     checkerr("number expected", getinfo, {});
-    checkerr("number expected", getinfo, class{});
-    checkerr("number expected", getinfo, (class{})());
+    checkerr("number expected", getinfo, class);
+    checkerr("number expected", getinfo, (class)());
     checkerr("no integer representation", getinfo, 0.15);
     /// invalid option errors
     checkerr("invalid option", getinfo, f, "Z");
     checkerr("invalid option '>'", getinfo, f, ">");
 }
 
-{ /// active Tokudae functions
+{ /// active Tokudae functions (main)
     local t = getinfo(1);
     assert(string.find(t.source, "getinfo.toku") and string.find(t.shortsrc, "getinfo.toku"));
     assert(t.defline == 0 and t.lastdefline == 0 and t.what == "main");
-    assert(t.currline == 67);
+    assert(t.currline == 70);
     assert(t.nupvals == 1 and t.nparams == 0 and t.isvararg == true);
+    assert(t.istailcall == false);
     assert(t.name == nil and t.namewhat == "");
     assert(t.ftransfer == 0 and t.ntransfer == 0); 
     assert(t.activelines == nil);
@@ -85,7 +89,7 @@ local getinfo = db.getinfo;
         (Message or print)("skipped traceback size test for active Tokudae function");
 }
 
-local Cprint = (__c and __c.print) or print;
+local Cprint = (__c and __c.print) or print; /// test script might change 'print'
 
 { /// inactive C function
     local t = getinfo(Cprint);
@@ -93,6 +97,7 @@ local Cprint = (__c and __c.print) or print;
     assert(t.defline == -1 and t.lastdefline == -1 and t.what == "C");
     assert(t.currline == -1);
     assert(t.nupvals == 0 and t.nparams == 0 and t.isvararg == true);
+    assert(t.extraargs == 0 and t.istailcall == false);
     assert(t.name == nil and t.namewhat == "");
     assert(t.ftransfer == 0 and t.ntransfer == 0); 
     assert(t.activelines == nil and getinfo(Cprint, "L").activelines == nil);
@@ -106,6 +111,7 @@ local Cprint = (__c and __c.print) or print;
     assert(t.defline == -1 and t.lastdefline == -1 and t.what == "C");
     assert(t.currline == -1);
     assert(t.nupvals == 0 and t.nparams == 0 and t.isvararg == true);
+    /// we can't assert if it is tail called or the number of varargs
     assert(t.name == nil and t.namewhat == "");
     assert(t.ftransfer == 0 and t.ntransfer == 0); 
     assert(t.activelines == nil and getinfo(Cprint, "L").activelines == nil);

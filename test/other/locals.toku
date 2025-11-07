@@ -1,0 +1,650 @@
+local debug = import("debug");
+
+local f;
+
+{
+    local fn f(x) { x = nil; return x; }
+    assert(f(10) == nil);
+
+    fn f() { local x; return x; }
+    assert(f(10) == nil);
+
+    fn f(x) { x = nil; local y; return x, y; }
+    assert(f(10) == nil and getargs(1, f(20)) == nil);
+}
+
+{
+    local i = 10;
+    { local i = 100; assert(i==100); }
+    { local i = 1000; assert(i==1000); }
+    assert(i == 10);
+    if i != 10 {
+        local i = 20;
+    } else {
+        local i = 30;
+        assert(i == 30);
+    }
+}
+
+{
+    a = nil;
+    load("local a = {};")();
+    assert(a == nil);
+}
+
+local x=  1;
+f = nil;
+
+fn f(a) {
+    local _1, _2, _3, _4, _5;
+    local _6, _7, _8, _9, _10;
+    local x = 3;
+    local b = a;
+    local c,d = a,b;
+    if (d == b) {
+        local x = "q";
+        x = b;
+        assert(x == 2);
+    } else
+        assert(nil);
+    assert(x == 3);
+    local f = 10;
+}
+
+{
+    local b=10;
+    local a;
+    do { local b; a,b=1,2; assert(a+1==b); } while a+b!=3;
+    assert(b == 10);
+}
+
+assert(x == 1);
+
+f(2);
+assert(typeof(f) == "function");
+
+
+local fn getenv(f) {
+    local a,b = debug.getupvalue(f, 0);
+    assert(a == "__ENV");
+    return b;
+}
+
+/// test for global table of loaded chunks
+assert(getenv(load("a=3;")) == __G);
+local c = {}; f = load("a = 3;", nil, nil, c);
+assert(getenv(f) == c);
+assert(c.a == nil);
+f();
+assert(c.a == 3);
+
+{
+  local i = 2;
+  local p = 4;  /// p == 2**i
+  do {
+    for (local j=-3; j<=3; j++) {
+      assert(load(string.fmt([=[local a=%s;
+                                      a=a+%s;
+                                      assert(a==2**%s);]=],
+                                      j, p-j, i), ""))();
+      assert(load(string.fmt([=[local a=%s;
+                                        a=a-%s;
+                                        assert(a==-2**%s);]=],
+                                        -j, p-j, i), ""))();
+      assert(load(string.fmt([=[local a,b=0,%s;
+                                        a=b-%s;
+                                        assert(a==-2**%s);]=],
+                                        -j, p-j, i), ""))();
+    }
+    p *= 2;
+    i++;
+  } while (p > 0);
+}
+
+
+
+/// testing lexical environments
+
+assert(__ENV == __G);
+
+{
+    local tostr = tostr;
+    local dummy;
+    local __ENV = (|...| :: return ...)(__G, dummy);
+
+    {
+        local __ENV = {assert=assert};
+        assert(true);
+    }
+    local mt = {__G = __G};
+    local foo,x;
+    A = false;
+    {
+        local __ENV = mt;
+        fn foo(x) {
+            A = x;
+            { local __ENV =  __G; A = 1000; }
+            return (|x| :: return tostr(A) .. tostr(x))
+        }
+    }
+    assert(getenv(foo) == mt);
+    x = foo("hi"); assert(mt.A == "hi" and A == 1000);
+    assert(x("*") == mt.A .. "*");
+
+    {
+        local __ENV = {assert=assert, A=10};
+        {
+            local __ENV = {assert=assert, A=20};
+            assert(A==20);
+            x=A;
+        }
+        assert(A==10 and x==20);
+    }
+    assert(x==20);
+    A = nil;
+
+
+    { /// testing local final values
+        X = 1; /// not a constant
+        local a<final>, b, c<final> = 10, 20, 30;
+        b = a + c + b; /// "b" is not constant
+        assert(a == 10 and b == 60 and c == 30);
+
+        local fn checkro(name, code) {
+            local st, msg = load(code);
+            local gab = string.fmt("attempt to assign to read-only variable '%s'", name);
+            assert(!st and reg.find(msg, gab, nil, true));
+        }
+
+        checkro("y", "local x, y <final>, z = 10, 20, 30; x = 11; y = 12;");
+        checkro("x", "local x <final>, y, z <final> = 10, 20, 30; x = 11;");
+        checkro("z", "local x <final>, y, z <final> = 10, 20, 30; y = 10; z = 11;");
+        checkro("foo", "local foo <final> = 10; fn foo();");
+        checkro("foo", "local foo <final> = {}; fn foo();");
+
+        checkro("z", [=[
+                local a, z <final>, b = 10;
+                fn foo() { a = 20; z = 32; }
+        ]=]);
+
+        checkro("var1", [=[
+                local a, var1 <final> = 10;
+                fn foo() { a = 20; z = || { var1 = 12; }; }
+        ]=]);
+    }
+
+
+    /// testing to-be-closed variables
+
+    {
+        local st, msg = load("local a<close>, b<close>;");
+        assert(!st and string.find(msg, "multiple"));
+    }
+
+    local fn stack(n) :: n = ((n == 0) or stack(n - 1));
+
+    local fn func2close(f, x, y) {
+        local obj = setmetatable(class, {__close = f;})();
+        if x
+            return x, obj, y;
+        else
+            return obj;
+    }
+
+    {
+        local a = [];
+        {
+            local mt = {
+                __init = |self| { self.list = ["x"]; return self },
+                __close = |self| { a[a.len] = self.list.x; }
+            };
+            local b <close> = false;   /// not to be closed
+            local x <close> = setmetatable(class, mt)();
+            local w, y <close>, z = func2close(
+                fn(_, err) { assert(err == nil); a[a.len] = "y"; },
+                10,
+                20
+            );
+            local c <close> = nil;  /// not to be closed
+            a[a.len] = "in";
+            assert(w == 10 and z == 20);
+        }
+        a[a.len] = "out";
+        assert(a[0] == "in" and a[1] == "y" and a[2] == "x" and a[3] == "out");
+    }
+
+    {
+        local X = false;
+
+        local x, closescope = func2close(|_, msg| {
+            stack(10);
+            assert(msg == nil);
+            X = true;
+        }, 100);
+        assert(x == 100); x = 101; /// "x" is not read-only
+
+        /// closing functions do not corrupt returning values
+        local fn foo(x) {
+            local _ <close> = closescope;
+            return x, X, 23;
+        }
+
+        local a, b, c = foo(1.5);
+        assert(a == 1.5 and b == false and c == 23 and X == true);
+
+        X = false;
+        foo = |x| {
+            local _<close> = func2close(|_, msg| {
+                /// without errors, enclosing fn should be still active when
+                /// __close is called
+                assert(debug.getinfo(2).name == "foo");
+                assert(msg == nil);
+            });
+            local _<close> = closescope;
+            local y = 15;
+            return y;
+        };
+
+        assert(foo() == 15 and X == true);
+
+        X = false;
+        foo = || {
+            local x <close> = closescope;
+            return x;
+        };
+
+        assert(foo() == closescope and X == true);
+    }
+
+
+    { /// testing presence of second argument
+        local fn foo(howtoclose, obj, n) {
+            local ca; /// copy of "a" visible inside its close metamethod
+            {
+                local a <close> = func2close(|...| {
+                    local l = [...];
+                    assert(getargs("len", ...) == n);
+                    assert(l.len == n and l[0] == ca and (l.len < 2 or l[1] == obj));
+                    ca = 15; /// final value to be returned if howtoclose=="scope"
+                });
+                ca = a;
+                if (howtoclose == "ret") return obj; /// "a" closed by return
+                else if (howtoclose == "err") error(obj); /// "a" closed by error
+            } /// "a" closed by end of scope
+            return ca; /// ca now should be 15
+        }
+        /// with no errors, closing methods receive no extra argument
+        assert(foo("scope", nil, 1) == 15); /// close by end of scope
+        assert(foo("ret", 32, 1) == 32); /// close by return
+                                         /// with errors, they do
+        local st, msg = pcall(foo, "err", 23, 2); /// close by error
+        assert(!st and msg == 23);
+    }
+
+
+    /// testing to-be-closed x compile-time constants
+    /// (there were some bugs here in Tokudae 5.4-rc3, due to a confusion
+    /// between compile levels and stack levels of variables)
+    {
+        local flag = false;
+        local x = setmetatable(class, {
+            __close = || { assert(flag == false); flag = true; }
+        })();
+        local y <final> = nil;
+        local z <final> = nil;
+        {
+            local a <close> = x;
+        }
+        assert(flag); /// "x" must be closed here
+    }
+
+    {
+        /// similar problem, but with implicit close in for loops
+        local flag = false;
+        local _x = setmetatable(class, {
+            __close = || { assert(flag == false); flag = true; }
+        })();
+        /// return an empty iterator, nil, nil, and "x" to be closed
+        local fn a() :: return (|| return nil), nil, nil, _x;
+        local v <final> = 1;
+        local w <final> = 1;
+        local x <final> = 1;
+        local y <final> = 1;
+        local z <final> = 1;
+        foreach k in a()
+            a = k;
+        /// ending the loop must close "x"
+        assert(flag); /// "x" must be closed here
+    }
+
+
+
+    {
+        /// calls cannot be tail in the scope of to-be-closed variables
+        local X, Y;
+        local fn foo() {
+            local _ <close> = func2close(|| { Y = 10; });
+            assert(X == true and Y == nil); /// "X" not closed yet
+            return 1,2,3;
+        }
+
+        local fn bar() {
+            local _ <close> = func2close(|| { X = false; });
+            X = true;
+            {
+                return foo(); /// not a tail call!
+            }
+        }
+
+        local a, b, c, d = bar();
+        assert(a == 1 and b == 2 and c == 3 and X == false and Y == 10 and d == nil);
+    }
+
+
+    {
+        /// calls cannot be tail in the scope of to-be-closed variables;
+        /// must be valid for tbc variables created by "for" loops.
+
+        local closed = false;
+
+        local fn foo() {
+            return (|| :: return true), 0, 0, func2close(|| { closed = true; });
+        }
+
+        local fn tail() :: return closed;
+
+        local fn foo1() {
+            foreach k in foo() return tail();
+        }
+
+        assert(foo1() == false);
+        assert(closed == true);
+    }
+
+
+    {
+        local closed = false;
+
+        local o1 = setmetatable(class, {__close = || { closed = true; }})();
+
+        local fn test() {
+            foreach k, v in nextfield, {}, nil, o1 {
+                local fn f() :: return k; /// create an upvalue
+                break;
+            }
+            assert(closed);
+        }
+
+        test();
+    }
+
+
+    { /* testing errors in __close */
+        /// original error is in __close
+        local fn foo() {
+            local x <close> =
+                func2close(fn (self, msg) {
+                    assert(reg.find(msg, "@y"));
+                    error("@x");
+                });
+
+            local x1 <close> =
+                func2close(fn (self, msg) :: assert(reg.find(msg, "@y")););
+
+            local gc <close> = func2close(|| { gc(); });
+
+            local y <close> =
+                func2close(fn (self, msg) {
+                    assert(reg.find(msg, "@z")); /// error in "z"
+                    error("@y");
+                });
+
+            local z <close> =
+                func2close(fn (self, msg) {
+                    assert(msg == nil);
+                    error("@z");
+                });
+
+            return 200;
+        }
+
+        local stat, msg = pcall(foo, false);
+        assert(reg.find(msg, "@x"));
+
+
+        /// original error not in __close
+        fn foo() {
+            local x <close> =
+                func2close(fn (self, msg) {
+                    /// after error, "foo" was discarded, so caller now
+                    /// must be "pcall"
+                    assert(debug.getinfo(2).name == "pcall");
+                    assert(reg.find(msg, "@x1"));
+                });
+
+            local x1 <close> =
+                func2close(fn (self, msg) {
+                    assert(debug.getinfo(2).name == "pcall");
+                    assert(reg.find(msg, "@y"));
+                    error("@x1");
+                });
+
+            local gc <close> = func2close(|| :: gc(););
+
+            local y <close> =
+                func2close(fn (self, msg) {
+                    assert(debug.getinfo(2).name == "pcall");
+                    assert(reg.find(msg, "@z"));
+                    error("@y");
+                });
+
+            local first = true;
+            local z <close> =
+                func2close(fn (self, msg) {
+                    assert(debug.getinfo(2).name == "pcall");
+                    /// "z" close is called once;
+                    assert(first and msg == 4);
+                    first = false;
+                    error("@z");
+                });
+            error(4);    /// original error
+        }
+
+        stat, msg = pcall(foo, true);
+        assert(reg.find(msg, "@x1"));
+
+        /// error leaving a block
+        fn foo(...) {
+            {
+                local x1 <close> =
+                    func2close(fn (self, msg) {
+                        assert(reg.find(msg, "@X"));
+                        error("@Y");
+                    });
+
+                local x123 <close> =
+                    func2close(fn (_, msg) {
+                        assert(msg == nil);
+                        error("@X");
+                    });
+            }
+            os.exit(false); /// should not run
+        }
+
+        stat, msg = xpcall(foo, debug.traceback);
+        assert(reg.match(msg, "^[^ ]* @Y"));
+
+        /// error in toclose in vararg function
+        fn foo(...) {
+            local x123 <close> = func2close(|| { error("@x123"); });
+        }
+
+        stat, msg = xpcall(foo, debug.traceback);
+        assert(reg.match(msg, "^[^ ]* @x123"));
+        assert(reg.find(msg, "in metamethod 'close'"));
+    }
+
+
+    { /// errors due to non-closable values
+        local fn foo() {
+            local x <close> = {};
+            os.exit(false); /// should not run
+        }
+        stat, msg = pcall(foo);
+        assert(!stat and
+                reg.find(msg, "variable 'x' got a non%-closable value"));
+
+        fn foo() {
+            local xyz <close> = setmetatable(class, {__close = print})();
+            getmetatable(xyz).__close = nil; /// remove metamethod
+        }
+        stat, msg = pcall(foo);
+        assert(!stat and reg.find(msg, "metamethod 'close'"));
+
+        fn foo() {
+            local a1 <close> = func2close(|_, msg| {
+                assert(reg.find(msg, "number value"));
+                error(12);
+            });
+            local a2 <close> = setmetatable(class, {__close = print})();
+            local a3 <close> = func2close(|_, msg| { assert(msg == nil); error(123); });
+            getmetatable(a2).__close = 4; /// invalidate metamethod
+        }
+        stat, msg = pcall(foo);
+        assert(!stat and msg == 12);
+    }
+
+
+    { /// tbc inside close methods
+        local track = [];
+        local fn foo() {
+            local x <close> = func2close(fn() {
+                local xx <close> = func2close(|_, msg| {
+                    assert(msg == nil);
+                    track[track.len] = "xx";
+                });
+                track[track.len] = "x";
+            });
+            track[track.len] = "foo";
+            return 20, 30, 40;
+        }
+        local a, b, c, d = foo();
+        assert(a == 20 and b == 30 and c == 40 and d == nil);
+        assert(track[0] == "foo" and track[1] == "x" and track[2] == "xx");
+
+        /// again, with errors
+        track = [];
+        fn foo() {
+            local x0 <close> = func2close(fn (_, msg) {
+                assert(msg == 202);
+                track[track.len] = "x0";
+            });
+            local x <close> = func2close(fn() {
+                local xx <close> = func2close(fn (_, msg) {
+                    assert(msg == 101);
+                    track[track.len] = "xx";
+                    error(202);
+                });
+                track[track.len] = "x";
+                error(101);
+            });
+            track[track.len] = "foo";
+            return 20, 30, 40;
+        }
+        local st, msg = pcall(foo);
+        assert(!st and msg == 202);
+        assert(track[0] == "foo" and track[1] == "x" and track[2] == "xx" and
+               track[3] == "x0");
+    }
+
+
+    local fn checklist(l1, l2) {
+        assert(l1.len == l2.len);
+        for (local i=0; i<l1.len; i++)
+            assert(l1[i] == l2[i]);
+    }
+
+
+    if !(__TESTS and __TESTS.stack) { /// test for tbc variable high in the stack
+      /// function to force a stack overflow
+        local fn overflow(n) :: overflow(n + 1);
+
+        /// error handler will create tbc variable handling a stack overflow,
+        /// high in the stack
+        local fn errorh(m) {
+            assert(reg.find(m, "stack overflow"));
+            local x <close> = func2close(|o| { o[0] = 10; });
+            return x;
+        }
+
+        local flag;
+        local st, obj;
+        /// run test in a coroutine so as not to swell the main stack
+        (fn() {
+         /// tbc variable down the stack
+         local y <close> = func2close(|obj, msg| {
+             assert(msg == nil);
+             obj[0] = 100;
+             flag = obj;
+         });
+         st, obj = xpcall(overflow, errorh, 0);
+         })();
+        assert(!st and obj[0] == 10 and flag[0] == 100);
+    } else
+        (Message or print)("skipped test for tbc variable high in the stack");
+
+
+    { /// "__close" vs. return hooks in Tokudae functions
+        local trace = [];
+
+        local fn hook(event) {
+            trace[trace.len] = event .. " " .. debug.getinfo(2).name;
+        }
+
+        local fn foo(...) {
+            local x <close> = func2close(fn (_,msg) :: { trace[trace.len] = "x"; });
+            local y <close> = func2close(fn (_,msg) :: { debug.sethook(hook, "r"); });
+            return ...;
+        }
+
+        local t = [foo(10,20,30)];
+        debug.sethook();
+        checklist(t, [10, 20, 30]);
+        checklist(trace,
+                ["return sethook", "return close", "x", "return close", "return foo"]);
+    }
+
+
+    { /// to-be-closed variables in generic for loops
+        local numopen = 0;
+        local fn open(x) {
+            numopen++;
+            return || { x--; if x > 0 return x; }, /// iteration function
+                   nil, /// state
+                   nil, /// control variable
+                   func2close(|| numopen--;); /// closing function
+        }
+
+        local s = 0;
+        foreach i in open(10) s += i;
+        assert(s == 45 and numopen == 0);
+
+        s = 0;
+        foreach i in open(10) {
+            if i < 5 break;
+            s += i;
+        }
+        assert(s == 35 and numopen == 0);
+
+        local flag = false;
+        s = 0;
+        foreach i in open(10) {
+            foreach j in open(10) {
+                if (i+j < 5) { flag = true; break; }
+                s += i;
+            }
+            if flag break;
+        }
+        assert(s == 375 and numopen == 0);
+    }
+}

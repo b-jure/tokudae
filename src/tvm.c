@@ -30,12 +30,14 @@
 #include "tprotected.h"
 
 
-#if 0 /* (by default do not trace lines) */
+#if 0 /* (by default do not trace bytecode execution) */
 
 #include <stdio.h>
+#include "topnames.h"
 
 #define debugline(p,pc) \
-        printf("line: %d\n", tokuD_getfuncline(p, relpc(pc, p)));
+        printf("%-12s on line: %d\n", \
+                opnames[I], tokuD_getfuncline(p, relpc(pc, p)));
 
 #define TOKU_USE_JUMPTABLE      0
 
@@ -659,21 +661,20 @@ static void rethook(toku_State *T, CallFrame *cf, int32_t nres) {
         int32_t ftransfer;
         if (isTokudae(cf)) {
             Proto *p = cf_func(cf)->p;
-            if (p->isvararg)
-                delta = cf->t.nvarargs + p->arity + 1;
+            delta = !!p->isvararg * (cf->t.nvarargs + p->arity + 1);
         }
-        cf->func.p += delta; /* if vararg, back to virtual 'func' */
+        cf->func.p += delta; /* if vararg, back to virtual function */
         ftransfer = cast_u16(firstres - cf->func.p) - 1;
         toku_assert(ftransfer >= 0);
         tokuD_hook(T, TOKU_HOOK_RET, -1, ftransfer, nres); /* call it */
-        cf->func.p -= delta;
+        cf->func.p -= delta; /* if vararg, back to original function */
     }
     if (isTokudae(cf = cf->prev))
         T->oldpc = relpc(cf->t.pc, cf_func(cf)->p); /* set 'oldpc' */
 }
 
 
-/* properly move results and if needed close variables */
+/* move call results and if needed close variables */
 t_sinline void moveresults(toku_State *T, SPtr res, int32_t nres,
                                                     int32_t wanted) {
     int32_t i;
@@ -718,15 +719,37 @@ t_sinline void moveresults(toku_State *T, SPtr res, int32_t nres,
 }
 
 
+/* get the next call frame or allocate a new one */
 #define next_cf(T)   ((T)->cf->next ? (T)->cf->next : tokuT_newcf(T))
 
-t_sinline CallFrame *prepCallframe(toku_State *T, SPtr func, int32_t nres,
-                                   int32_t mask, SPtr top) {
+/*
+** These macros are used to manipulate 'extra' in order to extract the
+** total number of call, init and/or bound (meta)method calls in a chains.
+** Bits 0-7 are reserved for status; bits 8-15 are reserved for counting
+** call metamethods; bits 16-23 are reserved for counting init metamethods;
+** bits 24-31 are reserved for counting bound methods.
+*/
+
+#define gstatus(extra)      ((extra) & 0xff)
+
+#define incccall(extra)     ((extra) + 0x100u)
+#define gccall(extra)       cast_u32(((extra) & 0xff00) >> 8u)
+
+#define inccinit(extra)     ((extra) + 0x10000u)
+#define gcinit(extra)       cast_u32(((extra) & 0xff0000) >> 16u)
+
+#define inccmethod(extra)   ((extra) + 0x1000000u)
+#define gcmethod(extra)     cast_u32(((extra) & 0xff000000) >> 24u)
+
+
+t_sinline CallFrame *prepcallframe(toku_State *T, SPtr func,
+                                   uint32_t extra, int32_t nres, SPtr top) {
     CallFrame *cf = T->cf = next_cf(T);
     cf->func.p = func;
     cf->top.p = top;
     cf->nresults = nres;
-    cf->status = cast_u8(mask);
+    cf->extraargs = gccall(extra) + gcinit(extra) + gcmethod(extra);
+    cf->status = cast_u8(gstatus(extra));
     return cf;
 }
 
@@ -734,7 +757,7 @@ t_sinline CallFrame *prepCallframe(toku_State *T, SPtr func, int32_t nres,
 /* move the results into correct place and return to caller */
 t_sinline void poscall(toku_State *T, CallFrame *cf, int32_t nres) {
     int32_t wanted = cf->nresults;
-    if (t_unlikely(T->hookmask && !hastocloseCfunc(wanted)))
+    if (t_unlikely(T->hookmask) && !hastocloseCfunc(wanted))
         rethook(T, cf, nres);
     /* move results to proper place */
     moveresults(T, cf->func.p, nres, wanted);
@@ -744,13 +767,13 @@ t_sinline void poscall(toku_State *T, CallFrame *cf, int32_t nres) {
 }
 
 
-t_sinline int32_t precallC(toku_State *T, SPtr func, int32_t nres,
-                                                     toku_CFunction f) {
+t_sinline int32_t precallC(toku_State *T, SPtr func,
+                           uint32_t extra, int32_t nres, toku_CFunction f) {
     int32_t n;
     CallFrame *cf;
     checkstackGCp(T, TOKU_MINSTACK, func); /* ensure minimum stack space */
-    T->cf = cf = prepCallframe(T, func, nres, CFST_CCALL,
-                                              T->sp.p + TOKU_MINSTACK);
+    T->cf = cf = prepcallframe(T, func, extra | CFST_CCALL, nres,
+                                  T->sp.p + TOKU_MINSTACK);
     toku_assert(cf->top.p <= T->stackend.p);
     if (t_unlikely(T->hookmask & TOKU_MASK_CALL)) {
         int32_t narg = cast_i32(T->sp.p - func) - 1;
@@ -768,7 +791,7 @@ t_sinline int32_t precallC(toku_State *T, SPtr func, int32_t nres,
 /* 
 ** Shifts stack by one slot in direction of stack pointer,
 ** and inserts 'f' in place of 'func'.
-** Warning: this function assumes there is enough space for 'f'.
+** WARNING: this function assumes there is enough space for 'f'.
 */
 t_sinline void auxinsertf(toku_State *T, SPtr func, const TValue *f) {
     for (SPtr p = T->sp.p; p > func; p--)
@@ -778,82 +801,159 @@ t_sinline void auxinsertf(toku_State *T, SPtr func, const TValue *f) {
 }
 
 
-t_sinline SPtr trymetacall(toku_State *T, SPtr func) {
-    const TValue *f;
-    checkstackGCp(T, 1, func); /* space for func */
-    f = tokuTM_objget(T, s2v(func), TM_CALL); /* (after previous GC) */
-    if (t_unlikely(notm(f))) /* missing __call? */
-        tokuD_callerror(T, s2v(func));
-    auxinsertf(T, func, f);
-    return func;
+t_sinline int32_t callclass(toku_State *T, SPtr *func, uint32_t extra) {
+    const TValue *tm = NULL;
+    OClass *cls = classval(s2v(*func));
+    Table *mt = cls->metatable;
+    Instance *ins = tokuTM_newinstance(T, cls);
+    tokuG_checkfin(T, obj2gco(ins), mt);
+    setinsval2s(T, *func, ins); /* replace class with its instance */
+    if (fasttm(T, mt, TM_INIT)) { /* have __init (before GC)? */
+        checkstackGCp(T, 1, *func); /* space for 'tm' */
+        tm = fasttm(T, ins->oclass->metatable, TM_INIT); /* (after GC) */
+    }
+    if (tm) { /* have __init (after GC)? */
+        auxinsertf(T, *func, tm);
+        if (t_unlikely(gcinit(extra) == CALLCHAIN_MAX))
+            tokuD_runerror(T, "'__init' chain too long");
+        return 1; /* try again */
+    } else
+        return 0;
 }
 
 
+#define callbmethod(T,func,as,set,self,extra,t) \
+    { t *bm_ = as(s2v(func)); \
+      checkstackGCp(T, 1, func); /* space for method and instance */ \
+      auxinsertf(T, func, &bm_->method); /* insert method object... */ \
+      set(T, func + 1, bm_->self); /* and self as first arg */ \
+      if (t_unlikely(gcmethod(extra) >= CALLCHAIN_MAX)) \
+          tokuD_runerror(T, "bound method call chain too long"); }
+
+
+t_sinline uint32_t trymetacall(toku_State *T, SPtr func, uint32_t extra) {
+    const TValue *f = tokuTM_objget(T, s2v(func), TM_CALL);
+    if (t_unlikely(notm(f))) /* missing __call? */
+        tokuD_callerror(T, s2v(func));
+    auxinsertf(T, func, f);
+    if (t_unlikely(gccall(extra) == CALLCHAIN_MAX))
+        tokuD_runerror(T, "'__call' chain too long");
+    return incccall(extra);
+}
+
 CallFrame *precall(toku_State *T, SPtr func, int32_t nres) {
+    uint32_t extra = 0; /* extraargs + status */
 retry:
     switch (ttypetag(s2v(func))) {
         case TOKU_VCCL: /* C closure */
-            precallC(T, func, nres, clCval(s2v(func))->fn);
+            precallC(T, func, extra, nres, clCval(s2v(func))->fn);
             return NULL; /* done */
         case TOKU_VLCF: /* light C function */
-            precallC(T, func, nres, lcfval(s2v(func)));
+            precallC(T, func, extra, nres, lcfval(s2v(func)));
             return NULL; /* done */
         case TOKU_VTCL: { /* Tokudae closure */
             CallFrame *cf;
-            Proto *p = clTval(s2v(func))->p;
-            int32_t nargs = cast_i32(T->sp.p - func - 1); /*num args received*/
-            int32_t nparams = p->arity; /* number of fixed parameters */
-            int32_t fsize = p->maxstack; /* frame size */
+            Proto *f = clTval(s2v(func))->p;
+            int32_t narg = cast_i32(T->sp.p - func - 1); /* num. arguments */
+            int32_t nparams = f->arity; /* number of fixed parameters */
+            int32_t fsize = f->maxstack; /* frame size */
             checkstackGCp(T, fsize, func);
-            T->cf = cf = prepCallframe(T, func, nres, 0, func + 1 + fsize);
-            cf->t.pc = cf->t.pcret = p->code; /* set starting point */
-            for (; nargs < nparams; nargs++)
+            T->cf = cf = prepcallframe(T, func, extra, nres, func+1+fsize);
+            cf->t.pc = cf->t.pcret = f->code; /* set starting point */
+            for (; narg < nparams; narg++)
                 setnilval(s2v(T->sp.p++)); /* set missing as 'nil' */
-            if (!p->isvararg) /* not a vararg function? */
+            if (!f->isvararg) /* not a vararg function? */
                 T->sp.p = func + 1 + nparams; /* might have extra args */
             toku_assert(cf->top.p <= T->stackend.p);
             return cf; /* new call frame */
         }
+        case TOKU_VIMETHOD: /* Instance method */
+            callbmethod(T, func, imval, setinsval2s, ins, extra, IMethod);
+            goto retry_bm;
+        case TOKU_VUMETHOD: /* UserData method */
+            callbmethod(T, func, umval, setudval2s, ud, extra, UMethod);
+        retry_bm:
+            extra = inccmethod(extra);
+            goto retry; /* try again with method object */
         case TOKU_VCLASS: { /* Class object */
-            const TValue *tm;
-            OClass *cls = classval(s2v(func));
-            Table *mt = cls->metatable;
-            Instance *ins = tokuTM_newinstance(T, cls);
-            tokuG_checkfin(T, obj2gco(ins), mt);
-            setinsval2s(T, func, ins); /* replace class with its instance */
-            ;
-            if (fasttm(T, mt, TM_INIT)) { /* have __init ? */
-                checkstackGCp(T, 1, func); /* space for 'tm' */
-                tm = fasttm(T, ins->oclass->metatable, TM_INIT); /*(after GC)*/
-                if (t_likely(tm)) { /* have __init (after GC)? */
-                    auxinsertf(T, func, tm); /* insert it into stack... */
-                    goto retry; /* ...and try calling it */
-                } else goto noinit; /* no __init (after GC) */
-            } else {
-            noinit:
-                T->sp.p -= (T->sp.p - func - 1); /* remove args */
+            if (!callclass(T, &func, extra)) { /* no __init? */
                 toku_assert(!hastocloseCfunc(nres));
-                moveresults(T, func, 1, nres);
+                moveresults(T, func, 1, nres); /* only instance is returned */
                 return NULL; /* done */
             }
-        }
-        case TOKU_VIMETHOD: { /* Instance method */
-            IMethod *im = imval(s2v(func));
-            checkstackGCp(T, 2, func); /* space for method and instance */
-            auxinsertf(T, func, &im->method); /* insert method object... */
-            setinsval2s(T, func + 1, im->ins); /* ...and ins. as first arg */
-            goto retry;
-        }
-        case TOKU_VUMETHOD: { /* UserData method */
-            UMethod *um = umval(s2v(func));
-            checkstackGCp(T, 2, func); /* space for method and userdata */
-            auxinsertf(T, func, &um->method); /* insert method object... */
-            setudval2s(T, func + 1, um->ud); /* ...and udata as first arg */
-            goto retry;
+            extra = inccinit(extra);
+            goto retry; /* try again with __init */
         }
         default: /* try __call metamethod */
-            func = trymetacall(T, func);
-            goto retry;
+            checkstackGCp(T, 1, func); /* space for func */
+            extra = trymetacall(T, func, extra);
+            goto retry; /* try again with __call */
+    }
+}
+
+
+/*
+** Prepare a function for a tail call, building its call frame on top
+** of the current call frame. 'narg1' is the number of arguments plus 1
+** (so that it includes the function itself). Return the number of
+** results, if it was a C function, or -1 for a Tokudae function.
+*/
+static int32_t pretailcall(toku_State *T, CallFrame *cf, SPtr func,
+                                          int32_t narg1, int32_t delta) {
+    uint32_t extra = 0; /* extraargs + status */
+retry:
+    switch (ttypetag(s2v(func))) {
+        case TOKU_VCCL: /* C closure */
+            return precallC(T, func, extra, TOKU_MULTRET, clCval(s2v(func))->fn);
+        case TOKU_VLCF: /* light C function */
+            return precallC(T, func, extra, TOKU_MULTRET, lcfval(s2v(func)));
+        case TOKU_VTCL: { /* Tokudae function */
+            Proto *f = clTval(s2v(func))->p;
+            int32_t nparams = f->arity; /* number of fixed parameters */
+            int32_t fsize = f->maxstack; /* frame size */
+            checkstackGCp(T, fsize - delta, func);
+            cf->func.p -= delta; /* restore 'func' (if vararg) */
+            /* move down function and arguments */
+            for (int32_t i = 0; i < narg1; i++)
+                setobjs2s(T, cf->func.p + i, func + i);
+            func = cf->func.p; /* moved-down function */
+            for (; narg1 <= nparams; narg1++)
+                setnilval(s2v(func + narg1)); /* complete missing arguments */
+            cf->top.p = func + 1 + fsize; /* top for new function */
+            toku_assert(cf->top.p <= T->stackend.p);
+            cf->t.pc = cf->t.pcret = f->code; /* set starting point */
+            cf->status |= CFST_TAIL;
+            if (!f->isvararg) /* not a vararg function? */
+                T->sp.p = func + nparams + 1; /* (leave only parameters) */
+            else /* otherwise leave all arguments */
+                T->sp.p = func + narg1;
+            return -1;
+        }
+        case TOKU_VIMETHOD: /* Instance method */
+            callbmethod(T, func, imval, setinsval2s, ins, extra, IMethod);
+            goto retry_bm;
+        case TOKU_VUMETHOD: /* UserData method */
+            callbmethod(T, func, umval, setudval2s, ud, extra, UMethod);
+        retry_bm:
+            extra = inccmethod(extra);
+            /* return pretailcall(T, cf, func, narg1 + 2, delta); */
+            narg1 += 2;
+            goto retry; /* try again with method object */
+        case TOKU_VCLASS: { /* Class object */
+            if (!callclass(T, &func, extra)) { /* no __init? */
+                T->sp.p = func + 1; /* leave only class instance */
+                return 1; /* returns class instance */
+            }
+            extra = inccinit(extra);
+            goto retry1; /* try again with __init */
+        }
+        default:
+            checkstackGCp(T, 1, func); /* space for func */
+            extra = trymetacall(T, func, extra); /* try __call metamethod */
+        retry1:
+            /* return pretailcall(T, cf, func, narg1 + 1, delta); */
+            narg1++;
+            goto retry; /* try again */
     }
 }
 
@@ -1185,8 +1285,7 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 
 /* order operations with stack operands */
 #define op_order(T,iop,fop,other) { \
-    TValue *res = peek(1); \
-    TValue *v1 = res; \
+    TValue *v1 = peek(1); \
     TValue *v2 = peek(0); \
     int32_t cond; \
     savestate(T); \
@@ -1198,9 +1297,11 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
     } else if (ttisnum(v1) && ttisnum(v2)) { \
         cond = fop(v1, v2); \
     } else { \
-        Protect(cond = other(T, v1, v2)); \
+        cond = other(T, v1, v2); \
+        updatetrap(cf); \
+        updatestack(cf); \
     } \
-    setorderres(res, cond, 1); sp = --T->sp.p; }
+    setorderres(peek(1), cond, 1); sp--; }
 
 
 /* order operation error with immediate operand */
@@ -1246,17 +1347,20 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 
 
 /* update global 'trap' */
-#define updatetrap(cf)      (trap = cf->t.trap)
+#define updatetrap(cf)      (trap = (cf)->t.trap)
 
 /* update global 'base' */
 #define updatebase(cf)      (base = (cf)->func.p + 1)
+
 
 /*
 ** If 'trap' (maybe stack reallocation), then update global 'base'
 ** and global 'sp'.
 */
-#define updatestack(cf) \
-    { if (t_unlikely(trap)) { updatebase(cf); sp = T->sp.p; }}
+#define updatestackaux(cf,extra) \
+        if (t_unlikely(trap)) { updatebase(cf); sp = T->sp.p; (extra); }
+
+#define updatestack(cf)     updatestackaux(cf,(void)0)
 
 
 /* store global 'pc' */
@@ -1272,10 +1376,6 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 ** debug information for the error message (if error occurrs).
 */
 #define savestate(T)        (storepc(T), storesp(T))
-
-
-/* protect code that can reallocate stack or change hooks */
-#define Protect(exp)    ((exp), updatetrap(cf))
 
 
 /* collector might of reallocated stack, so update global 'trap' */
@@ -1315,7 +1415,7 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 */
 #define docondjumppre(pre) \
     { int32_t cond_ = fetch_s(); TValue *v = peek(0); pre; \
-      if ((!t_isfalse(v)) != cond_) check_exp(getopSize(*pc) == 4, pc += 4); \
+      if ((!t_isfalse(v)) != cond_) check_exp(getopSize(*pc)==4, pc += 4); \
       vm_break; }
 
 #define docondjump()    docondjumppre(((void)0))
@@ -1337,11 +1437,11 @@ startfunc:
 returning: /* trap already set */
     cl = cf_func(cf);
     k = cl->p->k;
-    sp = T->sp.p;
     pc = cf->t.pcret;
     if (t_unlikely(trap)) /* hooks? */
         trap = tokuD_tracecall(T, hookdelta());
     base = cf->func.p + 1;
+    sp = T->sp.p;
     /* main loop of interpreter */
     for (;;) {
         uint8_t I; /* opcode being executed */
@@ -1412,13 +1512,14 @@ returning: /* trap already set */
             vm_case(OP_VARARGPREP) {
                 savestate(T);
                 /* 'tokuF_adjustvarargs' handles 'sp' */
-                Protect(tokuF_adjustvarargs(T, fetch_l(), cf, &sp, cl->p));
-                if (t_unlikely(trap)) {
+                tokuF_adjustvarargs(T, fetch_l(), cf, &sp, cl->p);
+                updatetrap(cf);
+                if (t_unlikely(trap)) { /* (check for hooks) */
                     storepc(T);
                     tokuD_hookcall(T, cf, hookdelta());
                     /* next opcode will be seen as a "new" line */
                     T->oldpc = getopSize(OP_VARARGPREP); 
-                    sp = T->sp.p; /* to properly calculate stack size */
+                    sp = T->sp.p; /* 'sp' must be in sync with 'base' */
                 }
                 updatebase(cf); /* function has new base after adjustment */
                 vm_break;
@@ -1426,7 +1527,8 @@ returning: /* trap already set */
             vm_case(OP_VARARG) {
                 savestate(T);
                 /* 'tokuF_getvarargs' handles 'sp' */
-                Protect(tokuF_getvarargs(T, cf, &sp, fetch_l() - 1));
+                tokuF_getvarargs(T, cf, &sp, fetch_l() - 1);
+                updatetrap(cf);
                 updatebase(cf); /* make sure 'base' is up-to-date */
                 vm_break;
             }
@@ -1525,11 +1627,10 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_MBIN) {
-                TValue *v1 = peek(1);
-                TValue *v2 = peek(0);
                 savestate(T);
                 /* operands are already swapped */
-                Protect(tokuTM_trybin(T, v1, v2, sp-2, asTM(fetch_s())));
+                tokuTM_trybin(T, peek(1), peek(0), sp-2, asTM(fetch_s()));
+                updatetrap(cf);
                 sp--;
                 vm_break;
             }
@@ -1683,7 +1784,8 @@ returning: /* trap already set */
                 int32_t total;
                 savestate(T);
                 total = fetch_l();
-                Protect(tokuV_concat(T, total));
+                tokuV_concat(T, total);
+                updatetrap(cf);
                 checkGC(T);
                 sp -= total - 1;
                 vm_break;
@@ -1727,13 +1829,13 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_EQ) {
-                TValue *v1 = peek(1);
-                TValue *v2 = peek(0);
                 int32_t condexp, cond;
                 savestate(T);
                 condexp = fetch_s();
-                Protect(cond = tokuV_ordereq(T, v1, v2));
-                setorderres(v1, cond, condexp);
+                cond = tokuV_ordereq(T, peek(1), peek(0));
+                updatetrap(cf);
+                updatestack(cf);
+                setorderres(peek(1), cond, condexp);
                 sp--;
                 vm_break;
             }
@@ -1746,12 +1848,12 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_EQPRESERVE) {
-                TValue *v1 = peek(1);
-                TValue *v2 = peek(0);
                 int32_t cond;
                 savestate(T);
-                Protect(cond = tokuV_ordereq(T, v1, v2));
-                setorderres(v2, cond, 1);
+                cond = tokuV_ordereq(T, peek(1), peek(0));
+                updatetrap(cf);
+                updatestack(cf);
+                setorderres(peek(0), cond, 1);
                 vm_break;
             }
             vm_case(OP_NOT) {
@@ -1772,7 +1874,8 @@ returning: /* trap already set */
                     setfval(v, tokui_numunm(T, n));
                 } else {
                     savestate(T);
-                    Protect(tokuTM_tryunary(T, v, sp-1, TM_UNM));
+                    tokuTM_tryunary(T, v, sp-1, TM_UNM);
+                    updatetrap(cf);
                 }
                 vm_break;
             }
@@ -1783,20 +1886,21 @@ returning: /* trap already set */
                     setival(v, intop(^, ~t_castS2U(0), i));
                 } else {
                     savestate(T);
-                    Protect(tokuTM_tryunary(T, v, sp-1, TM_BNOT));
+                    tokuTM_tryunary(T, v, sp-1, TM_BNOT);
+                    updatetrap(cf);
                 }
                 vm_break;
             }
             vm_case(OP_JMP) {
                 int32_t offset = fetch_l();
                 pc += offset;
-                updatetrap(cf);
+                updatetrap(cf); /* for interrupt in tight loops */
                 vm_break;
             }
             vm_case(OP_JMPS) {
                 int32_t offset = fetch_l();
                 pc -= offset;
-                updatetrap(cf);
+                updatetrap(cf); /* for interrupt in tight loops */
                 vm_break;
             }
             vm_case(OP_TEST) {
@@ -1812,6 +1916,7 @@ returning: /* trap already set */
                 savestate(T);
                 func = STK(fetch_l());
                 nres = fetch_l() - 1;
+                UNUSED(fetch_s());
                 if ((newcf = precall(T, func, nres)) == NULL) /* C call? */
                     updatetrap(cf); /* done (C function already returned) */
                 else { /* Tokudae call */
@@ -1819,13 +1924,37 @@ returning: /* trap already set */
                     cf = newcf; /* run function in this same C frame */
                     goto startfunc;
                 }
-                /* recalculate 'sp' from maybe outdated (current) 'base' */
+                /* update 'sp' to properly compute stack size (if 'trap') */
                 sp = base + (cast_i32(T->sp.p - cf->func.p) - 1);
                 vm_break;
             }
+            vm_case(OP_TAILCALL) {
+                Proto *p = cl->p;
+                int32_t nres, delta;
+                SPtr func;
+                savestate(T);
+                func = STK(fetch_l());
+                nres = fetch_l() - 1;
+                delta = (p->isvararg) ? cf->t.nvarargs + p->arity + 1 : 0;
+                if (fetch_s()) { /* close upvalues? */
+                    tokuF_closeupval(T, base);
+                    toku_assert(T->tbclist.p < base); /* no tbc variables */
+                    toku_assert(base == cf->func.p + 1);
+                }
+                nres = pretailcall(T, cf, func, cast_i32(T->sp.p-func), delta);
+                if (nres < 0) /* Tokudae function? */
+                    goto startfunc; /* execute the callee */
+                else { /* otherwise C function */
+                    cf->func.p -= delta; /* restore 'func' (if vararg) */
+                    poscall(T, cf, nres); /* finish caller */
+                    updatetrap(cf); /* 'poscall' can change hooks */
+                    goto ret; /* caller returns after the tail call */
+                }
+            }
             vm_case(OP_CLOSE) {
                 savestate(T);
-                Protect(tokuF_close(T, STK(fetch_l()), TOKU_STATUS_OK));
+                tokuF_close(T, STK(fetch_l()), TOKU_STATUS_OK);
+                updatetrap(cf);
                 vm_break;
             }
             vm_case(OP_TBC) {
@@ -1888,90 +2017,84 @@ returning: /* trap already set */
                 vm_break;
             }
             vm_case(OP_SETPROPERTY) {
-                TValue *v = peek(0);
                 TValue *o;
                 TValue *prop;
                 savestate(T);
                 o = peek(fetch_l());
                 prop = K(fetch_l());
                 toku_assert(ttisstring(prop));
-                Protect(tokuV_setstr(T, o, prop, v));
+                tokuV_setstr(T, o, prop, peek(0));
+                updatetrap(cf);
                 sp--;
                 vm_break;
             }
             vm_case(OP_GETPROPERTY) {
-                TValue *v = peek(0);
                 TValue *prop;
                 savestate(T);
                 prop = K(fetch_l());
                 toku_assert(ttisstring(prop));
-                Protect(tokuV_getstr(T, v, prop, sp - 1));
+                tokuV_getstr(T, peek(0), prop, sp - 1);
+                updatetrap(cf);
                 vm_break;
             }
             vm_case(OP_GETINDEX) {
-                TValue *o = peek(1);
-                TValue *key = peek(0);
                 savestate(T);
-                Protect(tokuV_get(T, o, key, sp - 2));
+                tokuV_get(T, peek(1), peek(0), sp - 2);
+                updatetrap(cf);
                 sp--;
                 vm_break;
             }
             vm_case(OP_SETINDEX) {
-                TValue *v = peek(0);
                 SPtr os;
-                TValue *o;
-                TValue *idx;
                 savestate(T);
                 os = stkpeek(fetch_l());
-                o = s2v(os);
-                idx = s2v(os+1);
-                Protect(tokuV_set(T, o, idx, v));
+                tokuV_set(T, s2v(os), s2v(os+1), peek(0));
+                updatetrap(cf);
                 sp--;
                 vm_break;
             }
             vm_case(OP_GETINDEXSTR) {
-                TValue *v = peek(0);
                 TValue *i;
                 savestate(T);
                 i = K(fetch_l());
                 toku_assert(ttisstring(i));
-                Protect(tokuV_getstr(T, v, i, sp - 1));
+                tokuV_getstr(T, peek(0), i, sp - 1);
+                updatetrap(cf);
                 vm_break;
             }
             vm_case(OP_SETINDEXSTR) {
-                TValue *v = peek(0);
                 TValue *o;
                 TValue *idx;
                 savestate(T);
                 o = peek(fetch_l());
                 idx = K(fetch_l());
                 toku_assert(ttisstring(idx));
-                Protect(tokuV_setstr(T, o, idx, v));
+                tokuV_setstr(T, o, idx, peek(0));
+                updatetrap(cf);
                 sp--;
                 vm_break;
             }
             vm_case(OP_GETINDEXINT) {
-                TValue *v = peek(0);
                 TValue i;
                 int32_t imm;
                 savestate(T);
                 imm = fetch_s();
                 setival(&i, IMM(imm));
-                Protect(tokuV_getint(T, v, &i, sp - 1));
+                tokuV_getint(T, peek(0), &i, sp - 1);
+                updatetrap(cf);
                 vm_break;
             }
             vm_case(OP_GETINDEXINTL) {
-                TValue *v = peek(0);
                 TValue i;
                 int32_t imm;
                 savestate(T);
                 imm = fetch_l();
                 setival(&i, IMML(imm));
-                Protect(tokuV_getint(T, v, &i, sp - 1));
+                tokuV_getint(T, peek(0), &i, sp - 1);
+                updatetrap(cf);
                 vm_break;
             }
             vm_case(OP_SETINDEXINT) {
-                TValue *v = peek(0);
                 TValue *o;
                 toku_Integer imm;
                 TValue index;
@@ -1979,12 +2102,12 @@ returning: /* trap already set */
                 o = peek(fetch_l());
                 imm = fetch_s();
                 setival(&index, IMM(imm));
-                Protect(tokuV_setint(T, o, &index, v));
+                tokuV_setint(T, o, &index, peek(0));
+                updatetrap(cf);
                 sp--;
                 vm_break;
             }
             vm_case(OP_SETINDEXINTL) {
-                TValue *v = peek(0);
                 TValue *o;
                 toku_Integer imm;
                 TValue index;
@@ -1992,34 +2115,30 @@ returning: /* trap already set */
                 o = peek(fetch_l());
                 imm = fetch_l();
                 setival(&index, IMML(imm));
-                Protect(tokuV_setint(T, o, &index, v));
+                tokuV_setint(T, o, &index, peek(0));
+                updatetrap(cf);
                 sp--;
                 vm_break;
             }
             vm_case(OP_GETSUP) {
-                TValue *o = peek(0);
                 TValue *key;
                 savestate(T);
                 key = K(fetch_l());
                 toku_assert(ttisstring(key));
-                checksuperprop(T, o, strval(key), sp - 1, tokuH_getstr);
+                checksuperprop(T, peek(0), strval(key), sp-1, tokuH_getstr);
                 vm_break;
             }
             vm_case(OP_GETSUPIDX) {
-                TValue *o = peek(1);
-                TValue *key = peek(0);
                 savestate(T);
-                checksuperprop(T, o, key, sp - 2, tokuH_get);
+                checksuperprop(T, peek(1), peek(0), sp-2, tokuH_get);
                 sp--;
                 vm_break;
             }
             vm_case(OP_INHERIT) {
-                TValue *o1 = peek(1); /* class */
-                TValue *o2 = peek(0); /* superclass */
-                OClass *cls = classval(o1);
                 OClass *supcls;
+                OClass *cls = classval(peek(1));
                 savestate(T);
-                supcls = checkinherit(T, o2);
+                supcls = checkinherit(T, peek(0));
                 toku_assert(cls != supcls);
                 doinherit(T, cls, supcls);
                 checkGC(T);
@@ -2052,9 +2171,11 @@ returning: /* trap already set */
                 setobjs2s(T, stk + VAR_N + VAR_STATE, stk + VAR_STATE);
                 setobjs2s(T, stk + VAR_N + VAR_CNTL, stk + VAR_CNTL);
                 T->sp.p = stk + VAR_N + VAR_CNTL + 1;
-                Protect(tokuV_call(T, stk + VAR_N + VAR_ITER, fetch_l()));
+                tokuV_call(T, stk + VAR_N + VAR_ITER, fetch_l());
+                updatetrap(cf);
                 updatestack(cf); /* stack may have changed */
                 sp = T->sp.p; /* correct sp for next opcode */
+                toku_assert(sp - base == sp - cf->func.p - 1);
                 /* go to the next opcode */
                 I = *(pc++);
                 toku_assert(I == OP_FORLOOP);
@@ -2076,15 +2197,17 @@ returning: /* trap already set */
             vm_case(OP_RETURN) {
                 SPtr stk;
                 int32_t nres; /* number of results */
+                int32_t nslot;
                 savestate(T);
-                stk = STK(fetch_l());
+                nslot = fetch_l();
+                stk = STK(nslot);
                 nres = fetch_l() - 1;
                 if (nres < 0) /* not fixed ? */
                     nres = cast_i32(sp - stk);
                 if (fetch_s()) { /* have open upvalues? */
                     tokuF_close(T, base, CLOSEKTOP);
                     updatetrap(cf);
-                    updatestack(cf);
+                    updatestackaux(cf, stk = STK(nslot));
                 }
                 if (cl->p->isvararg) /* vararg function? */
                     cf->func.p -= cf->t.nvarargs + cl->p->arity + 1;
@@ -2092,6 +2215,7 @@ returning: /* trap already set */
                 poscall(T, cf, nres);
                 updatetrap(cf); /* 'poscall' can change hooks */
                 /* return from Tokudae function */
+            ret: /* return from Tokudae function */
                 if (cf->status & CFST_FRESH) /* top-level function? */
                     return; /* end this frame */
                 else {

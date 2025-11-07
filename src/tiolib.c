@@ -145,8 +145,8 @@ static int32_t checkmode(const char *mode) {
 typedef tokuL_Stream TStream;
 
 
-#define totstream(T) \
-        ((TStream *)tokuL_check_userdata(T, 0, TOKU_FILEHANDLE))
+#define toTStream(T) \
+        cast(TStream *, tokuL_check_userdata(T, 0, TOKU_FILEHANDLE))
 
 #define isclosed(p)     ((p)->closef == NULL)
 #define markclosed(p)   ((p)->closef = NULL)
@@ -155,7 +155,7 @@ typedef tokuL_Stream TStream;
 
 /* get open file handle */
 static FILE *tofile(toku_State *T) {
-    TStream *p = totstream(T);
+    TStream *p = toTStream(T);
     if (t_unlikely(isclosed(p)))
         tokuL_error(T, "attempt to use a closed file");
     toku_assert(p->f);
@@ -177,7 +177,7 @@ static TStream *new_cstream(toku_State *T) {
 
 
 static int32_t aux_close(toku_State *T) {
-    TStream *p = totstream(T);
+    TStream *p = toTStream(T);
     toku_CFunction f = p->closef;
     markclosed(p);
     return (*f)(T); /* close it */
@@ -185,7 +185,7 @@ static int32_t aux_close(toku_State *T) {
 
 
 static int32_t f_gc(toku_State *T) {
-    TStream *p = totstream(T);
+    TStream *p = toTStream(T);
     if (!isclosed(p) && p->f != NULL)
         aux_close(T); /* ignore closed and incompletely open files */
     return 0;
@@ -193,7 +193,7 @@ static int32_t f_gc(toku_State *T) {
 
 
 static int32_t closef(toku_State *T) {
-    TStream *p = totstream(T);
+    TStream *p = toTStream(T);
     errno = 0; /* reset errno */
     return tokuL_fileresult(T, (fclose(p->f) == 0), NULL);
 }
@@ -284,7 +284,7 @@ static int32_t io_output(toku_State *T) {
 
 /* function to close 'popen' files */
 static int32_t io_pclose(toku_State *T) {
-    TStream *p = totstream(T);
+    TStream *p = toTStream(T);
     errno = 0;
     return tokuL_execresult(T, t_pclose(T, p->f));
 }
@@ -781,7 +781,7 @@ static const tokuL_Entry f_methods[] = {
 
 
 static int32_t f_getidx(toku_State *T) {
-    totstream(T);
+    toTStream(T);
     tokuL_get_metafield(T, 0, "__methods");
     toku_push(T, 1); /* get index value */
     if (toku_get_field(T, -2) != TOKU_T_NIL)
@@ -791,7 +791,7 @@ static int32_t f_getidx(toku_State *T) {
 
 
 static int32_t f_tostring(toku_State *T) {
-    TStream *p = totstream(T);
+    TStream *p = toTStream(T);
     if (isclosed(p))
         toku_push_literal(T, "file (closed)");
     else
@@ -823,7 +823,7 @@ static void create_metatable(toku_State *T) {
 ** function to (not) close the standard files stdin, stdout, and stderr
 */
 static int32_t io_noclose(toku_State *T) {
-    TStream *p = totstream(T);
+    TStream *p = toTStream(T);
     p->closef = &io_noclose; /* keep file opened */
     tokuL_push_fail(T);
     toku_push_literal(T, "cannot close standard file");

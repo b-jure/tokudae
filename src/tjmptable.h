@@ -95,6 +95,7 @@ static const void *const jmptable[NUM_OPCODES] = { /* "ORDER OP" */
     &&L_OP_TEST,
     &&L_OP_TESTPOP,
     &&L_OP_CALL,
+    &&L_OP_TAILCALL,
     &&L_OP_CLOSE,
     &&L_OP_TBC,
     &&L_OP_CHECKADJ,

@@ -1251,7 +1251,7 @@ assert(getmetatable(Example).__init);</pre>
         <pre>
     stm ::= dowhilestm | whilestm | forstm | loopstm | ifstm | switchstm
     whilestm ::= <b>while</b> exp stm
-    dowhilestm ::= <b>do</b> stm <b>while</b> exp &lsquo;<b>;</b>&rsquo;
+    dowhilestm ::= <b>do</b> &lsquo;<b>{</b>&rsquo; loopblock &lsquo;<b>}</b>&rsquo; <b>while</b> exp &lsquo;<b>;</b>&rsquo;
     forstm ::= <b>for</b> forclauses stm
     forclauses ::= &lsquo;<b>(</b>&rsquo; forinfix &lsquo;<b>)</b>&rsquo; | forinfix &lsquo;<b>;</b>&rsquo;
     forinfix ::= [forinit] &lsquo;<b>;</b>&rsquo; [exp] &lsquo;<b>;</b>&rsquo; [expstm]
@@ -1416,12 +1416,14 @@ assert(getmetatable(Example).__init);</pre>
         exiting its block by <b>break</b>/<b>continue</b>/<b>return</b>,
         or exiting by an error.
         <br/><br/>
-        Here, to <em>close</em> a value means to call its
-        <code>__close</code> metamethod.
-        When calling the metamethod, the value itself is passed as the
-        first argument and the error object that caused the exit (if any)
+        Here, to <em>close</em> a value means to call its <code>__close</code>
+        metamethod.
+        When calling the metamethod,
+        the value itself is passed as the first argument.
+        If there was an error,
+        the error object that caused the exit
         is passed as a second argument;
-        if there was no error, the second argument is <b>nil</b>.
+        otherwise, there is no second argument.
         <br/><br/>
         The value assigned to a to-be-closed variable must have a
         <code>__close</code> metamethod or be a false value.
@@ -1772,7 +1774,8 @@ assert(getmetatable(Example).__init);</pre>
         <pre>
     l = [];
     l[0] = 5.2;
-    l[1] = "?";</pre>
+    l[1] = "?";
+    a = l;</pre>
 
         because index <code>2</code> is <em>nil</em>, so the rest of the
         indices are not assigned as <em>nil</em> truncates the list.
@@ -1844,10 +1847,11 @@ assert(size &lt; l.size);</pre>
         All argument expressions are evaluated before the call.
         <br/><br/>
         If the call is not a statement (see <a href="#3.3.6">&sect;3.3.6</a>), 
-        then the <code>?</code> can follow right after the call, this is a false
-        test that checks the first call result, and if it is false
-        (<em>nil</em> or <em>false</em>), it returns from the function/chunk
-        with all the results from that call, otherwise the return is skipped,
+        then the <code>?</code> can follow right after the call,
+        this is a false test that checks the first call result,
+        and if it is false (<em>nil</em> or <em>false</em>),
+        it returns from the function/chunk with all the results from that call;
+        otherwise the return is skipped,
         meaning <code>?</code> is ignored.
         For instance,
 
@@ -1859,7 +1863,7 @@ assert(size &lt; l.size);</pre>
 
         <pre>
     local res = [test()];
-    if !res[0] return list.flatten(res);
+    if (!res[0]) return list.flatten(res);
     res = res[0];
     print(res);</pre>
 
@@ -3038,14 +3042,16 @@ typedef struct toku_Debug {
     const char *what;               /* (s) */
     const char *source;             /* (s) */
     size_t srclen;                  /* (s) */
-    int32_t currline;               /* (l) */
     int32_t defline;                /* (s) */
     int32_t lastdefline;            /* (s) */
-    int32_t nupvals;                /* (u) */
-    int32_t nparams;                /* (u) */
-    uint8_t isvararg;               /* (u) */
+    int32_t currline;               /* (l) */
     int32_t ftransfer;              /* (r) */
     int32_t ntransfer;              /* (r) */
+    int32_t nupvals;                /* (u) */
+    int32_t nparams;                /* (u) */
+    uint32_t extraargs;             /* (t) */
+    uint8_t istailcall;             /* (t) */
+    uint8_t isvararg;               /* (u) */
     char shortsrc[TOKU_IDSIZE];     /* (s) */
     /* private part */
     <em>other fields</em>
@@ -3131,6 +3137,24 @@ typedef struct toku_Debug {
                 <b><code>nparams</code>: </b>
                 the number of parameters of the function
                 (always 0&nbsp;for C&nbsp;functions).
+            </li>
+            <li>
+                <b><code>extraargs</code></b>: 
+                The number of extra arguments added by the call
+                to functions called through <code>__call</code> and
+                <code>__init</code> metamethods or by calling bound methods.
+                (Each <code>__call</code> and <code>__init</code> metavalue
+                or bound method adds a single extra argument,
+                the object being called or the method object in case of
+                a call to bound method,
+                but there may be a chain of <code>__call</code> and
+                <code>__init</code> metavalues or methods in case of a call
+                to bound method.)
+            </li>
+            <li>
+                <b><code>istailcall</code></b>: 
+                true if this function invocation was called by a tail call.
+                In this case, the caller of this level is not in the stack.
             </li>
             <li>
                 <b><code>isvararg</code>: </b>
@@ -5524,6 +5548,11 @@ printf("%d\n", ar.defline);</pre>
                 <b>'<code>u</code>': </b>
                 fills in the fields <code>nupvals</code>, <code>nparams</code>
                 and <code>isvararg</code>;
+            </li>
+            <li>
+                <b>'<code>t</code>': </b>
+                fills in the fields <code>istailcall</code> and
+                <code>extraargs</code>;
             </li>
             <li>
                 <b>'<code>L</code>': </b>
@@ -13054,7 +13083,7 @@ assert(!res and err == l);</pre>
         
         whilestm ::= <b>while</b> exp stm
         
-        dowhilestm ::= <b>do</b> stm <b>while</b> exp &lsquo;<b>;</b>&rsquo;
+        dowhilestm ::= <b>do</b> &lsquo;<b>{</b>&rsquo; loopblock &lsquo;<b>}</b>&rsquo; <b>while</b> exp &lsquo;<b>;</b>&rsquo;
         
         forinit ::= localstm | expstm
         

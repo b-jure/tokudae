@@ -181,42 +181,44 @@ typedef struct DynData {
 } DynData;
 
 
-struct LoopState; /* defined in tparser.c */
-struct ClassState; /* defined in tparser.c */
-struct Scope; /* defined in tparser.c */
+struct Scope;       /* defined in tparser.c */
+struct LoopState;   /* defined in tparser.c */
+struct ClassState;  /* defined in tparser.c */
 
 
-/* state for currently compiled function prototype */
+/*
+** State of the currently compiled function prototype (for parsing).
+*/
 typedef struct FunctionState {
     Proto *p;                   /* current function prototype */
-    struct ClassState *cs;      /* chain, class definition */
-    struct LoopState *ls;       /* chain, loop specific state */
     struct FunctionState *prev; /* chain, enclosing function */
     struct Lexer *lx;           /* lexical state */
     struct Scope *scope;        /* chain, current scope */
-    struct Scope *loopscope;    /* chain, innermost loop scope */
     struct Scope *switchscope;  /* chain, innermost switch scope */
-    Table *kcache;      /* cache for reusing constants */
-    int32_t firstlocal;     /* index of first local in 'lvars' */
-    int32_t prevpc;         /* previous opcode pc */
-    int32_t prevline;       /* previous opcode line */
-    int32_t sp;             /* first free compiler stack index */
-    int32_t nactlocals;     /* number of active local variables */
-    int32_t np;             /* number of elements in 'p' */
-    int32_t nk;             /* number of elements in 'k' */
-    int32_t pc;             /* number of elements in 'code' (aka 'ncode') */
-    int32_t nabslineinfo;   /* number of elements in 'abslineinfo' */
-    int32_t nopcodepc;        /* number of elements in 'opcodepc' */
-    int32_t nlocals;        /* number of elements in 'locals' */
-    int32_t nupvals;        /* number of elements in 'upvals' */
-    int32_t lasttarget;     /* latest 'pc' that is jump target */
-    uint8_t ismethod;   /* if true, the function is a class method */
-    uint8_t nonilmerge; /* if true, merging NIL opcodes are prohibited */
-    uint8_t iwthabs;    /* opcodes issued since last abs. line info */
-    uint8_t needclose;  /* if true, needs to close upvalues before returning */
-    uint8_t callcheck;  /* if true, last call has false check ('?') */
-    uint8_t lastisend;  /* if true, last statement ends control flow
-                           (1==return, 2==break, 3==continue) */
+    struct LoopState *ls;       /* chain, loop statement */
+    struct ClassState *cs;      /* chain, class definition */
+    Table *kcache;              /* cache for reusing constants */
+    int32_t pcdo;               /* start of 'do/while' or 'loop' (or NOPC) */
+    int32_t firstlocal;         /* index of first local in 'lvars' */
+    int32_t prevpc;             /* previous opcode pc */
+    int32_t prevline;           /* previous opcode line */
+    int32_t sp;                 /* first free compiler stack index */
+    int32_t nactlocals;         /* number of active local variables */
+    int32_t np;                 /* number of elements in 'p' */
+    int32_t nk;                 /* number of elements in 'k' */
+    int32_t pc;                 /* number of elements in 'code' ('ncode') */
+    int32_t nabslineinfo;       /* number of elements in 'abslineinfo' */
+    int32_t nopcodepc;          /* number of elements in 'opcodepc' */
+    int32_t nlocals;            /* number of elements in 'locals' */
+    int32_t nupvals;            /* number of elements in 'upvals' */
+    int32_t lasttarget;         /* latest 'pc' that is jump target */
+    uint8_t ismethod;           /* if true, the function is a class method */
+    uint8_t nonilmerge;         /* if true, no NIL opcode merging */
+    uint8_t iwthabs;            /* opcodes issued since last abs. line info */
+    uint8_t needclose;          /* if true, needs to close upvalues */
+    uint8_t callcheck;          /* if true, last call has false check ('?') */
+    uint8_t lastisend;          /* if true, last statement ends control flow
+                                   (1==return, 2==break, 3==continue) */
 } FunctionState;
 
 

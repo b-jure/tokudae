@@ -206,9 +206,9 @@ void tokuTM_callbinres(toku_State *T, const TValue *f, const TValue *o1,
 static int32_t callbinTM(toku_State *T, const TValue *v1, const TValue *v2,
                                         SPtr res, TM event) {
     int32_t t1 = ttypetag(v1);
-    if (t1 != TOKU_VINSTANCE || t1 != ttypetag(v2))
+    if (t_unlikely(t1 != TOKU_VINSTANCE || t1 != ttypetag(v2)))
         return 0; /* error is invoked by caller */
-    else if (insval(v1)->oclass != insval(v2)->oclass) {
+    else if (t_unlikely(insval(v1)->oclass != insval(v2)->oclass)) {
         tokuD_classerror(T, event); /* instances have differing classes */
         return 0; /* to avoid warnings */
     } else {

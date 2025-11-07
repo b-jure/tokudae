@@ -167,17 +167,25 @@ static int32_t push_glbfunc_name(toku_State *T, toku_Debug *ar) {
 TOKULIB_API int32_t tokuL_error_arg(toku_State *T, int32_t arg,
                                                    const char *extra) {
     toku_Debug ar;
+    const char *argword;
     if (!toku_getstack(T, 0, &ar)) /* no stack frame? */
         return tokuL_error(T, "bad argument #%d (%s)", arg+1, extra);
-    toku_getinfo(T, "n", &ar);
-    if (strcmp(ar.namewhat, "metamethod") == 0) {
-        arg--; /* ignore 'self' */
-        if (arg == -1) /* 'self' is the invalid argument? */
-            tokuL_error(T,"calling '%s' on a bad 'self' (%s)", ar.name, extra);
+    toku_getinfo(T, "nt", &ar);
+    if (arg+1 <= ar.extraargs) /* error in an extra argument? */
+        argword = "extra argument";
+    else {
+        arg -= ar.extraargs; /* do not count extra arguments */
+        if (strcmp(ar.namewhat, "metamethod") == 0) {
+            arg--; /* ignore 'self' */
+            if (arg == -1) /* 'self' is the invalid argument? */
+                tokuL_error(T,"calling '%s' on a bad 'self' (%s)", ar.name, extra);
+        }
+        argword = "argument";
     }
     if (ar.name == NULL)
         ar.name = (push_glbfunc_name(T, &ar)) ? toku_to_string(T, -1) : "?";
-    return tokuL_error(T,"bad argument #%d to '%s' (%s)", arg+1,ar.name,extra);
+    return tokuL_error(T, "bad %s #%d to '%s' (%s)",
+                          argword, arg+1,ar.name,extra);
 }
 
 
@@ -836,7 +844,7 @@ TOKULIB_API void tokuL_traceback(toku_State *T, toku_State *T1,
             tokuL_buff_push_stack(&B);
             level += n; /* skip to last levels */
         } else {
-            toku_getinfo(T1, "snl", &ar); /* source, name, line info */
+            toku_getinfo(T1, "snlt", &ar);
             if (ar.currline <= 0)
                 toku_push_fstring(T, "\n\t%s in ", ar.shortsrc);
             else
@@ -844,6 +852,8 @@ TOKULIB_API void tokuL_traceback(toku_State *T, toku_State *T1,
             tokuL_buff_push_stack(&B);
             push_func_name(T, &ar);
             tokuL_buff_push_stack(&B);
+            if (ar.istailcall)
+                tokuL_buff_push_string(&B, "\n\t(...tail calls...)");
         }
     }
     tokuL_buff_end(&B);

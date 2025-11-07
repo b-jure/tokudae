@@ -4,7 +4,7 @@ do {
 } while false;
 assert(x == 1);
 
-do x++; while (x < 5);
+do { x++; } while (x < 5);
 assert(x == 5);
 
 do {
@@ -26,5 +26,35 @@ do {
     if (x == 499) break;
     continue;
 } while false;
+print("+");
 
-assert(x == 499);
+assert(x == 90);
+
+{
+    local b=10;
+    local a;
+    do {
+        local cl <close> = (class{ __close = || :: { print("ok"); }; })();
+        local b;
+        a,b=1,2;
+        assert(a+1==b);
+        print(a,b);
+    } while a+b!=3;
+    assert(b == 10);
+    print("+");
+}
+
+{
+    local x = 5;
+    local a3;
+    do {
+        local a1,a2;
+        if x == 5 {
+            x = -x;
+            continue;
+        }
+        x--;
+    } while (x > 0);
+    assert(x == -5);
+    print("+");
+}

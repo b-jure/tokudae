@@ -60,11 +60,10 @@ CClosure *tokuF_newCclosure(toku_State *T, int32_t nupvals) {
 void tokuF_adjustvarargs(toku_State *T, int32_t arity, CallFrame *cf,
                          SPtr *sp, const Proto *fn) {
     int32_t actual = cast_i32(T->sp.p - cf->func.p) - 1;
-    int32_t extra = actual - arity; /* number of varargs */
-    cf->t.nvarargs = extra;
+    cf->t.nvarargs = actual - arity;
     checkstackp(T, fn->maxstack + 1, *sp);
     setobjs2s(T, T->sp.p++, cf->func.p); /* move function to the top */
-    for (int32_t i = 1; i <= arity; i++) { /* move params to the top */
+    for (int32_t i = 1; i <= arity; i++) { /* move parameters to the top */
         setobjs2s(T, T->sp.p++, cf->func.p + i);
         setnilval(s2v(cf->func.p + i)); /* erase original (for GC) */
     }
@@ -168,7 +167,7 @@ static void checkclosetm(toku_State *T, SPtr level) {
         int32_t vidx = cast_i32(level - T->cf->func.p);
         const char *name = tokuD_findlocal(T, T->cf, vidx, NULL);
         if (name == NULL) name = "?";
-        tokuD_runerror(T, "local variable %s got a non-closeable value", name);
+        tokuD_runerror(T, "local variable '%s' got a non-closable value", name);
     }
 }
 
@@ -242,18 +241,19 @@ static void poptbclist(toku_State *T) {
 
 
 /* 
-** Call '__close' method on 'obj' with error object 'errobj'.
-** This function assumes 'EXTRA_STACK'.
+** Call '__close' method on 'obj' with error object 'err'.
+** (This function assumes EXTRA_STACK.)
 */
-static void callclosemm(toku_State *T, TValue *obj, TValue *errobj) {
+static void callclosemm(toku_State *T, TValue *obj, TValue *err) {
     SPtr top = T->sp.p;
+    SPtr func = top;
     const TValue *method = tokuTM_objget(T, obj, TM_CLOSE);
-    toku_assert(!ttisnil(method));
-    setobj2s(T, top, method);
-    setobj2s(T, top + 1, obj);
-    setobj2s(T, top + 2, errobj);
-    T->sp.p = top + 3;
-    tokuV_call(T, top, 0);
+    setobj2s(T, top++, method); /* will call metamethod... */
+    setobj2s(T, top++, obj); /* with 'self' as the 1st argument */
+    if (err != NULL) /* there was an error? */
+        setobj2s(T, top++, err); /* error object wil be the 2nd argument */
+    T->sp.p = top; /* add function and arguments */
+    tokuV_call(T, func, 0);
 }
 
 
@@ -267,11 +267,16 @@ static void callclosemm(toku_State *T, TValue *obj, TValue *errobj) {
 static void prepcallclose(toku_State *T, SPtr level, int32_t status) {
     TValue *uv = s2v(level); /* value being closed */
     TValue *errobj;
-    if (status == CLOSEKTOP)
-        errobj = &G(T)->nil; /* error object is nil */
-    else { /* 'tokuPR_seterrorobj' will set top to level + 2 */
-        errobj = s2v(level + 1); /* error object goes after 'uv' */
-        tokuPR_seterrorobj(T, status, level + 1); /* set error object */
+    switch (status) {
+        case TOKU_STATUS_OK:
+            T->sp.p = level + 1; /* call will be at this level */
+            /* fall through */
+        case CLOSEKTOP:
+            errobj = NULL;
+            break;
+        default: /* 'tokuPR_seterrorobj' will set top to level + 2 */
+            errobj = s2v(level + 1); /* error object goes after 'uv' */
+            tokuPR_seterrorobj(T, status, level + 1); /* set error object */
     }
     callclosemm(T, uv, errobj);
 }

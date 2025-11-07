@@ -48,16 +48,17 @@
     { if (t_unlikely(!(cond))) tokuY_syntaxerror(lx, err); }
 
 
-/* control flow masks */
-#define CFML            (1 << 0) /* regular loop */
-#define CFMGL           (1 << 1) /* generic loop */
-#define CFMS            (1 << 2) /* switch */
-#define CFMASK          (CFML | CFMGL | CFMS)
+/* 'cfmask' */
+#define CFM_LOOP        (1 << 0) /* regular loop */
+#define CFM_DOWHILE     (1 << 1) /* do/while loop */
+#define CFM_GENLOOP     (1 << 2) /* generic loop */
+#define CFM_SWITCH      (1 << 3) /* switch */
 
-#define is_loop(s)              (testbits((s)->cf, CFML) != 0)
-#define is_genloop(s)           (testbits((s)->cf, CFMGL) != 0)
-#define is_switch(s)            (testbits((s)->cf, CFMS) != 0)
-#define haspendingjumps(s)      testbits((s)->cf, CFMASK)
+#define CFM_MASK    (CFM_LOOP | CFM_DOWHILE | CFM_GENLOOP | CFM_SWITCH)
+
+#define isdowhile(s)            (testbits((s)->cfmask, CFM_DOWHILE) != 0)
+#define isgenloop(s)            (testbits((s)->cfmask, CFM_GENLOOP) != 0)
+#define haspendingjumps(s)      (testbits((s)->cfmask, CFM_MASK) != 0)
 
 
 /* lexical scope information */
@@ -66,24 +67,24 @@ typedef struct Scope {
     int32_t nactlocals; /* number of locals outside of this scope */
     int32_t depth; /* scope depth (number of nested scopes) */
     int32_t firstgoto; /* index of first pending goto jump in this block */
-    uint8_t cf; /* control flow */
+    uint8_t cfmask; /* control flow mask */
     uint8_t haveupval; /* set if scope contains upvalue variable */
     uint8_t havetbcvar; /* set if scope contains to-be-closed variable */
 } Scope;
 
 
-/* class declaration state */
+/* state for class declarations/definitions */
 typedef struct ClassState {
     struct ClassState *prev; /* chain of nested declarations */
     int32_t pc; /* pc of the NEWCLASS opcode (for private upvalues) */
 } ClassState;
 
 
-/* loop state */
+/* state for loop statements */
 typedef struct LoopState {
     struct LoopState *prev; /* chain */
     Scope s; /* loop scope */
-    int32_t pcloop; /* pc where loop starts */
+    int32_t pcloop; /* loop start pc */
 } LoopState;
 
 
@@ -94,8 +95,8 @@ typedef struct LoopState {
 ** the 'kcache'.
 */
 typedef struct FuncContext {
-    int32_t ps_actlocals;
-    int32_t nopcodepc;
+    int32_t dyd_actlocals;
+    int32_t pcdo;
     int32_t prevpc;
     int32_t prevline;
     int32_t sp;
@@ -103,6 +104,7 @@ typedef struct FuncContext {
     int32_t np;
     int32_t pc;
     int32_t nabslineinfo;
+    int32_t nopcodepc;
     int32_t nlocals;
     int32_t nupvals;
     int32_t lasttarget;
@@ -117,8 +119,8 @@ typedef struct FuncContext {
 
 
 static void storecontext(FunctionState *fs, FuncContext *ctx) {
-    ctx->ps_actlocals = fs->lx->dyd->actlocals.len;
-    ctx->nopcodepc = fs->nopcodepc;
+    ctx->dyd_actlocals = fs->lx->dyd->actlocals.len;
+    ctx->pcdo = fs->pcdo;
     ctx->prevpc = fs->prevpc;
     ctx->prevline = fs->prevline;
     ctx->sp = fs->sp;
@@ -126,6 +128,7 @@ static void storecontext(FunctionState *fs, FuncContext *ctx) {
     ctx->np = fs->np;
     ctx->pc = currPC;
     ctx->nabslineinfo = fs->nabslineinfo;
+    ctx->nopcodepc = fs->nopcodepc;
     ctx->nlocals = fs->nlocals;
     ctx->nupvals = fs->nupvals;
     ctx->lasttarget = fs->lasttarget;
@@ -140,8 +143,8 @@ static void storecontext(FunctionState *fs, FuncContext *ctx) {
 
 
 static void loadcontext(FunctionState *fs, FuncContext *ctx) {
-    fs->lx->dyd->actlocals.len = ctx->ps_actlocals;
-    fs->nopcodepc = ctx->nopcodepc;
+    fs->lx->dyd->actlocals.len = ctx->dyd_actlocals;
+    fs->pcdo = ctx->pcdo;
     fs->prevpc = ctx->prevpc;
     fs->prevline = ctx->prevline;
     fs->sp = ctx->sp;
@@ -149,6 +152,7 @@ static void loadcontext(FunctionState *fs, FuncContext *ctx) {
     fs->np = ctx->np;
     currPC = ctx->pc;
     fs->nabslineinfo = ctx->nabslineinfo;
+    fs->nopcodepc = ctx->nopcodepc;
     fs->nlocals = ctx->nlocals;
     fs->nupvals = ctx->nupvals;
     fs->lasttarget = ctx->lasttarget;
@@ -277,7 +281,9 @@ static OString *str_expectname(Lexer *lx) {
 }
 
 
-/* semantic error; variant of syntax error without 'near <token>' */
+/*
+** Semantic error; variant of syntax error without 'near <token>'.
+*/
 t_noret tokuP_semerror(Lexer *lx, const char *err) {
     lx->t.tk = 0;
     tokuY_syntaxerror(lx, err);
@@ -326,7 +332,7 @@ static int32_t nvarstack(FunctionState *fs) {
 
 
 static void contadjust(FunctionState *fs, int32_t push) {
-    int32_t ncntl = is_genloop(&fs->ls->s) * VAR_N;
+    int32_t ncntl = isgenloop(&fs->ls->s) * VAR_N;
     int32_t total = (fs->nactlocals - fs->ls->s.nactlocals - ncntl);
     tokuC_adjuststack(fs, push ? -total : total);
 }
@@ -372,7 +378,7 @@ static const Scope *getcfscope(const FunctionState *fs) {
 ** is emitted as the popping and close is managed by 'continuestm'.
 */
 static int32_t newpendingjump(Lexer *lx, int32_t bk, int32_t close,
-                                                     int32_t adjust) {
+                                                     int32_t nvars) {
     FunctionState *fs = lx->fs;
     int32_t pc;
     toku_assert(getopSize(OP_JMP) == getopSize(OP_POP));
@@ -383,8 +389,8 @@ static int32_t newpendingjump(Lexer *lx, int32_t bk, int32_t close,
         tokuC_emitIL(fs, OP_CLOSE, stacklevel(fs, cfs->nactlocals));
     }
     if (bk) { /* break statement? */
-        toku_assert(adjust >= 0);
-        tokuC_adjuststack(fs, adjust);
+        toku_assert(nvars >= 0);
+        tokuC_adjuststack(fs, nvars);
     }
     pc = tokuC_jmp(fs, OP_JMP);
     return newbreakjump(lx, pc, bk, close);
@@ -404,6 +410,11 @@ static void removelocals(FunctionState *fs, int32_t tolevel) {
 
 /*
 ** Patch pending goto jumps ('break' or 'continue' in generic loop).
+** NOTE: 'continue' might be jumping to optimized out false condition in
+** do/while loop, so if there is no code after 'continue' (not including
+** the optimized out 'while' condition), then this jump is invalid.
+** However, this is not possible as all Tokudae chunks end with RETURN
+** opcode even when the chunk is missing explicit 'return'.
 */
 static void patchpendingjumps(FunctionState *fs, Scope *s) {
     Lexer *lx = fs->lx;
@@ -414,9 +425,9 @@ static void patchpendingjumps(FunctionState *fs, Scope *s) {
         Goto *gt = &gl->arr[igt];
         if (gt->bk) /* 'break' ? */
             tokuC_patchtohere(fs, gt->pc);
-        else { /* 'continue' in generic loop */
+        else { /* otherwise 'continue' in generic or do/while loop */
             toku_assert(fs->ls && fs->ls->pcloop != NOPC);
-            toku_assert(s == &fs->ls->s && is_genloop(s));
+            toku_assert(s == &fs->ls->s && (isgenloop(s) || isdowhile(s)));
             toku_assert(!gt->close);
             tokuC_patch(fs, gt->pc, fs->ls->pcloop);
         }
@@ -487,8 +498,8 @@ static void adjustlocals(Lexer *lx, int32_t nvars) {
 }
 
 
-static void enterscope(FunctionState *fs, Scope *s, int32_t cf) {
-    s->cf = cast_u8(cf);
+static void enterscope(FunctionState *fs, Scope *s, int32_t mask) {
+    s->cfmask = cast_u8(mask);
     if (fs->scope) { /* not a global scope? */
         s->depth = fs->scope->depth + 1;
         s->havetbcvar = fs->scope->havetbcvar;
@@ -554,6 +565,7 @@ static void open_func(Lexer *lx, FunctionState *fs, Scope *s) {
     lx->fs = fs;
     fs->prevline = p->defline;
     fs->firstlocal = lx->dyd->actlocals.len;
+    fs->pcdo = NOPC;
     p->source = lx->src;
     tokuG_objbarrier(T, p, p->source);
     p->maxstack = 2; /* stack slots 0/1 are always valid */
@@ -2021,7 +2033,7 @@ static void switchstm(Lexer *lx) {
         .jmp = NOJMP,
         .c = CNONE
     };
-    enterscope(fs, &s, CFMS);
+    enterscope(fs, &s, CFM_SWITCH);
     storecontext(fs, &ctxbefore);
     fs->switchscope = &s; /* set the current 'switch' scope */
     tokuY_scan(lx); /* skip 'switch' */
@@ -2041,15 +2053,15 @@ static void switchstm(Lexer *lx) {
 
 /* data for 'condbody()' */
 typedef struct CondBodyState {
-    FuncContext ctxbefore; /* snapshot before the condition (and body) */
-    FuncContext ctxend; /* pc != NOPC if dead code was found */
-    ExpInfo e; /* condition expression */
-    OpCode opT; /* test opcode */
-    OpCode opJ; /* jump opcode */
-    int32_t isif; /* true if this is 'if' statement body */
-    int32_t pcCond; /* pc of condition */
-    int32_t pcClause; /* pc of last 'for' loop clause */
-    int32_t condline; /* condition line (for test opcode) */
+    FuncContext ctxbefore;  /* snapshot before the condition (and body) */
+    FuncContext ctxend;     /* 'ctxend.pc != NOPC' if dead code was found */
+    ExpInfo e;              /* condition expression */
+    OpCode opT;             /* test opcode */
+    OpCode opJ;             /* jump opcode */
+    int32_t isif;           /* true if this is 'if' statement body */
+    int32_t pcCond;         /* pc of condition */
+    int32_t pcClause;       /* pc of last 'for' loop clause */
+    int32_t condline;       /* condition line (for test opcode) */
 } CondBodyState;
 
 
@@ -2125,8 +2137,8 @@ static void ifstm(Lexer *lx) {
 }
 
 
-static void enterloop(FunctionState *fs, struct LoopState *ls, int32_t isgen) {
-    enterscope(fs, &ls->s, isgen ? CFMGL : CFML);
+static void enterloop(FunctionState *fs, struct LoopState *ls, int32_t mask) {
+    enterscope(fs, &ls->s, mask);
     ls->pcloop = currPC;
     ls->prev = fs->ls; /* chain it */
     fs->ls = ls;
@@ -2135,7 +2147,7 @@ static void enterloop(FunctionState *fs, struct LoopState *ls, int32_t isgen) {
 
 static void leaveloop(FunctionState *fs) {
     leavescope(fs);
-    fs->ls = check_exp(fs->ls, fs->ls->prev);
+    fs->ls = check_exp(fs->ls != NULL, fs->ls->prev);
 }
 
 
@@ -2148,7 +2160,7 @@ static void whilestm(Lexer *lx) {
         .isif = 0, .pcCond = currPC, .pcClause = NOJMP,
     };
     tokuY_scan(lx); /* skip 'while' */
-    enterloop(fs, &ls, 0);
+    enterloop(fs, &ls, CFM_LOOP);
     storecontext(fs, &cb.ctxbefore);
     cb.condline = lx->line;
     expr(lx, &cb.e);
@@ -2160,31 +2172,55 @@ static void whilestm(Lexer *lx) {
 
 static void dowhilestm(Lexer *lx) {
     FunctionState *fs = lx->fs;
-    FuncContext ctxbefore;
     ExpInfo e = INIT_EXP;
-    int32_t isend;
+    int32_t old_pcdo = fs->pcdo;
+    int32_t isend = 0;
+    FuncContext ctxbefore;
     struct LoopState ls;
-    int32_t condline;
+    Scope s; /* scope for 'decl_list' */
+    int32_t linenum;
     tokuY_scan(lx); /* skip 'do' */
-    enterloop(fs, &ls, 0);
-    stm(lx); /* body */
-    isend = stmIsEnd(fs);
+    enterloop(fs, &ls, CFM_DOWHILE);
+    fs->pcdo = currPC;
+    linenum = lx->line;
+    expectnext(lx, '{');
+    enterscope(fs, &s, 0);
+    if (!check(lx, '}')) {
+        decl_list(lx, '}');
+        isend = stmIsReturn(fs) || stmIsBreak(fs);
+    }
+    expectmatch(lx, '}', '{', linenum);
     expectnext(lx, TK_WHILE);
     storecontext(fs, &ctxbefore);
-    condline = lx->line;
+    linenum = lx->line;
+    fs->ls->pcloop = currPC; /* do/while loop starts here */
     expr(lx, &e); /* condition */
     codeconstexp(fs, &e);
-    if (isend || eisconstant(&e)) { /* optimize? */
+    if (isend || eisconstant(&e)) { /* end or condition is a constant? */
         loadcontext(fs, &ctxbefore); /* remove the condition expression */
+        leavescope(fs);
         if (!isend && eistrue(&e)) /* condition is true? */
-            tokuC_patch(fs, tokuC_jmp(fs, OP_JMPS), fs->ls->pcloop);
-        /* otherwise condition is false, nothing else to be done */
+            tokuC_patch(fs, tokuC_jmp(fs, OP_JMPS), fs->pcdo); /* inf. loop */
+        /* otherwise nothing else to be done; fall through */
     } else { /* otherwise condition is a variable */
-        int32_t test = tokuC_test(fs, OP_TESTPOP, 0, condline);
-        tokuC_patch(fs, tokuC_jmp(fs, OP_JMPS), fs->ls->pcloop);
+        int32_t nvars = fs->nactlocals - s.nactlocals;
+        int32_t test = tokuC_test(fs, OP_TESTPOP, 0, linenum);
+        //int32_t skip;
+        leavescope(fs);
+        tokuC_patch(fs, tokuC_jmp(fs, OP_JMPS), fs->pcdo);
+        /* adjust stack for compiler and symbolic execution */
+        tokuC_adjuststack(fs, -nvars); /* unreached */
         tokuC_patch(fs, test, currPC);
+        if (s.haveupval)
+            tokuC_emitIL(fs, OP_CLOSE, stacklevel(fs, s.nactlocals));
+        tokuC_pop(fs, nvars);
+        //skip = tokuC_jmp(fs, OP_JMP); /* jump that skips adjustment */
+        ///* adjust stack for compiler and symbolic execution */
+        //tokuC_adjuststack(fs, -nvars); /* unreached */
+        //tokuC_patch(fs, skip, currPC);
     }
     leaveloop(fs);
+    fs->pcdo = old_pcdo;
     expectnext(lx, ';');
 }
 
@@ -2226,7 +2262,7 @@ static void foreachstm(Lexer *lx) {
     int32_t linenum;
     ExpInfo e = INIT_EXP;
     Scope s;
-    enterloop(fs, &ls, 1); /* enter loop (scope for control variables) */
+    enterloop(fs, &ls, CFM_GENLOOP); /* (scope for control variables) */
     tokuY_scan(lx); /* skip 'foreach' */
     addlocallit(lx, "(foreach1)");  /* iterator         (base)   */
     addlocallit(lx, "(foreach2)");  /* invariant state  (base+1) */
@@ -2329,7 +2365,7 @@ static void forstm(Lexer *lx) {
     /* 1st clause (initializer) */
     forinitializer(lx); 
     oldsp = fs->sp; /* stack index before condition (for last clause) */
-    enterloop(fs, &ls, 0); /* enter loop scope */
+    enterloop(fs, &ls, CFM_LOOP); /* enter loop scope */
     cb.pcCond = fs->ls->pcloop = currPC; /* loop is after initializer clause */
     storecontext(fs, &cb.ctxbefore); /* store context at loop start */
     /* 2nd clause (condition) */
@@ -2348,17 +2384,18 @@ static void forstm(Lexer *lx) {
 
 static void loopstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
+    int32_t old_pcdo = fs->pcdo;
     struct LoopState ls;
-    int32_t jmp, lstart;
     tokuY_scan(lx); /* skip 'loop' */
-    lstart = currPC; /* store the pc where the loop starts */
-    enterloop(fs, &ls, 0);
+    enterloop(fs, &ls, CFM_LOOP);
+    fs->pcdo = currPC;
     stm(lx);
     if (!stmIsEnd(fs)) { /* statement (body) does not end control flow? */
-        jmp = tokuC_jmp(fs, OP_JMPS);
-        tokuC_patch(fs, jmp, lstart); /* jump back to loop start */
+        int32_t jmp = tokuC_jmp(fs, OP_JMPS);
+        tokuC_patch(fs, jmp, fs->pcdo); /* jump back to loop start */
     }
     leaveloop(fs);
+    fs->pcdo = old_pcdo;
 }
 
 
@@ -2381,18 +2418,35 @@ static int32_t needtoclose(Lexer *lx, const Scope *limit) {
 static void continuestm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     LoopState *ls = fs->ls;
+    int32_t nvars = 0;
     tokuY_scan(lx); /* skip 'continue' */
     if (t_unlikely(ls == NULL)) /* not in a loop? */
         tokuP_semerror(lx, "'continue' outside of a loop statement");
-    if (needtoclose(lx, ls->s.prev))
-        tokuC_emitIL(fs, OP_CLOSE, stacklevel(fs, ls->s.nactlocals));
-    contadjust(fs, 0);
-    if (is_genloop(&ls->s)) /* generic loop? */
+    if (isdowhile(&ls->s)) { /* innermost loop is do/while? */
+        Scope *s = &ls->s;
+        Scope *curr = fs->scope;
+        if (s->depth+2 < curr->depth) { /* there is 3rd scope in do/while? */
+            do { /* get that scope */
+                curr = curr->prev;
+            } while (s->depth+2 < curr->depth);
+            nvars = fs->nactlocals - curr->nactlocals;
+        }
+        tokuC_adjuststack(fs, nvars);
+    } else { /* otherwise some other loop */
+        if (needtoclose(lx, ls->s.prev))
+            tokuC_emitIL(fs, OP_CLOSE, stacklevel(fs, ls->s.nactlocals));
+        contadjust(fs, 0);
+    }
+    if (isgenloop(&ls->s) || isdowhile(&ls->s)) /* generic or do/while loop? */
         newpendingjump(lx, 0, 0, 0); /* 'continue' compiles as 'break' */
     else /* otherwise regular loop */
         tokuC_patch(fs, tokuC_jmp(fs, OP_JMPS), ls->pcloop); /* backpatch */
     expectnext(lx, ';');
-    contadjust(fs, 1); /* adjust stack for compiler and symbolic execution */
+    /* adjust stack for compiler and symbolic execution */
+    if (isdowhile(&ls->s))
+        tokuC_adjuststack(fs, -nvars);
+    else
+        contadjust(fs, 1);
     fs->lastisend = 3; /* statement is a continue */
 }
 
@@ -2400,15 +2454,15 @@ static void continuestm(Lexer *lx) {
 static void breakstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     const Scope *cfs = getcfscope(fs); /* control flow scope */
-    int32_t adjust;
+    int32_t nvars;
     tokuY_scan(lx); /* skip 'break' */
     if (t_unlikely(cfs == NULL)) /* no control flow scope? */
         tokuP_semerror(lx, "'break' outside of a loop or switch statement");
-    adjust = fs->nactlocals - cfs->nactlocals;
-    newpendingjump(lx, 1, needtoclose(lx, cfs->prev), adjust);
+    nvars = fs->nactlocals - cfs->nactlocals;
+    newpendingjump(lx, 1, needtoclose(lx, cfs->prev), nvars);
     expectnext(lx, ';');
     /* adjust stack for compiler and symbolic execution */
-    tokuC_adjuststack(fs, -adjust);
+    tokuC_adjuststack(fs, -nvars);
     fs->lastisend = 2; /* statement is a break */
 }
 
@@ -2434,18 +2488,23 @@ static int32_t boundary(Lexer *lx) {
 static void returnstm(Lexer *lx) {
     FunctionState *fs = lx->fs;
     int32_t first = fs->sp;
-    int32_t nret = 0;
+    int32_t nres = 0;
     ExpInfo e = INIT_EXP;
     tokuY_scan(lx); /* skip 'return' */
     if (!boundary(lx) && !check(lx, ';')) { /* have return values ? */
-        nret = explist(lx, &e); /* get return values */
+        nres = explist(lx, &e); /* get return values */
         if (eismulret(&e)) { /* last expressions is a call or vararg? */
+            int32_t iscall = (e.et == EXP_CALL);
             tokuC_setmulret(fs, &e); /* returns all results (finalize it) */
-            nret = TOKU_MULTRET; /* 'return' will return all values */
-        } else /* otherwise 'return' will return 'nret' values */
+            if (iscall && nres==1 && !fs->scope->havetbcvar) { /* tail call? */
+                toku_assert(getopSize(OP_TAILCALL) == getopSize(OP_CALL));
+                *getpi(fs, &e) = OP_TAILCALL;
+            }
+            nres = TOKU_MULTRET; /* 'return' will return all values */
+        } else /* otherwise 'return' will return 'nres' values */
             tokuC_exp2stack(fs, &e); /* finalize last expression */
     }
-    tokuC_return(fs, first, nret);
+    tokuC_return(fs, first, nres);
     match(lx, ';'); /* optional ';' */
     fs->sp = first; /* removes all temp values */
     fs->lastisend = 1; /* statement is a return */

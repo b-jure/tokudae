@@ -1,4 +1,4 @@
-if __port or !__heavy {
+if __port or !__heavy or (__TESTS and (__TESTS.memory or __TESTS.gc)) {
     (Message or print)("skipped \"verybig\" tests");
     return;
 }

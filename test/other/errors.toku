@@ -20,7 +20,8 @@ local fn doit(s) {
 
 local fn checkmessage(prog, msg, debug) {
     local m = doit(prog);
-    if (debug) print(m, msg);
+    if (debug)
+        printf("> %: %\t%", import("debug").getinfo(2, "l").currline, m, msg);
     assert(reg.find(m, msg, 0, true));
 }
 
@@ -81,6 +82,16 @@ __G.aaa, __G.bbbb = nil;
 
 /// calls
 checkmessage("local a; a(13);", "local 'a'");
+checkmessage([=[
+  local a = setmetatable(class, {__add = 34})();
+  a += a;
+]=], "metamethod 'add'");
+checkmessage([=[
+  local a = setmetatable(class, {__lt = {}})();
+  a = a < a;
+]=], "metamethod 'lt'");
+/* 'extra argument' error test requires error in C code that has extraargs */
+   
 
 /// tail calls
 checkmessage("local a={}; return a.bbbb(3);", "field 'bbbb'");
@@ -91,7 +102,6 @@ checkmessage("aaa.bbb.ddd(9);", "global 'aaa'");
 checkmessage("local aaa={bbb=1}; aaa.bbb.ddd(9);", "field 'bbb'");
 checkmessage("local a,b,c; (fn() { a = b+1.1; })();", "upvalue 'b'");
 
-/// upvalues being indexed do not go to the stack
 checkmessage("local a,b,cc; (fn() { a = cc[1]; })();", "upvalue 'cc'");
 checkmessage("local a,b,cc; (fn() { a.x = 1; })();", "upvalue 'a'");
 

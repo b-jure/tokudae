@@ -1,4 +1,4 @@
-local a = class { __eq = fn(rhs) { return nil; }; };
+local a = class { __eq = |rhs| { return nil }; };
 local x = a();
 assert(!(x == x));
 assert(rawequal(x, x));

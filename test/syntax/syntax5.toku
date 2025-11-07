@@ -30,7 +30,7 @@ local chunk = [=[
 
 local f = assert(load(chunk));
 local st, res = pcall(f);
-assert(!st and string.find(res, "local variable x"));
+assert(!st and string.find(res, "local variable 'x'"));
 
 chunk = string.replace(chunk, "<close> ", ""); /* remove close attribute */
 assert(load(chunk))(); /* all ok */

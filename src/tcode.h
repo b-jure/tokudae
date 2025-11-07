@@ -222,7 +222,8 @@ OP_JMPS,/*         L       'pc -= L'                                        */
 OP_TEST,/*         V S     'if (!t_isfalse(V) == S) dojump;'                */
 OP_TESTPOP,/*      V S     'if (!t_isfalse(V) == S) { dojump; } pop;'       */
 
-OP_CALL,/*  L1 L2   'V{L1},...,V{L1+L2-1} = V{L1}(V{L1+1},...,V{offtp-1})'  */
+OP_CALL,/*  L1 L2 S 'V{L1},...,V{L1+L2-1} = V{L1}(V{L1+1},...,V{offtp-1})'  */
+OP_TAILCALL,/* L1 L2 S  '-||- (S is true if it needs close; it skips RET)   */
 
 OP_CLOSE,/*        L           'close all open upvalues >= V{L}'            */
 OP_TBC,/*          L           'mark L{L} at to-be-closed'                  */
@@ -306,7 +307,7 @@ TOKUI_DEC(const uint8_t tokuC_opsize[FormatN];)
 
 
 /*
-** All chunks and functions end with OP_RETURN instruction.
+** All chunks and functions end with OP_RETURN opcode.
 */
 #define lastpc(f)   cast_u32((f)->sizecode - getopSize(OP_RETURN))
 
@@ -327,6 +328,7 @@ TOKUI_DEC(const uint8_t tokuC_opsize[FormatN];)
     int32_t left_ = tokuC_storevar(fs, v, 0); tokuC_fixline(fs, ln); \
     tokuC_pop(fs, left_); }
 
+TOKUI_FUNC int32_t tokuC_emitS(FunctionState *fs, int32_t a);
 TOKUI_FUNC int32_t tokuC_emitI(FunctionState *fs, uint8_t i);
 TOKUI_FUNC int32_t tokuC_emitIS(FunctionState *fs, uint8_t i, int32_t a);
 TOKUI_FUNC int32_t tokuC_emitIL(FunctionState *fs, uint8_t i, int32_t a);
@@ -348,9 +350,9 @@ TOKUI_FUNC int32_t tokuC_nil(FunctionState *fs, int32_t n);
 TOKUI_FUNC void tokuC_load(FunctionState *fs, int32_t stk);
 TOKUI_FUNC int32_t tokuC_remove(FunctionState *fs, int32_t n);
 TOKUI_FUNC int32_t tokuC_pop(FunctionState *fs, int32_t n);
-TOKUI_FUNC void tokuC_adjuststack(FunctionState *fs, int32_t left);
+TOKUI_FUNC void tokuC_adjuststack(FunctionState *fs, int32_t nextra);
 TOKUI_FUNC int32_t tokuC_return(FunctionState *fs, int32_t first,
-                                int32_t nret);
+                                int32_t nres);
 TOKUI_FUNC void tokuC_callcheck(FunctionState *fs, int32_t base,
                                 int32_t linenum);
 TOKUI_FUNC void tokuC_methodset(FunctionState *fs, ExpInfo *e);

@@ -48,8 +48,11 @@ typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
 
 
 /*
-** Extra stack space that is used mostly when calling metamethods.
-** Helps reduce stack checks (branching).
+** Extra stack space to handle TM calls and some other extras. This
+** space is not included in 'stackend'. It is used only to avoid stack
+** checks, either because the element will be promptly popped or because
+** there will be a stack check soon after the push. Function frames
+** never use this extra space, so it does not need to be kept clean.
 */
 #define EXTRA_STACK     5
 
@@ -64,12 +67,11 @@ typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
 ** CallFrame
 ** ======================================================================= */
 
-/* bits in CallFrame status */
 #define CFST_CCALL      (1<<0) /* call is running a C function */
 #define CFST_FRESH      (1<<1) /* call is on fresh "tokuV_execute" frame */
 #define CFST_HOOKED     (1<<2) /* call is running a debug hook */
 #define CFST_FIN        (1<<3) /* function "called" a finalizer */
-
+#define CFST_TAIL       (1<<4) /* call was tail called */
 
 typedef struct CallFrame {
     SIndex func; /* function stack index */
@@ -81,9 +83,14 @@ typedef struct CallFrame {
         volatile t_signal trap; /* hooks or stack reallocation flag */
         int32_t nvarargs; /* number of optional arguments */
     } t;
-    int32_t nresults; /* number of expected/wanted results from this function */
+    int32_t nresults; /* number of wanted results from this function */
+    uint32_t extraargs; /* number of call, init and bound (meta)methods */
     uint8_t status; /* call status */
 } CallFrame;
+
+
+/* maximum number of init/call/bound (meta)methods (and their arguments) */
+#define CALLCHAIN_MAX       UINT8_MAX
 
 
 /*

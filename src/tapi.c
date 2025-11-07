@@ -2084,6 +2084,7 @@ static int32_t setExtraI(toku_Opdesc *opd, int32_t imm, int32_t l) {
 ** concat(x,y)  <- function, return concatenation of 'x' with 'y'
 ** markclose(x) <- function, marks 'x' (pointer to stack) as to-be-closed
 ** close(x)     <- function, close appropriate values in ['x', &top]
+** closeup(x)   <- function, close all upvalues in ['x', &top]
 ** new_cl(x)    <- function, returns new closure from function 'x'
 ** new_list(x)  <- function, returns new list of size 'x'
 ** new_table(x) <- function, returns new table of size 'x'
@@ -2261,6 +2262,13 @@ static void DCall(toku_Opdesc *opd, int32_t func, int32_t nres) {
     preCall(n, nres);
 }
 
+static void DTailCall(toku_Opdesc *opd, int32_t func, int32_t nres,
+                                                      int32_t close) {
+    int32_t n = DX("if (%d != 0) { close(base); } ", close);
+    n = DAX(n, "return base[%d](stackrange(&base[%d], &top)); ", func, func+1);
+    preCall(n, nres);
+}
+
 #define DTbc(opd,slot)      DX("markclose(&base[%d]);", slot)
 
 #define DClose(opd,slot)    DX("close(&base[%d]);", slot)
@@ -2412,6 +2420,9 @@ static void setdescription(toku_State *T, toku_Opdesc *opd,
         case OP_INHERIT: DInherit(opd); break;
         case OP_FORPREP: DForPrep(opd, opc->args[0], opc->args[1]); break;
         case OP_FORCALL: DForCall(opd, opc->args[0], opc->args[1]-1); break;
+        case OP_TAILCALL:
+            DTailCall(opd, opc->args[0]+1, opc->args[1]-1, opc->args[2]);
+            break;
         case OP_SETLOCAL:
             get = 0; /* fall through */
         case OP_LOAD: case OP_GETLOCAL:

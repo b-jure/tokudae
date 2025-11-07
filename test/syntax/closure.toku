@@ -196,17 +196,12 @@ assert(r == 1 and s == "a");
 }
 
 
-
 { /// test for correctly closing upvalues in tail calls of vararg functions
     local fn t() {
-        local fn c(a,b) {
-            assert(a=="test" and b=="OK");
-        }
-        local fn v(f, ...) {
-            c("test", f() != 1 and "FAILED" or "OK");
-        }
+        local fn c(a,b) :: assert(a=="test" and b=="OK");
+        local fn v(f, ...) :: c("test", f() != 1 and "FAILED" or "OK");
         local x = 1;
-        return v(fn() { return x; });
+        return v(|| return x);
     }
     t();
 }

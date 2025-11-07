@@ -55,7 +55,6 @@ fn controlstruct() {
     s = "loop { " .. s .. " }";
     local st, msg = load(s);
     assert(!st and string.find(msg, "too long"));
-    print(msg);
     __G.a = nil;
 }
 
@@ -135,10 +134,12 @@ fn toomanyidx() {
     local a = [];
     local out = 0;
     local st, msg = pcall(fn() {
-        foreach i in range(0, math.maxint) {
+        local write = io.stderr.write;
+        local lim = math.maxint;
+        for (local i=0; i<lim; i++) {
             out = i;
             if (i % 0x100000 == 0)
-                io.stderr.write("(", i // 2**20, " M)");
+                write("(", i // 2**20, " M)");
             a[i] = i;
         }
     });
@@ -151,15 +152,15 @@ fn toomanyidx() {
 
 
 if !__port and __heavy {
-    /// skip them anyway
+    # skip them anyway
     (Message or print)("skipped heavy non-portable tests");
-    ///teststring();
-    ///controlstruct();
-    ///manylines();
-    ///hugeid();
-    ///toomanyinst();
-    ///toomanyconst();
-    ///toomanyidx();
+    #teststring();
+    #controlstruct();
+    #manylines();
+    #hugeid();
+    #toomanyinst();
+    #toomanyconst();
+    #toomanyidx();
 } else
     (Message or print)("skipped heavy non-portable tests");
 
