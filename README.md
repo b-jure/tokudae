@@ -13,35 +13,40 @@ You are free to modify the configuration files `config_*.mk`
 installation program, compiler, compiler flags, archiver, binary/library
 targets and other utility programs.
 
-Before building do:
+First do:
 ```sh
-PLATFORM=linux make echo
+export PLATFORM=linux_readline
 ```
-in order to see if the build configuration is what you expect it to be.
+where platform value is one of the supported platforms.
+
+To see if the build configuration is what you expect it to be.
+```sh
+make echo
+```
 
 Building the binary and library:
 ```sh
-PLATFORM=linux make
+make
 ```
 
 Installing onto the system (add `sudo` in front if you lack the permission):
 ```sh
-PLATFORM=linux make install
+make install
 ```
 
 Local Installation (in the current directory under `local` directory):
 ```sh
-PLATFORM=linux make local
+make local
 ```
 
 Uninstalling (add `sudo` in front if you lack the permission):
 ```sh
-PLATFORM=linux make uninstall
+make uninstall
 ```
 
 Clean build files and targets:
 ```sh
-PLATFORM=linux make clean
+make clean
 ```
 
 For help on other make targets do:

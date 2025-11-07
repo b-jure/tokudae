@@ -19,9 +19,9 @@
 #endif
 
 
-static int32_t dump = 1;                            /* dump bytecode? */
-static int32_t list = 0;                            /* list bytecode? */
-static int32_t strip = 0;                           /* strip debug info? */
+static int32_t dump = 1;                        /* dump bytecode? */
+static int32_t list = 0;                        /* list bytecode? */
+static int32_t strip = 0;                       /* strip debug info? */
 static char verbosity = 0;                      /* verbosity level */
 static char showdesc = 0;                       /* show opcode description? */
 static const char *progname = TOKU_PROGNAMEC;   /* actual program name */
