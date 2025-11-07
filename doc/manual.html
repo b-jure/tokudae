@@ -35,24 +35,28 @@
         <br/><br/>
         Tokudae is implemented as a library fully written in C, and to be
         compiled with any ISO C99 compliant C compiler.
-        Tokudae distribution includes a host program called
+        Tokudae distribution includes a host programs called
         <a href="#7"><code>tokudae</code></a>,
-        which is the interpreter that uses Tokudae library.
+        which is the interpreter and <code>tokuc</code>,
+        which is the compiler, both of them use the Tokudae library.
         Tokudae is intended to be primarily used as lightweight embeddable
-        scripting language but also as a stand-alone language that is easy
-        to learn as it shares most of its syntax with the C programming
-        language and has the semantics of
-        <a href="https://www.lua.org/">Lua</a>.
+        scripting language but also as a stand-alone language.
+        The language shares most of it's syntax with the C programming
+        language. Additionally the internals, API and language semantics are
+        very similar to <a href="https://www.lua.org/">Lua</a>,
+        which is the main inspiration behind the implementation of this
+        language.
         <br/><br/>
         Tokudae is free software, and is provided with no guarantees,
         as stated in its license.
         <br/><br/>
         This manual is subject to changes, as the language itself changes.
         However the reference manual is always valid for the same version of
-        Tokudae distribution. If you spot a mistake or you think the manual
-        is lacking in various places, please let me know
+        the Tokudae distribution.
+        If you spot a mistake or you think the manual is lacking in various
+        places, please let me know
         <a href="https://github.com/b-jure/tokudae">here</a>
-        (github repository).
+        (github repository) by opening an <em>issue</em>.
         </p>
 
 
@@ -168,7 +172,7 @@
         but any Tokudae value except <b>nil</b> and NaN
         (<em>Not a Number</em> is a special floating-point value
         used by the IEEE 754 standard to represent undefined numerical
-        results, such as <code>0/0</code>).
+        results).
         <br/>
         Tables can contain values of all types (except <b>nil</b>).
         Any key associated to the value <b>nil</b> is not considered part of
@@ -176,10 +180,10 @@
         an associated value <b>nil</b>.
         <br/>
         Tables can be indexed two different ways, given the key
-        <code>name</code> we index the table <code>t</code> either as
+        <code>"name"</code> we index the table <code>t</code> either as
         <code>t.name</code> or <code>t["name"]</code>.
         The array-like indexing is useful when we want to index the table
-        with the value of the variable.
+        with the value of the variable or any other value that is not a string.
         <br/><br/>
         <!-- list -->
         The type <code>list</code> is a dynamic array of Tokudae values, each
@@ -192,7 +196,7 @@
         <br/>
         Additionally the list has special built-in fields.
         The fields <code>x</code>, <code>y</code>, <code>z</code> access the
-        first, second and third list elements respectively.
+        first, second and third list element respectively.
         Given the list <code>l</code>, we index it as <code>l.x</code> or
         <code>l["x"]</code>, which is equivalent to <code>l[0]</code>,
         and <code>l.x&nbsp;=&nbsp;"ok"</code> is equivalent to
@@ -264,20 +268,21 @@
         <em>class</em> that is inheriting. However after the inherit is done,
         the class being created overrides the superclass methods and metatable
         entries with it's own definitions (in case they collide).
-        When defining <em>class</em> methods and <em>metalist</em> entries,
-        a class that inherited has access to the <em>superclass</em> object
+        When defining <em>class</em> methods and <em>metavalues</em> that
+        are functions,
+        a class that has a superclass can access the <em>superclass</em>
         through the <code>super</code> keyword.
         <br/>
-        As mentioned, classes can also make use of <em>metatables</em> to
-        define operations on their instances, besides the already
-        defined operations of identity test (<code>==</code>) and the
-        assignment.
+        Classes can make use of <em>metatables</em> to define operations
+        on their instances,
+        besides the already defined operations of identity test
+        (<code>==</code>) and the assignment.
         <br/><br/>
         <!-- instance -->
-        The type <code>instance</code> is similar to <em>table</em>,
-        meaning they can be indexed in the same way as tables and therefore
-        can hold values (a state), these values are called
-        <em>instance fields</em>.
+        The type <code>instance</code> is similar to a <em>table</em>,
+        it can be indexed in the same way as tables and therefore
+        can hold values (a state),
+        these values are called <em>instance fields</em>.
         Each <em>instance</em> is constructed from a <em>class</em>.
         When <em>instance</em> is indexed, first the <em>metatable</em>
         <code>__getidx</code> entry is checked, if not found then the
@@ -288,8 +293,8 @@
         The type <code>thread</code> represents independent threads of execution.
         Tokudae threads are not related to operating-system threads.
         <br/><br/>
-        Tables, functions, threads, lists, instances, classes, bound methods
-        and full userdata values are objects:
+        Tables, strings, functions, threads, lists, instances, classes,
+        bound methods and full userdata values are objects:
         variables do not actually contain these values,
         only references to them.
         Assignment, parameter passing, and function returns always manipulate
@@ -1114,11 +1119,11 @@ assert(getmetatable(Example).__init);</pre>
         These declarations are executed sequentially:
 
         <pre>
-    stm ::= blockstm
-    blockstm ::= &lsquo;<b>{</b>&rsquo; loopblock &lsquo;<b>}</b>&rsquo;
-    loopblock ::= {decl} [continuestm] | switchblock
+    stm         ::= blockstm
+    blockstm    ::= &lsquo;<b>{</b>&rsquo; loopblock &lsquo;<b>}</b>&rsquo;
+    loopblock   ::= {decl} [continuestm] | switchblock
     switchblock ::= {decl} [breakstm] | block
-    block ::= {decl} [returnstm]</pre>
+    block       ::= {decl} [returnstm]</pre>
         </p>
 
 
@@ -1163,14 +1168,14 @@ assert(getmetatable(Example).__init);</pre>
         is terminated by a semicolon:
 
         <pre>
-    stm ::= expstm &lsquo;<b>;</b>&rsquo;
-    expstm ::= varlist assignop explist
+    stm      ::= expstm &lsquo;<b>;</b>&rsquo;
+    expstm   ::= varlist assignop explist
+    varlist  ::= var {&lsquo;<b>,</b>&rsquo; var}
     assignop ::= &lsquo;<b>=</b>&rsquo; | &lsquo;<b>+=</b>&rsquo; | &lsquo;<b>-=</b>&rsquo; | &lsquo;<b>*=</b>&rsquo; 
                | &lsquo;<b>/=</b>&rsquo; | &lsquo;<b>//=</b>&rsquo; | &lsquo;<b>**=</b>&rsquo; | &lsquo;<b>%=</b>&rsquo; 
                | &lsquo;<b>&=</b>&rsquo; | &lsquo;<b>|=</b>&rsquo; | &lsquo;<b>^=</b>&rsquo; | &lsquo;<b>&gt;&gt;=</b>&rsquo; 
                | &lsquo;<b>&lt;&lt;=</b>&rsquo; | &lsquo;<b>..=</b>&rsquo;
-    varlist ::= var {&lsquo;<b>,</b>&rsquo; var}
-    explist ::= exp {&lsquo;<b>,</b>&rsquo; exp}</pre>
+    explist  ::= exp {&lsquo;<b>,</b>&rsquo; exp}</pre>
 
         Expressions are discussed in <a href="#3.4">&sect;3.4</a>.
         <br/>
@@ -1249,16 +1254,16 @@ assert(getmetatable(Example).__init);</pre>
         familiar syntax:
 
         <pre>
-    stm ::= dowhilestm | whilestm | forstm | loopstm | ifstm | switchstm
-    whilestm ::= <b>while</b> exp stm
+    stm        ::= dowhilestm | whilestm | forstm | loopstm | ifstm | switchstm
+    whilestm   ::= <b>while</b> exp stm
     dowhilestm ::= <b>do</b> &lsquo;<b>{</b>&rsquo; loopblock &lsquo;<b>}</b>&rsquo; <b>while</b> exp &lsquo;<b>;</b>&rsquo;
-    forstm ::= <b>for</b> forclauses stm
+    forstm     ::= <b>for</b> forclauses stm
     forclauses ::= &lsquo;<b>(</b>&rsquo; forinfix &lsquo;<b>)</b>&rsquo; | forinfix &lsquo;<b>;</b>&rsquo;
-    forinfix ::= [forinit] &lsquo;<b>;</b>&rsquo; [exp] &lsquo;<b>;</b>&rsquo; [expstm]
-    forinit ::= localstm | expstm
-    loopstm ::= <b>loop</b> stm
-    ifstm ::= <b>if</b> exp stm [<b>else</b> stm]
-    switchstm ::= <b>switch</b> exp switchbody
+    forinfix   ::= [forinit] &lsquo;<b>;</b>&rsquo; [exp] &lsquo;<b>;</b>&rsquo; [expstm]
+    forinit    ::= localstm | expstm
+    loopstm    ::= <b>loop</b> stm
+    ifstm      ::= <b>if</b> exp stm [<b>else</b> stm]
+    switchstm  ::= <b>switch</b> exp switchbody
     switchbody ::= &lsquo;<b>{</b>&rsquo; {<b>case</b> exp &rsquo;<b>:</b>&lsquo; {stm}} [<b>default</b> &rsquo;<b>:</b>&lsquo; {stm}] &lsquo;<b>}</b>&rsquo;</pre>
 
         Tokudae also has a generic <b>foreach</b> loop
@@ -1275,7 +1280,7 @@ assert(getmetatable(Example).__init);</pre>
         (after the loop or switch):
 
         <pre>
-    stm ::= breakstm
+    stm      ::= breakstm
     breakstm ::= <b>break</b> &lsquo;<b>;</b>&rsquo;</pre>
 
         A <b>break</b> ends the innermost enclosing loop or switch statement,
@@ -1285,7 +1290,7 @@ assert(getmetatable(Example).__init);</pre>
         and proceed to the next iteration of the loop:
 
         <pre>
-    stm ::= continuestm
+    stm         ::= continuestm
     continuestm ::= <b>continue</b> &lsquo;<b>;</b>&rsquo;</pre>
 
         When a <b>continue</b> statement is encountered, the remaining
@@ -1300,13 +1305,13 @@ assert(getmetatable(Example).__init);</pre>
         <b>return</b> statement is
 
         <pre>
-    stm ::= returnstm
+    stm       ::= returnstm
     returnstm ::= <b>return</b> [explist] [&lsquo;<b>;</b>&rsquo;]</pre>
 
         Finally the <b>return</b> statement can also only be written as the
         last statement of a block or a chunk.
         If it is necessary to <b>return</b> in the middle of a block,
-        then an explicit inner block can be used: <code>{ return; }</code>,
+        then an explicit inner block can be used: <code>{ return }</code>,
         because now <b>return</b> is the last statement in its (inner) block
         (this also applies to <b>break</b> and <b>continue</b>).
         </p>
@@ -1321,9 +1326,9 @@ assert(getmetatable(Example).__init);</pre>
         The generic <b>foreach</b> loop has the following syntax:
 
         <pre>
-    stm ::= foreachstm
+    stm        ::= foreachstm
     foreachstm ::= <b>foreach</b> namelist <b>in</b> forexplist stm
-    namelist ::= Name {&lsquo;<b>,</b>&rsquo; Name}
+    namelist   ::= Name {&lsquo;<b>,</b>&rsquo; Name}
     forexplist ::= exp [&lsquo;<b>,</b>&rsquo; exp [&lsquo;<b>,</b>&rsquo; exp [&lsquo;<b>,</b>&rsquo; exp]]]</pre>
 
         A <b>foreach</b> statement like
@@ -1378,9 +1383,9 @@ assert(getmetatable(Example).__init);</pre>
         The declaration can include an initialization:
 
         <pre>
-    decl ::= localstm &lsquo;<b>;</b>&rsquo; | localfn | localclass | stm
-    localstm ::= <b>local</b> attnamelist [&lsquo;<b>=</b>&rsquo; explist]
-    attnamelist ::=  Name [attrib] {&lsquo;<b>,</b>&rsquo; Name [attrib]}</pre>
+    decl        ::= localstm &lsquo;<b>;</b>&rsquo; | localfn | localclass | stm
+    localstm    ::= <b>local</b> attnamelist [&lsquo;<b>=</b>&rsquo; explist]
+    attnamelist ::= Name [attrib] {&lsquo;<b>,</b>&rsquo; Name [attrib]}</pre>
 
         If present, an initial assignment has the same semantics
         of a multiple assignment (see <a href="#3.3.3">&sect;3.3.3</a>).
@@ -1705,10 +1710,10 @@ assert(getmetatable(Example).__init);</pre>
         The general syntax for table definition is
 
         <pre>
-    tabledef ::= &lsquo;<b>{</b>&rsquo; [fieldlist] &lsquo;<b>}</b>&rsquo;
+    tabledef  ::= &lsquo;<b>{</b>&rsquo; [fieldlist] &lsquo;<b>}</b>&rsquo;
     fieldlist ::= field {sep field} [sep]
-    field ::= &lsquo;<b>[</b>&rsquo; exp &lsquo;<b>]</b>&rsquo; &lsquo;<b>=</b>&rsquo; exp | Name &lsquo;<b>=</b>&rsquo; exp
-    sep ::= &lsquo;<b>,</b>&rsquo; | &lsquo;<b>;</b>&rsquo;</pre>
+    field     ::= &lsquo;<b>[</b>&rsquo; exp &lsquo;<b>]</b>&rsquo; &lsquo;<b>=</b>&rsquo; exp | Name &lsquo;<b>=</b>&rsquo; exp
+    sep       ::= &lsquo;<b>,</b>&rsquo; | &lsquo;<b>;</b>&rsquo;</pre>
 
         Each field of the form <code>[exp1] = exp2</code> adds to the new
         table an entry with key <code>exp1</code> and value <code>exp2</code>.
@@ -1736,7 +1741,7 @@ assert(getmetatable(Example).__init);</pre>
         The general syntax for list definition is:
 
         <pre>
-    listdef ::= &lsquo;<b>[</b>&rsquo; [elementlist] &lsquo;<b>]</b>&rsquo;
+    listdef     ::= &lsquo;<b>[</b>&rsquo; [elementlist] &lsquo;<b>]</b>&rsquo;
     elementlist ::= exp {sep exp} [sep]</pre>
 
         Each expression in the elements list is equivalent to
@@ -1939,17 +1944,17 @@ error(tostr(r2));  /* convert to string for error to add extra information */</p
         <pre>
     functiondef ::= <b>fn</b> parenparams funcbody | pipeparams funcbody
     parenparams ::= &lsquo;<b>(</b>&rsquo; [parameters] &lsquo;<b>)</b>&rsquo;
-    pipeparams ::= &lsquo;<b>|</b>&rsquo; [parameters] &lsquo;<b>|</b>&rsquo;
-    funcbody ::= [&lsquo;<b>::</b>&rsquo;] funcblock
-    funcblock ::= &lsquo;<b>{</b>&rsquo; block &lsquo;<b>}</b>&rsquo; | stm</pre>
+    pipeparams  ::= &lsquo;<b>|</b>&rsquo; [parameters] &lsquo;<b>|</b>&rsquo;
+    funcbody    ::= [&lsquo;<b>::</b>&rsquo;] funcblock
+    funcblock   ::= &lsquo;<b>{</b>&rsquo; block &lsquo;<b>}</b>&rsquo; | stm</pre>
 
         The following syntactic sugar simplifies function definitions:
 
         <pre>
-    stm ::= fnstm
-    fnstm ::= <b>fn</b> dottedname parenparams funcbody
+    stm        ::= fnstm
+    fnstm      ::= <b>fn</b> dottedname parenparams funcbody
     dottedname ::= Name {&lsquo;<b>.</b>&rsquo; Name}
-    localfn ::= <b>local</b> <b>fn</b> Name parenparams funcbody</pre>
+    localfn    ::= <b>local</b> <b>fn</b> Name parenparams funcbody</pre>
 
         The statement
 
@@ -2178,22 +2183,22 @@ error(tostr(r2));  /* convert to string for error to add extra information */</p
         The syntax for class definition is
 
         <pre>
-    classdef ::= <b>class</b> [inherit] [classbody]
-    inherit ::= <b>inherits</b> exp
-    classbody ::= &lsquo;<b>{</b>&rsquo; {classvalue} &lsquo;<b>}</b>&rsquo;
+    classdef   ::= <b>class</b> [inherit] [classbody]
+    inherit    ::= <b>inherits</b> exp
+    classbody  ::= &lsquo;<b>{</b>&rsquo; {classvalue} &lsquo;<b>}</b>&rsquo;
     classvalue ::= method | metafield
-    method ::= <b>fn</b> Name parenparams funcbody
-    metafield ::= Name &lsquo;<b>=</b>&rsquo; exp &lsquo;<b>;</b>&rsquo;</pre>
+    method     ::= <b>fn</b> Name parenparams funcbody
+    metafield  ::= Name &lsquo;<b>=</b>&rsquo; exp &lsquo;<b>;</b>&rsquo;</pre>
 
         The following syntax is used for class definition as a statement or
         a declaration, which also allows declaration of local variables in
         the class body.
 
         <pre>
-    classvaluestm = classvalue | localstm &lsquo;<b>;</b>&rsquo;
-    classbodystm ::= &lsquo;<b>{</b>&rsquo; {classvaluestm} &lsquo;<b>}</b>&rsquo;
-    classstm ::= <b>class</b> dottedname [inherit] [classbodystm]
-    localclass ::= <b>local</b> <b>class</b> Name [inherit] [classbodystm]</pre>
+    classvaluestm ::= classvalue | localstm &lsquo;<b>;</b>&rsquo;
+    classbodystm  ::= &lsquo;<b>{</b>&rsquo; {classvaluestm} &lsquo;<b>}</b>&rsquo;
+    classstm      ::= <b>class</b> dottedname [inherit] [classbodystm]
+    localclass    ::= <b>local</b> <b>class</b> Name [inherit] [classbodystm]</pre>
 
         The statements
 
@@ -2383,18 +2388,18 @@ assert(player.lol == "lol");</pre>
         Consider the following example:
 
         <pre>
-    x = 10;                 // global variable
-    {                       // new block
-        local x = x;        // new 'x', with value 10
-        print(x);           // 10
+    x = 10;                 # global variable
+    {                       # new block
+        local x = x;        # new 'x', with value 10
+        print(x);           # 10
         x = x+1;
-        {                   // another block
-            local x = x+1;  // another 'x'
-            print(x);       // 12
+        {                   # another block
+            local x = x+1;  # another 'x'
+            print(x);       # 12
         }  
-        print(x);           // 11
+        print(x);           # 11
     }  
-    print(x);               // 10  (the global one) </pre>
+    print(x);               # 10  (the global one) </pre>
 
         Notice that, in a declaration like <code>local x = x;</code>,
         the new <code>x</code> being declared is not in scope yet,
@@ -3049,7 +3054,7 @@ typedef struct toku_Debug {
     int32_t ntransfer;              /* (r) */
     int32_t nupvals;                /* (u) */
     int32_t nparams;                /* (u) */
-    uint32_t extraargs;             /* (t) */
+    int32_t extraargs;              /* (t) */
     uint8_t istailcall;             /* (t) */
     uint8_t isvararg;               /* (u) */
     char shortsrc[TOKU_IDSIZE];     /* (s) */
@@ -3144,12 +3149,10 @@ typedef struct toku_Debug {
                 to functions called through <code>__call</code> and
                 <code>__init</code> metamethods or by calling bound methods.
                 (Each <code>__call</code> and <code>__init</code> metavalue
-                or bound method adds a single extra argument,
-                the object being called or the method object in case of
-                a call to bound method,
+                or a bound method add a single extra argument,
+                the <em>self</em> object,
                 but there may be a chain of <code>__call</code> and
-                <code>__init</code> metavalues or methods in case of a call
-                to bound method.)
+                <code>__init</code> metavalues or bound methods.)
             </li>
             <li>
                 <b><code>istailcall</code></b>: 
@@ -3239,7 +3242,7 @@ typedef struct toku_Opcode {
         similarly to the <a href="#toku_Cinfo"><code>toku_Cinfo</code></a>,
         the garbage collector can still collect the function that filled
         this structure, if that happens, this structure would reference
-        freed memory.
+        freed memory in it's private fields.
         <br/><br/>
         The fields of <a href="#toku_Opcode"><code>toku_Opcode</code></a>
         have the following meaning:
@@ -3314,7 +3317,8 @@ typedef struct toku_Opdesc {
         <a href="#toku_getopdesc"><code>toku_getopdesc</code></a>
         filled the <code>extra.value.s</code> field (a string constant),
         and the function that holds the constant value is collected,
-        then <code>extra.value.s</code> would reference freed memory.
+        then <code>extra.value.s</code> could potentially reference freed
+        memory.
         <br/><br/>
         The fields of <a href="#toku_Opdesc"><code>toku_Opdesc</code></a>
         have the following meaning:
@@ -4841,7 +4845,7 @@ typedef struct toku_Cinfo {
         a single function and pushes it on top of the stack.
         The resulting function is compiled as if it is calling every
         function that was combined in the order they were pushed onto the
-        stack.
+        stack. The results of these functions are discarded.
         <br/><br/>
         The debug information for the <code>n</code> functions on the stack
         and the ones in the new combined function stays the same,

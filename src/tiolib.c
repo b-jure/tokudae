@@ -46,12 +46,12 @@ static int32_t checkmode(const char *mode) {
 
 #if !defined(t_popen)           /* { */
 
-#if defined(TOKU_USE_POSIX)       /* { */
+#if defined(TOKU_USE_POSIX) || defined(TOKU_USE_MINGW)   /* { */
 
 #define t_popen(T,c,m)      (fflush(NULL), popen(c,m))
 #define t_pclose(T,file)    (pclose(file))
 
-#elif defined(TOKU_USE_WINDOWS)   /* }{ */
+#elif defined(TOKU_USE_WINDOWS)                 /* }{ */
 
 #define t_popen(T,c,m)      (_popen(c,m))
 #define t_pclose(T,file)    (_pclose(file))
@@ -62,14 +62,14 @@ static int32_t checkmode(const char *mode) {
         (m[1] == '\0' || ((m[1] == 'b' || m[1] == 't') && m[2] == '\0')))
 #endif
 
-#else                           /* }{ */
+#else                                           /* }{ */
 
 /* ISO C definition */
 #define t_popen(T,c,m) \
         ((void)c, (void)m, tokuL_error(T, "'popen' not supported"), (FILE*)0)
 #define t_pclose(T,file)    ((void)T, (void)file, -1)
 
-#endif                          /* } */
+#endif                                          /* } */
 
 #endif                          /* } */
 

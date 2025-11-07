@@ -392,7 +392,6 @@ TOKU_API int32_t     toku_gethookmask(toku_State *T);
 TOKU_API int32_t     toku_gethookcount(toku_State *T);
 TOKU_API int32_t     toku_stackinuse(toku_State *T);
 
-// TODO: update docs
 struct toku_Debug {
     int32_t event;
     const char *name;           /* (n) */
