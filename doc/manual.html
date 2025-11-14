@@ -12796,10 +12796,8 @@ assert(!res and err == l);</pre>
         <!-- debug.getcode -->
         <hr/><h3><a name="debug.getcode"><code>debug.getcode (function)</code></a></h3>
         <p>
-        Returns a list representing the complete bytecode of the
-        <code>function</code>.
-        Each list element represents an opcode, and each opcode is a table
-        containing the following fields:
+        Returns a list of opcodes in <code>function</code>.
+        Each opcode is a table containing the following fields:
         <ul>
             <li>
                 <b>"<code>args</code>"</b>:
@@ -12830,14 +12828,33 @@ assert(!res and err == l);</pre>
         in which case the function at the given level will be used.
         </p>
 
-        <!-- debug.cstacklimit -->
-        <hr/><h3><a name="debug.cstacklimit"><code>debug.cstacklimit</code></a></h3>
-        <p>
-        Maximum depth for nested C calls (a number, not a function).
+        <!-- debug.opcodes -->
+        <hr/><h3><a name="debug.opcodes"><code>debug.opcodes (function[, init])</code></a></h3>
+        Returns an iterator function,
+        so that the construction
+
+        <pre>
+foreach i,op in debug.opcodes(f) <em>body</em></pre>
+
+        will iterate over the opcodes and their positions
+        (<code>n, opN</code>), (<code>n+1, opN+1</code>), ...,
+        up to (and including) the last opcode in the Tokudae function
+        <code>f</code>.
+        <br/><br/>
+        If the optional argument <code>init</code> is provided,
+        then the iteration begins at the <code>init</code> opcode
+        (starting from 0),
+        <code>init</code> can also be negative,
+        where -1 would be the last opcode in the <code>function</code>.
         <br/>
-        This is installation dependant
-        (see <code>TOKUI_MAXSTACK</code> in <code>tokudaeconf.h</code>).
-        </p>
+        If <code>function</code> is not a Tokudae function,
+        then it must be a level
+        (see <a href="#debug.getinfo"><code>debug.getinfo</code></a>),
+        in which case the opcodes of the function at the given level will
+        be iterated.
+
+        <br/><br/>
+        <p>
 
         <!-- debug.maxstack -->
         <hr/><h3><a name="debug.maxstack"><code>debug.maxstack</code></a></h3>
@@ -12845,7 +12862,7 @@ assert(!res and err == l);</pre>
         Maximum size of C stack (a number, not a function).
         <br/>
         This is installation dependant
-        (see <code>TOKUI_MAXCCALLS</code> in <code>tokudaelimits.h</code>).
+        (see <code>TOKU_MAXSTACK</code> in <code>tokudaeconf.h</code>).
         </p>
 
 

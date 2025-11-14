@@ -151,17 +151,15 @@ fn toomanyidx() {
   
 
 
-if !__port and __heavy {
-    # skip them anyway
-    (Message or print)("skipped heavy non-portable tests");
-    #teststring();
-    #controlstruct();
-    #manylines();
-    #hugeid();
-    #toomanyinst();
-    #toomanyconst();
-    #toomanyidx();
+if !__port and __veryheavy {
+    teststring();
+    controlstruct();
+    manylines();
+    hugeid();
+    toomanyinst();
+    toomanyconst();
+    toomanyidx();
 } else
-    (Message or print)("skipped heavy non-portable tests");
+    (Message or print)("skipped veryheavy non-portable tests");
 
 __G.a = nil;

@@ -400,15 +400,15 @@ lineerror([=[
 }
 
 
-if (__heavy and !(__TESTS.gc or __TESTS.memory or __TESTS.stack))
-    and (!__opts or (__opts and __opts.run_isolated)) {
+if (__veryheavy and !(__TESTS.gc or __TESTS.memory or __TESTS.stack))
+    and (!__opts or __opts.run_isolated) {
     /// several tests that exhaust the Tokudae stack
     gc();
     print("testing stack overflow");
     local C = 0;
     /// get line where stack overflow will happen
     local l = debug.getinfo(1, "l").currline + 1;
-    local fn auxy() { C=C+1; auxy(); } /// produce a stack overflow
+    local fn auxy() { C++; auxy(); } /// produce a stack overflow
     fn YY() {
         gc("stop"); /// avoid running finalizers without stack space
         auxy();
@@ -418,6 +418,7 @@ if (__heavy and !(__TESTS.gc or __TESTS.memory or __TESTS.stack))
     local fn checkstackmessage(m) {
         print("(expected stack overflow after " .. tostr(C) .. " calls)");
         C = 0; /// prepare next count
+        print(m);
         return (reg.find(m, "stack overflow"));
     }
     /// repeated stack overflows (to check stack recovery)
@@ -492,7 +493,7 @@ if (__heavy and !(__TESTS.gc or __TESTS.memory or __TESTS.stack))
     local res, msg = xpcall(error, err, 170);
     assert(!res and msg == "}");
 
-    /// too many levels (limit is 'TOKUI_MAXCCALLS')
+    /// too many levels
     res, msg = xpcall(error, err, 300);
     assert(!res and msg == "C stack overflow");
 }

@@ -60,7 +60,7 @@ CClosure *tokuF_newCclosure(toku_State *T, int32_t nupvals) {
 void tokuF_adjustvarargs(toku_State *T, int32_t arity, CallFrame *cf,
                          SPtr *sp, const Proto *fn) {
     int32_t actual = cast_i32(T->sp.p - cf->func.p) - 1;
-    cf->t.nvarargs = actual - arity;
+    cf->u.t.nvarargs = actual - arity;
     checkstackp(T, fn->maxstack + 1, *sp);
     setobjs2s(T, T->sp.p++, cf->func.p); /* move function to the top */
     for (int32_t i = 1; i <= arity; i++) { /* move parameters to the top */
@@ -75,7 +75,7 @@ void tokuF_adjustvarargs(toku_State *T, int32_t arity, CallFrame *cf,
 
 
 void tokuF_getvarargs(toku_State *T, CallFrame *cf, SPtr *sp, int32_t wanted) {
-    int32_t have = cf->t.nvarargs;
+    int32_t have = cf->u.t.nvarargs;
     if (wanted < 0) { /* TOKU_MULTRET? */
         wanted = have;
         checkstackGCp(T, wanted, *sp); /* check stack, maybe wanted>have */

@@ -125,8 +125,9 @@ static int32_t lst_flatten(toku_State *T) {
     tokuL_check_arg(T, 0 <= i, 1, "start index out of bounds");
     tokuL_check_arg(T, e < len, 1, "end index out of bounds");
     n = t_castS2U(e) - t_castS2U(i); /* number of elements minus 1 */
-    if (t_unlikely(!toku_checkstack(T, cast_i32(++n))))
-        return tokuL_error(T, "too many results");
+    if (t_unlikely(n >= cast_u32(INT32_MAX) ||
+                   !toku_checkstack(T, cast_i32(++n))))
+        return tokuL_error(T, "flatten produces too many results");
     while (i <= e) /* push l[i..e] */
         toku_get_index(T, 0, i++);
     return cast_i32(n);

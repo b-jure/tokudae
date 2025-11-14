@@ -113,7 +113,7 @@ int32_t tokuD_getfuncline(const Proto *p, int32_t pc) {
 
 
 t_sinline int32_t currentpc(const CallFrame *cf) {
-    return relpc(cf->t.pc, cf_func(cf)->p);
+    return relpc(cf->u.t.savedpc, cf_func(cf)->p);
 }
 
 
@@ -126,7 +126,7 @@ t_sinline int32_t getcurrentline(CallFrame *cf) {
 
 static const char *findvararg(CallFrame *cf, SPtr *pos, int32_t n) {
     if (cf_func(cf)->p->isvararg) {
-        int32_t nextra = cf->t.nvarargs;
+        int32_t nextra = cf->u.t.nvarargs;
         if (n >= -nextra) {
             *pos = cf->func.p - nextra - (n + 1);
             return "(vararg)";
@@ -484,10 +484,10 @@ static const char *getobjname(const Proto *p, int32_t lastpc, int32_t sp,
 static const char *funcnamefromcode(toku_State *T, const Proto *p, int32_t pc,
                                     const char **name) {
     int32_t event;
-    uint8_t *i = &p->code[pc];
-    switch (*i) {
+    uint8_t *po = &p->code[pc];
+    switch (*po) {
         case OP_TAILCALL: case OP_CALL:
-            return getobjname(p, pc, GET_ARG_L(i, 0), name);
+            return getobjname(p, pc, GET_ARG_L(po, 0), name);
         case OP_FORCALL:
             *name = "for iterator";
             return "for iterator";
@@ -500,7 +500,7 @@ static const char *funcnamefromcode(toku_State *T, const Proto *p, int32_t pc,
             event = TM_SETIDX;
             break;
         case OP_MBIN:
-            event = GET_ARG_S(i, 0) & 0x7f;
+            event = GET_ARG_S(po, 0) & 0x7f;
             break;
         case OP_LT: case OP_LTI: case OP_GTI:
             event = TM_LT;
@@ -522,7 +522,12 @@ static const char *funcnamefromcode(toku_State *T, const Proto *p, int32_t pc,
 }
 
 
-/* try to find a name for a function based on how it was called */
+/*
+** Try to find a name for a function based on how it was called.
+** WARNING: always first check if the function was called as a hook,
+** as the 'cf->u.t.savedpc' might point after the relevant instruction
+** and this would mess up symbolic execution (see 'tokuD_traceexec').
+*/
 static const char *funcnamefromcall(toku_State *T, CallFrame *cf,
                                                    const char **name) {
     if (cf->status & CFST_HOOKED) { /* was it called inside a hook? */
@@ -590,7 +595,7 @@ static int32_t auxgetinfo(toku_State *T, const char *options, Closure *cl,
                 break;
             case 't':
                 if (cf != NULL) {
-                    ar->istailcall = cf->status & CFST_TAIL;
+                    ar->istailcall = !!(cf->status & CFST_TAIL);
                     ar->extraargs = cast_i32(cf->extraargs);
                 } else {
                     ar->istailcall = 0;
@@ -692,7 +697,7 @@ TOKU_API int32_t toku_getinfo(toku_State *T, const char *options,
 static void settraps(CallFrame *cf) {
     for (; cf != NULL; cf = cf->prev)
         if (isTokudae(cf))
-            cf->t.trap = 1;
+            cf->u.t.trap = 1;
 }
 
 
@@ -1053,15 +1058,14 @@ void tokuD_hook(toku_State *T, int32_t event, int32_t line,
 ** whenever 'hookmask' is not zero, so it checks whether call hooks are
 ** active.
 */
-void tokuD_hookcall(toku_State *T, CallFrame *cf, int32_t delta) {
+void tokuD_hookcall(toku_State *T, CallFrame *cf) {
     T->oldpc = 0; /* set 'oldpc' for new function */
     if (T->hookmask & TOKU_MASK_CALL) { /* is call hook on? */
         int32_t event = (cf->status & CFST_TAIL) ? TOKU_HOOK_TAILCALL
                                                  : TOKU_HOOK_CALL;
-        toku_assert(delta > 0);
-        cf->t.pc += delta; /* hooks assume 'pc' is already incremented */
+        cf->u.t.savedpc++; /* hooks assume pc is already incremented */
         tokuD_hook(T, event, -1, 0, cf_func(cf)->p->arity);
-        cf->t.pc -= delta; /* correct 'pc' */
+        cf->u.t.savedpc--; /* correct pc */
     }
 }
 
@@ -1071,17 +1075,17 @@ void tokuD_hookcall(toku_State *T, CallFrame *cf, int32_t delta) {
 ** a function, and function is not vararg, calls 'tokuD_hookcall'
 ** (Vararg functions will call 'tokuD_hookcall' after adjusting its
 ** variable arguments; otherwise, they could call a line/count hook
-** before the call hook.)
+** before the call hook when fetching the first opcode.)
 */
-int32_t tokuD_tracecall(toku_State *T, int32_t delta) {
+int32_t tokuD_tracecall(toku_State *T) {
     CallFrame *cf = T->cf;
     Proto *p = cf_func(cf)->p;
-    cf->t.trap = 1; /* ensure hooks will be checked */
-    if (cf->t.pc == p->code) {
-        if (p->isvararg)
+    cf->u.t.trap = 1; /* ensure hooks will be checked */
+    if (cf->u.t.savedpc == p->code) { /* not returning? */
+        if (p->isvararg) /* vararg function? */
             return 0; /* hooks will start at VARARGPREP opcode */
-        else
-            tokuD_hookcall(T, cf, delta); /* check 'call' hook */
+        else /* otherwise check 'call' hook */
+            tokuD_hookcall(T, cf);
     }
     return 1; /* keep 'trap' on */
 }
@@ -1094,34 +1098,29 @@ int32_t tokuD_tracecall(toku_State *T, int32_t delta) {
 ** function, 'npci' will be zero and will test as a new line whatever
 ** the value of 'oldpc'. Some exceptional conditions may return to
 ** a function without setting 'oldpc'. In that case, 'oldpc' may be
-** invalid; if so, use zero as a valid value. (A wrong but valid 'oldpc'
-** at most causes an extra call to a line hook.)
-** This function is not "Protected" when called, so it should correct
-** 'T->sp.p' before calling anything that can run the GC.
+** invalid; if so, use zero as a valid value.
+** (A wrong but valid 'oldpc' at most causes an extra call to a line hook.)
+** WARNING: This function should correct 'T->sp.p' before calling anything
+** that can run the GC or raise errors.
 */
 int32_t tokuD_traceexec(toku_State *T, const uint8_t *pc, ptrdiff_t stacksz) {
     CallFrame *cf = T->cf;
     const Proto *p = cf_func(cf)->p;
     uint8_t mask = cast_u8(T->hookmask);
-    int32_t isize, counthook;
+    int32_t counthook;
     if (!(mask & (TOKU_MASK_LINE | TOKU_MASK_COUNT))) { /* no hooks? */
-        cf->t.trap = 0; /* don't need to stop again */
+        cf->u.t.trap = 0; /* don't need to stop again */
         return 0; /* turn off 'trap' */
     }
-    isize = getopSize(*pc);
-    isize = (cast_i32((pc + isize) - p->code) < p->sizecode) * isize;
-    /* reference is always the next (or last) opcode + SIZE_OPCODE */
-    cf->t.pc = pc + isize + SIZE_OPCODE;
+    cf->u.t.savedpc = pc + 1; /* hooks assume current opcode is consumed */
     counthook = (mask & TOKU_MASK_COUNT) && (--T->hookcount == 0);
-    if (counthook)
+    if (counthook) { /* opcode count hook is on and count reached 0? */
         resethookcount(T); /* reset count */
-    else if (!(mask & TOKU_MASK_LINE))
-        return 1; /* no line hook and count != 0; nothing to be done now */
-    if (counthook) {
         T->sp.p = cf->func.p + 1 + stacksz; /* save 'sp' */
         tokuD_hook(T, TOKU_HOOK_COUNT, -1, 0, 0); /* call count hook */
-    }
-    if (mask & TOKU_MASK_LINE) {
+    } else if (!(mask & TOKU_MASK_LINE))
+        return 1; /* no line hook and count != 0; nothing to be done now */
+    if (mask & TOKU_MASK_LINE) { /* line hook? */
         /* 'T->oldpc' may be invalid; use zero in this case */
         int32_t oldpc = (T->oldpc < p->sizecode) ? T->oldpc : 0;
         int32_t npci = cast_i32(pc - p->code);

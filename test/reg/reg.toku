@@ -216,7 +216,8 @@ if __heavy {
 
     a = string.repeat("a", 10000) .. string.repeat("b", 10000);
     assert(!pcall(reg.gsub, a, "b"));
-}
+} else
+    (Message or print)("skipped regex find on large strings");
 
 /// recursive nest of gsubs
 local fn rev(s) {

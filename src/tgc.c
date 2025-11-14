@@ -92,7 +92,6 @@ static void markobject_(GState *gs, GCObject *o);
 
 static void cleargraylists(GState *gs) {
     gs->graylist = gs->grayagain = NULL;
-    gs->weak = NULL;
 }
 
 
@@ -765,7 +764,6 @@ static t_mem atomic(toku_State *T) {
     GCObject *grayagain = gs->grayagain;
     t_mem work = 0;
     gs->grayagain = NULL;
-    toku_assert(gs->weak == NULL); /* 'weak' unused */
     toku_assert(!iswhite(gs->mainthread)); /* mainthread must be marked */
     gs->gcstate = GCSatomic;
     markobject(gs, T); /* mark running thread */
@@ -784,7 +782,6 @@ static t_mem atomic(toku_State *T) {
     tokuS_clearcache(gs);
     gs->whitebit = whitexor(gs); /* flip current white bit */
     toku_assert(gs->graylist == NULL); /* all must be propagated */
-    toku_assert(gs->weak == NULL); /* 'weak' unused */
     return work; /* estimate number of values marked by 'atomic' */
 }
 

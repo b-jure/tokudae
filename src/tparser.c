@@ -1625,13 +1625,14 @@ static void localclass(Lexer *lx) {
 
 
 static void blockstm(Lexer *lx) {
+    FunctionState *fs = lx->fs;
     int32_t linenum = lx->line;
     Scope s;
     tokuY_scan(lx); /* skip '{' */
-    enterscope(lx->fs, &s, 0); /* explicit scope */
+    enterscope(fs, &s, 0); /* explicit scope */
     decl_list(lx, '}'); /* body */
     expectmatchblk(lx, linenum);
-    leavescope(lx->fs);
+    leavescope(fs);
 }
 
 
@@ -2051,7 +2052,7 @@ static void switchstm(Lexer *lx) {
 }
 
 
-/* data for 'condbody()' */
+/* data for 'condbody' */
 typedef struct CondBodyState {
     FuncContext ctxbefore;  /* snapshot before the condition (and body) */
     FuncContext ctxend;     /* 'ctxend.pc != NOPC' if dead code was found */

@@ -107,33 +107,11 @@ typedef ptrdiff_t       t_mem;
 
 
 /*
-** Size of cache for strings in the API. 'N' is the number of
-** sets (better be a prime) and "M" is the size of each set (M == 1
-** makes a direct cache.)
-*/
-#if !defined(TOKUI_STRCACHE_N)
-#define TOKUI_STRCACHE_N        53  /* cache lines */
-#define TOKUI_STRCACHE_M        2   /* cache line size * sizeof(OString*) */
-#endif
-
-
-/*
 ** Minimum size for string buffer during lexing, this buffer memory
 ** will be freed after compilation.
 */
 #if !defined(TOKUI_MINBUFFER)
 #define TOKUI_MINBUFFER         32
-#endif
-
-
-/*
-** Maximum depth for nested C calls, syntactical nested non-terminals,
-** and other features implemented through recursion in C. (Value must
-** fit in a 16-bit unsigned integer. It must also be compatible with
-** the size of the C stack.)
-*/
-#if !defined(TOKUI_MAXCCALLS)
-#define TOKUI_MAXCCALLS         200
 #endif
 
 

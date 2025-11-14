@@ -1,3 +1,10 @@
+# DO NOT MODIFY THIS PART >>>>>>>>>>>>>>>>
+local debug = import("debug");
+fn test(name, level)
+    assert(debug.getinfo(2, "l").currline == 6);
+
+test(5, 5);
+
 fn err0(name, level) {
     if (!name)
         error("name is nil", level);
@@ -6,26 +13,17 @@ fn err0(name, level) {
 }
 
 local res, err = pcall(err0, nil, 0);
-print(err);
-assert(!res);
-assert(typeof(err) == "string");
+assert(!res and err == "name is nil");
 
-
-fn err1(name, level) {
+fn err1(name, level)
     err0(name, level);
-}
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 res, err = pcall(err1, nil, 0);
-print(err);
-assert(!res);
-assert(typeof(err) == "string");
+assert(!res and err == "name is nil");
 
 res, err = pcall(err1, nil, 1);
-print(err);
-assert(!res);
-assert(typeof(err) == "string");
+assert(!res and reg.find(err, ":10:%s*name is nil"));
 
 res, err = pcall(err1, nil, 2);
-print(err);
-assert(!res);
-assert(typeof(err) == "string");
+assert(!res and reg.find(err, ":19:%s*name is nil"));

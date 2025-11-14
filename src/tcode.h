@@ -282,14 +282,14 @@ typedef enum { /* "ORDER OPFMT" */
 } OpFormat;
 
 
-#define VD      INT_MAX /* flag for variable delta */
+#define VD      UINT8_MAX /* flag for variable delta */
 
 
 /* TODO: compress 'push','pop' and 'chgsp' into a single byte */
 typedef struct {
     OpFormat format; /* opcode format */
-    int32_t push; /* how many values the opcode pushes */
-    int32_t pop; /* how many values the opcode pops */
+    uint8_t push; /* how many values the opcode pushes */
+    uint8_t pop; /* how many values the opcode pops */
     uint8_t chgsp; /* true if opcode changes value at current stack pointer */
 } OpProperties; 
 

@@ -565,7 +565,7 @@ assert(__ENV == __G);
     }
 
 
-    if !(__TESTS and __TESTS.stack) { /// test for tbc variable high in the stack
+    if __veryheavy and !(__TESTS and __TESTS.stack) { /// test for tbc variable high in the stack
       /// function to force a stack overflow
         local fn overflow(n) :: overflow(n + 1);
 

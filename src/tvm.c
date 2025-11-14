@@ -30,18 +30,19 @@
 #include "tprotected.h"
 
 
-#if 0 /* (by default do not trace bytecode execution) */
+#if 0 /* { trace bytecode execution (slow) */
 
 #include <stdio.h>
 #include "topnames.h"
 
 #define debugline(p,pc) \
         printf("%-12s on line: %d\n", \
-                opnames[I], tokuD_getfuncline(p, relpc(pc, p)));
+                opnames[O], tokuD_getfuncline(p, relpc(pc, p)));
 
+#undef TOKU_USE_JUMPTABLE
 #define TOKU_USE_JUMPTABLE      0
 
-#else /* otherwise do not trace lines */
+#else /* }{ otherwise do not trace bytecode execution */
 
 #define debugline(p,pc)     ((void)0)
 
@@ -53,7 +54,7 @@
 #endif
 #endif
 
-#endif
+#endif /* } */
 
 
 /* cast OpCode to TM */
@@ -72,14 +73,13 @@
 ** Check whether some integers may not fit in a float, testing whether
 ** (maxinteger >> NBM) > 0. (That implies (1 << NBM) <= maxinteger.)
 ** (The shifts are done in parts, to avoid shifting by more than the size
-** of an integer. In a worst case, NBM == 113 for long double and
-** sizeof(long) == 32.)
+** of an integer.
 */
 #if ((((TOKU_INTEGER_MAX >> (NBM / 4)) >> (NBM / 4)) >> (NBM / 4)) \
         >> (NBM - (3 * (NBM / 4))))  >  0
 
 /* limit for integers that fit in a float */
-#define MAXINTFITSF     ((toku_Unsigned)1 << NBM)
+#define MAXINTFITSF     (cast_Unsigned(1) << NBM)
 
 /* check whether 'i' is in the interval [-MAXINTFITSF, MAXINTFITSF] */
 #define t_intfitsf(i)   ((MAXINTFITSF + t_castS2U(i)) <= (2 * MAXINTFITSF))
@@ -661,7 +661,7 @@ static void rethook(toku_State *T, CallFrame *cf, int32_t nres) {
         int32_t ftransfer;
         if (isTokudae(cf)) {
             Proto *p = cf_func(cf)->p;
-            delta = !!p->isvararg * (cf->t.nvarargs + p->arity + 1);
+            delta = !!p->isvararg * (cf->u.t.nvarargs + p->arity + 1);
         }
         cf->func.p += delta; /* if vararg, back to virtual function */
         ftransfer = cast_u16(firstres - cf->func.p) - 1;
@@ -670,7 +670,7 @@ static void rethook(toku_State *T, CallFrame *cf, int32_t nres) {
         cf->func.p -= delta; /* if vararg, back to original function */
     }
     if (isTokudae(cf = cf->prev))
-        T->oldpc = relpc(cf->t.pc, cf_func(cf)->p); /* set 'oldpc' */
+        T->oldpc = relpc(cf->u.t.savedpc, cf_func(cf)->p); /* set 'oldpc' */
 }
 
 
@@ -772,7 +772,7 @@ t_sinline int32_t precallC(toku_State *T, SPtr func,
     int32_t n;
     CallFrame *cf;
     checkstackGCp(T, TOKU_MINSTACK, func); /* ensure minimum stack space */
-    T->cf = cf = prepcallframe(T, func, extra | CFST_CCALL, nres,
+    T->cf = cf = prepcallframe(T, func, extra | CFST_C, nres,
                                   T->sp.p + TOKU_MINSTACK);
     toku_assert(cf->top.p <= T->stackend.p);
     if (t_unlikely(T->hookmask & TOKU_MASK_CALL)) {
@@ -841,6 +841,7 @@ t_sinline uint32_t trymetacall(toku_State *T, SPtr func, uint32_t extra) {
     return incccall(extra);
 }
 
+
 CallFrame *precall(toku_State *T, SPtr func, int32_t nres) {
     uint32_t extra = 0; /* extraargs + status */
 retry:
@@ -859,7 +860,7 @@ retry:
             int32_t fsize = f->maxstack; /* frame size */
             checkstackGCp(T, fsize, func);
             T->cf = cf = prepcallframe(T, func, extra, nres, func+1+fsize);
-            cf->t.pc = cf->t.pcret = f->code; /* set starting point */
+            cf->u.t.savedpc = cf->u.t.retpc = f->code; /* set starting point */
             for (; narg < nparams; narg++)
                 setnilval(s2v(T->sp.p++)); /* set missing as 'nil' */
             if (!f->isvararg) /* not a vararg function? */
@@ -921,7 +922,7 @@ retry:
                 setnilval(s2v(func + narg1)); /* complete missing arguments */
             cf->top.p = func + 1 + fsize; /* top for new function */
             toku_assert(cf->top.p <= T->stackend.p);
-            cf->t.pc = cf->t.pcret = f->code; /* set starting point */
+            cf->u.t.savedpc = cf->u.t.retpc = f->code; /* set starting point */
             cf->status |= CFST_TAIL;
             if (!f->isvararg) /* not a vararg function? */
                 T->sp.p = func + nparams + 1; /* (leave only parameters) */
@@ -1347,7 +1348,7 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 
 
 /* update global 'trap' */
-#define updatetrap(cf)      (trap = (cf)->t.trap)
+#define updatetrap(cf)      (trap = (cf)->u.t.trap)
 
 /* update global 'base' */
 #define updatebase(cf)      (base = (cf)->func.p + 1)
@@ -1364,7 +1365,7 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 
 
 /* store global 'pc' */
-#define storepc(T)          (cf->t.pc = pc)
+#define storepc(T)          (cf->u.t.savedpc = pc)
 
 /* store global 'sp' */
 #define storesp(T)          (T->sp.p = sp)
@@ -1384,13 +1385,13 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 
 /* fetch opcode */
 #define fetch() { \
-    if (t_unlikely(trap)) { /* stack reallocation or hooks? */ \
-        ptrdiff_t sizestack = sp - base; \
-        trap = tokuD_traceexec(T, pc, sizestack); /* handle hooks */ \
+    if (t_unlikely(trap)) { /* stack changed or count/line hook? */ \
+        ptrdiff_t sizestack = sp - base; /* hook might change the stack */ \
+        trap = tokuD_traceexec(T, pc, sizestack); /* check hook */ \
         updatebase(cf); /* correct stack */ \
         sp = base + sizestack; /* correct stack pointer */ \
     } \
-    I = *(pc++); \
+    O = *(pc++); \
 }
 
 /* fetch short opcode argument */
@@ -1398,9 +1399,6 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 
 /* fetch long opcode argument */
 #define fetch_l()       (pc += SIZE_ARG_L, get3bytes(pc - SIZE_ARG_L))
-
-
-#define hookdelta()     (getopSize(*pc) + SIZE_OPCODE)
 
 
 /* In cases where jump table is not available or prefered. */
@@ -1433,23 +1431,23 @@ void tokuV_execute(toku_State *T, CallFrame *cf) {
 #endif
 startfunc:
     trap = T->hookmask;
-    toku_assert(cf->t.pcret == cf_func(cf)->p->code); /* must be at start */
-returning: /* trap already set */
+    toku_assert(cf->u.t.savedpc == cf->u.t.retpc);
+    toku_assert(cf->u.t.savedpc == cf_func(cf)->p->code);
+returning: /* trap is already set */
     cl = cf_func(cf);
     k = cl->p->k;
-    pc = cf->t.pcret;
+    pc = cf->u.t.retpc;
     if (t_unlikely(trap)) /* hooks? */
-        trap = tokuD_tracecall(T, hookdelta());
+        trap = tokuD_tracecall(T);
     base = cf->func.p + 1;
     sp = T->sp.p;
-    /* main loop of interpreter */
-    for (;;) {
-        uint8_t I; /* opcode being executed */
+    for (;;) { /* main loop of interpreter */
+        uint8_t O; /* opcode being executed */
         fetch();
         debugline(cl->p, pc);
         toku_assert(base == cf->func.p + 1);
         toku_assert(base <= T->sp.p && T->sp.p <= T->stackend.p);
-        vm_dispatch(I) {
+        vm_dispatch(O) {
             vm_case(OP_TRUE) {
                 setbtval(s2v(sp));
                 sp++;
@@ -1514,11 +1512,11 @@ returning: /* trap already set */
                 /* 'tokuF_adjustvarargs' handles 'sp' */
                 tokuF_adjustvarargs(T, fetch_l(), cf, &sp, cl->p);
                 updatetrap(cf);
-                if (t_unlikely(trap)) { /* (check for hooks) */
+                if (t_unlikely(trap)) { /* check for hooks */
                     storepc(T);
-                    tokuD_hookcall(T, cf, hookdelta());
+                    tokuD_hookcall(T, cf);
                     /* next opcode will be seen as a "new" line */
-                    T->oldpc = getopSize(OP_VARARGPREP); 
+                    T->oldpc = getopSize(OP_VARARGPREP);
                     sp = T->sp.p; /* 'sp' must be in sync with 'base' */
                 }
                 updatebase(cf); /* function has new base after adjustment */
@@ -1910,9 +1908,9 @@ returning: /* trap already set */
                 docondjumppre(sp--);
             }
             vm_case(OP_CALL) {
-                CallFrame *newcf;
                 SPtr func;
                 int32_t nres;
+                CallFrame *newcf;
                 savestate(T);
                 func = STK(fetch_l());
                 nres = fetch_l() - 1;
@@ -1920,7 +1918,7 @@ returning: /* trap already set */
                 if ((newcf = precall(T, func, nres)) == NULL) /* C call? */
                     updatetrap(cf); /* done (C function already returned) */
                 else { /* Tokudae call */
-                    cf->t.pcret = pc; /* after return, continue at 'pc' */
+                    cf->u.t.retpc = pc; /* after return, continue at 'pc' */
                     cf = newcf; /* run function in this same C frame */
                     goto startfunc;
                 }
@@ -1935,7 +1933,7 @@ returning: /* trap already set */
                 savestate(T);
                 func = STK(fetch_l());
                 nres = fetch_l() - 1;
-                delta = (p->isvararg) ? cf->t.nvarargs + p->arity + 1 : 0;
+                delta = (p->isvararg) ? cf->u.t.nvarargs + p->arity + 1 : 0;
                 if (fetch_s()) { /* close upvalues? */
                     tokuF_closeupval(T, base);
                     toku_assert(T->tbclist.p < base); /* no tbc variables */
@@ -2153,8 +2151,8 @@ returning: /* trap already set */
                 offset = fetch_l();
                 pc += offset;
                 /* go to the next opcode */
-                I = *(pc++);
-                toku_assert(I == OP_FORCALL);
+                O = *(pc++);
+                toku_assert(O == OP_FORCALL);
                 goto l_forcall;
             }
             vm_case(OP_FORCALL) {
@@ -2177,8 +2175,8 @@ returning: /* trap already set */
                 sp = T->sp.p; /* correct sp for next opcode */
                 toku_assert(sp - base == sp - cf->func.p - 1);
                 /* go to the next opcode */
-                I = *(pc++);
-                toku_assert(I == OP_FORLOOP);
+                O = *(pc++);
+                toku_assert(O == OP_FORLOOP);
                 goto l_forloop;
             }}
             vm_case(OP_FORLOOP) {
@@ -2210,7 +2208,7 @@ returning: /* trap already set */
                     updatestackaux(cf, stk = STK(nslot));
                 }
                 if (cl->p->isvararg) /* vararg function? */
-                    cf->func.p -= cf->t.nvarargs + cl->p->arity + 1;
+                    cf->func.p -= cf->u.t.nvarargs + cl->p->arity + 1;
                 T->sp.p = stk + nres; /* set stk ptr for 'poscall' */
                 poscall(T, cf, nres);
                 updatetrap(cf); /* 'poscall' can change hooks */

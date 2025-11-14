@@ -15,26 +15,60 @@
 #include <setjmp.h>
 
 
-/* 
-** Increment number of nested non-yield-able calls.
-** The counter it located in the upper 2 bytes of 'nCcalls'.
-** (As of current version, every call is non-yield-able.)
+/*
+** Some notes about garbage-collected objects: All objects in Tokudae must
+** be kept somehow accessible until being freed, so all objects always
+** belong to one (and only one) of these lists, using field 'next' of
+** the 'ObjectHeader' for the link:
+**
+** 'objects': all objects not marked for finalization;
+** 'fin': all objects marked for finalization;
+** 'tobefin': all objects ready to be finalized;
+** 'fixed': all objects that are not to be collected
+**          (currently only small strings, such as reserved words).
+**
+** There is another set of lists that control gray objects.
+** These lists are linked by fields 'gclist'. (All objects that
+** can become gray have such a field. The field is not the same
+** in all objects, but it always has this name.)  Any gray object
+** must belong to one of these lists, and all objects in these lists
+** must be gray (with two exceptions explained below):
+**
+** 'graylist': regular gray objects, still waiting to be visited.
+** 'grayagain': objects that must be revisited at the atomic phase.
+**   That includes
+**   - black objects got in a write barrier;
+**   - all threads.
+**
+** The exception to that "gray rule" is that open upvalues are kept gray to
+** avoid barriers, but they stay out of gray lists.
+** (They don't even have a 'gclist' field.)
 */
-#define incnnyc(T)      ((T)->nCcalls += 0x10000)
-
-/* decrement number of nested non-yieldable calls */
-#define decnnyc(T)      ((T)->nCcalls -= 0x10000)
 
 
 /*
-** Get total number of C calls.
-** This counter is located in the lower 2 bytes of 'nCcalls'.
+** About 'nCcalls':  This count has two parts: the lower 16 bits counts
+** the number of recursive invocations in the C stack; the higher
+** 16 bits counts the number of non-yieldable calls in the stack.
+** (They are together so that we can change and save both with one
+** instruction.)
 */
-#define getCcalls(T)    ((T)->nCcalls & 0xffff)
 
 
-/* non-yield-able and C calls increment */
-#define nyci        (0x10000 | 1)
+/* true if this thread does not have non-yieldable calls in the stack */
+#define yieldable(T)	(((T)->nCcalls & 0xffff0000) == 0)
+
+/* real number of C calls */
+#define getCcalls(T)	((T)->nCcalls & 0xffff)
+
+/* increment the number of non-yieldable calls */
+#define incnny(T)       ((T)->nCcalls += 0x10000)
+
+/* decrement the number of non-yieldable calls */
+#define decnny(T)       ((T)->nCcalls -= 0x10000)
+
+/* non-yieldable call increment */
+#define nyci    (0x10000 | 1)
 
 
 typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
@@ -63,48 +97,90 @@ typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
 #define stacksize(th)   cast_i32((th)->stackend.p - (th)->stack.p)
 
 
-/* {======================================================================
-** CallFrame
-** ======================================================================= */
+/* {{CallFrame============================================================ */
 
-#define CFST_CCALL      (1<<0) /* call is running a C function */
+/* bits in CallFrame status */
+#define CFST_C          (1<<0) /* call is running a C function */
 #define CFST_FRESH      (1<<1) /* call is on fresh "tokuV_execute" frame */
-#define CFST_HOOKED     (1<<2) /* call is running a debug hook */
-#define CFST_FIN        (1<<3) /* function "called" a finalizer */
-#define CFST_TAIL       (1<<4) /* call was tail called */
-
-typedef struct CallFrame {
-    SIndex func; /* function stack index */
-    SIndex top; /* top for this function */
-    struct CallFrame *prev, *next; /* dynamic call link */
-    struct { /* only for Tokudae function */
-        const uint8_t *pc; /* current pc (points to opcode) */
-        const uint8_t *pcret; /* after return continue from this pc */
-        volatile t_signal trap; /* hooks or stack reallocation flag */
-        int32_t nvarargs; /* number of optional arguments */
-    } t;
-    int32_t nresults; /* number of wanted results from this function */
-    uint32_t extraargs; /* number of call, init and bound (meta)methods */
-    uint8_t status; /* call status */
-} CallFrame;
-
-
-/* maximum number of init/call/bound (meta)methods (and their arguments) */
-#define CALLCHAIN_MAX       UINT8_MAX
+#define CFST_CLSRET     (1<<2) /* function is closing tbc variables */
+#define CFST_TBC        (1<<3) /* function has tbc variables to close */
+#define CFST_OAH        (1<<4) /* original value of 'allowhook' */
+#define CFST_HOOKED     (1<<5) /* call is running a debug hook */
+#define CFST_YPCALL     (1<<6) /* doing a yieldable protected call */
+#define CFST_TAIL       (1<<7) /* call was tail called */
+#define CFST_HOOKYIELD  (1<<8) /* last hook that was called yielded */
+#define CFST_FIN        (1<<9) /* function "called" a finalizer */
+/* bits 10-12 are used for CFST_RECST (see below) */
+#define CFST_RECST      10 /* the offset, not the mask */
+/* bits 13-15 are unused */
 
 
 /*
-** Check if the given call frame it running Tokudae function.
+** Field CFST_RECST stores the "recover status", used to keep the error
+** status while closing to-be-closed variables in coroutines, so that
+** Tokudae can correctly resume after an yield from a __close method
+** called because of an error.
 */
-#define isTokudae(cf)       (!((cf)->status & CFST_CCALL))
+#define getcfstrecst(cf)    (((cf)->status >> CFST_RECST) & 7)
+#define setcfstrecst(cf,st)  \
+        check_exp(((st) & 7) == (st), /* status must fit in three bits */ \
+                  ((cf)->status = ((cf)->status & ~(7u << CFST_RECST))  \
+                                  | (cast_u32(st) << CFST_RECST)))
 
-/* }====================================================================== */
+
+/* active function is Tokudae function */
+#define isTokudae(cf)       (!((cf)->status & CFST_C))
+
+/* call is running Tokudae code (not a hook) */
+#define isTokudaecode(cf)   (!((cf)->callstatus & (CFST_C | CFST_HOOKED)))
 
 
+/* set/get 'allowhook' from status */
+#define setoah(cf,v)  \
+        ((cf)->status = ((v) ? (cf)->status|CFST_OAH  \
+                             : (cf)->status & ~CFST_OAH))
+#define getoah(cf)  (((cf)->status & CFST_OAH) ? 1 : 0)
 
-/* {======================================================================
-** Global state
-** ======================================================================= */
+
+typedef struct CallFrame {
+    SIndex func; /* function stack index */
+    SIndex top;  /* top for this function */
+    struct CallFrame *prev, *next; /* dynamic call link */
+    union {
+        struct { /* only for Tokudae functions */
+            const uint8_t *savedpc; /* current pc (1 byte after the opcode) */
+            const uint8_t *retpc; /* execution continues here after return */
+            volatile t_signal trap; /* tracing lines/count or stack realloc */
+            int32_t nvarargs; /* number of extra args. in vararg function */
+        } t;
+        struct { /* only for C functions */
+            toku_KFunction k; /* continuation in case of yields */
+            toku_KContext cx; /* context information in case of yields */
+            ptrdiff_t old_errfunc; /* offset of message handler */
+        } c;
+    } u;
+    int32_t nresults; /* number of wanted results from this function */
+    uint32_t extraargs; /* number of call, init and/or bound (meta)methods */
+    uint16_t status; /* call status */
+} CallFrame;
+
+
+/* maximum number of calls through init/call/bound (meta)methods */
+#define CALLCHAIN_MAX   UINT8_MAX
+
+
+/* }{Global state========================================================= */
+
+/*
+** Size of cache for strings in the API. 'N' is the number of
+** sets (better be a prime) and 'M' is the size of each set.
+** (M == 1 makes a direct cache.)
+*/
+#if !defined(TOKUI_STRCACHE_N)
+#define TOKUI_STRCACHE_N        53 /* cache lines */
+#define TOKUI_STRCACHE_M        2  /* cache line size * sizeof(OString*) */
+#endif
+
 
 /* 
 ** Table for interned strings.
@@ -112,79 +188,74 @@ typedef struct CallFrame {
 */
 typedef struct StringTable {
     OString **hash; /* array of buckets (linked lists of strings) */
-    int32_t nuse; /* number of elements */
-    int32_t size; /* number of buckets */
+    int32_t nuse;   /* number of elements */
+    int32_t size;   /* number of buckets */
 } StringTable;
 
 
 typedef struct GState {
-    toku_Alloc falloc; /* allocator */
-    void *ud_alloc; /* userdata for 'falloc' */
-    t_mem totalbytes; /* number of bytes allocated - gcdebt */
-    t_mem gcdebt; /* number of bytes not yet compensated by collector */
-    t_umem gcestimate; /* gcestimate of non-garbage memory in use */
-    StringTable strtab; /* interned strings (weak refs) */
-    TValue c_list; /* API list */
-    TValue c_table; /* API table */
-    TValue nil; /* special nil value (also init flag) */
-    uint32_t seed; /* initial seed for hashing */
-    uint8_t whitebit; /* current white bit (WHITEBIT0 or WHITEBIT1) */
-    uint8_t gcstate; /* GC state bits */
-    uint8_t gcstopem; /* stops emergency collections */
-    uint8_t gcstop; /* control whether GC is running */
+    toku_Alloc falloc;   /* allocator */
+    void *ud_alloc;      /* userdata for 'falloc' */
+    t_mem totalbytes;    /* number of bytes allocated - gcdebt */
+    t_mem gcdebt;        /* number of bytes not yet compensated by collector */
+    t_umem gcestimate;   /* gcestimate of non-garbage memory in use */
+    StringTable strtab;  /* interned strings */
+    TValue c_list;       /* API list */
+    TValue c_table;      /* API table */
+    TValue nil;          /* special nil value (also init flag) */
+    uint32_t seed;       /* initial seed for hashing */
+    uint8_t whitebit;    /* current white bit (WHITEBIT0 or WHITEBIT1) */
+    uint8_t gcstate;     /* GC state bits */
+    uint8_t gcstopem;    /* stops emergency collections */
+    uint8_t gcstop;      /* control whether GC is running */
     uint8_t gcemergency; /* true if this is emergency collection */
     uint8_t gcparams[TOKU_GCP_NUM]; /* GC options */
-    uint8_t gccheck; /* true if collection was triggered since last check */
-    GCObject *objects; /* list of all collectable objects */
+    uint8_t gccheck;     /* true if collection triggered since last check */
+    GCObject *objects;   /* list of all collectable objects */
     GCObject **sweeppos; /* current position of sweep in list */
-    GCObject *fin; /* list of objects that have finalizer */
-    GCObject *graylist; /* list of gray objects */
+    GCObject *fin;       /* list of objects that have finalizer */
+    GCObject *graylist;  /* list of gray objects */
     GCObject *grayagain; /* list of objects to be traversed atomically */
-    GCObject *weak; /* list of all weak tables (key & value) */
-    GCObject *tobefin; /* list of objects to be finalized (pending) */
-    GCObject *fixed; /* list of fixed objects (not to be collected) */
+    GCObject *tobefin;   /* list of objects to be finalized (pending) */
+    GCObject *fixed;     /* list of fixed objects (not to be collected) */
     struct toku_State *twups; /* list of threads with open upvalues */
-    toku_CFunction fpanic; /* panic handler (runs in unprotected calls) */
+    toku_CFunction fpanic;    /* panic handler (runs in unprotected calls) */
     struct toku_State *mainthread; /* thread that also created global state */
-    OString *listfields[LFNUM]; /* array with names of list fields */
-    OString *memerror; /* preallocated message for memory errors */
-    OString *tmnames[TM_NUM]; /* array with tag method names */
+    OString *listfields[LFNUM];    /* array with names of list fields */
+    OString *memerror;             /* preallocated message for memory errors */
+    OString *tmnames[TM_NUM];      /* array with tag method names */
     OString *strcache[TOKUI_STRCACHE_N][TOKUI_STRCACHE_M]; /* string cache */
     toku_WarnFunction fwarn; /* warning function */
-    void *ud_warn; /* userdata for 'fwarn' */
+    void *ud_warn;           /* userdata for 'fwarn' */
 } GState;
 
-/* }====================================================================== */
 
-
-/* {======================================================================
-** Thread (per-thread-state)
-** ======================================================================= */
+/* }{Thread (per-thread-state)============================================ */
 
 /* Tokudae thread state */
 struct toku_State {
     ObjectHeader;
-    uint8_t status;
-    uint8_t allowhook;
-    uint16_t ncf; /* number of call frames in 'cf' list */
-    GCObject *gclist;
-    struct toku_State *twups; /* next thread with open upvalues */
-    GState *gstate; /* shared global state */
-    toku_longjmp *errjmp; /* error recovery */
-    SIndex stack; /* stack base */
-    SIndex sp; /* first free slot in the 'stack' */
-    SIndex stackend; /* end of 'stack' + 1 */
-    CallFrame basecf; /* base frame, C's entry to Tokudae */
-    CallFrame *cf; /* active frame */
-    volatile toku_Hook hook;
-    UpVal *openupval; /* list of open upvalues */
-    SIndex tbclist; /* list of to-be-closed variables */
-    ptrdiff_t errfunc; /* error handling function (on stack) */
-    uint32_t nCcalls; /* number of C calls */
-    int32_t oldpc; /* last pc traced */
-    int32_t basehookcount;
-    int32_t hookcount;
-    volatile t_signal hookmask;
+    uint8_t status;             /* status of the thread */
+    uint8_t allowhook;          /* true if hooks are allowed to run */
+    uint16_t ncf;               /* number of call frames in 'cf' list */
+    GCObject *gclist;           /* (for GC) */
+    struct toku_State *twups;   /* next thread with open upvalues */
+    GState *gstate;             /* global state of the thread */
+    toku_longjmp *errjmp;       /* error recovery */
+    SIndex stack;               /* stack base */
+    SIndex sp;                  /* first free slot in the 'stack' */
+    SIndex stackend;            /* end of 'stack' + 1 */
+    CallFrame basecf;           /* base frame, C's entry to Tokudae */
+    CallFrame *cf;              /* active frame */
+    volatile toku_Hook hook;    /* hook function */
+    UpVal *openupval;           /* list of open upvalues */
+    SIndex tbclist;             /* list of to-be-closed variables */
+    ptrdiff_t errfunc;          /* error handling function (on stack) */
+    uint32_t nCcalls;           /* number of C calls */
+    int32_t oldpc;              /* last pc that was traced */
+    int32_t basehookcount;      /* original value set for 'hookcount' */
+    int32_t hookcount;          /* current instruction count until hook */
+    volatile t_signal hookmask; /* mask of events when the hook should run */
     struct { /* info about transferred values (for call/return hooks) */
         int32_t ftransfer; /* offset of first value transferred */
         int32_t ntransfer; /* number of values transferred */
@@ -196,25 +267,18 @@ struct toku_State {
 #define statefullybuilt(gs)     ttisnil(&(gs)->nil)
 
 
-/* get thread global state */
+/* get global state/C list/C table */
 #define G(T)        ((T)->gstate)
-
-
-/* get the clist */
 #define CL(T)       (&G(T)->c_list)
-
-/* get the ctable */
 #define CT(T)       (&G(T)->c_table)
 
 
 /*
 ** Get the global table in the clist. Since all predefined
-** indices in the clist were inserted right when the clist
-** was created and never removed, they must always be present.
+** indices in the C list were inserted right when the C list
+** was created and were never removed, they must always be present.
 */
 #define GT(T)       (&listval(CL(T))->arr[TOKU_CLIST_GLOBALS])
-
-
 
 
 /* eXtra space + main thread State */
@@ -234,24 +298,24 @@ typedef struct XSG {
 /* cast 'toku_State' back to start of 'XS' */
 #define fromstate(T)    cast(XS *, cast(uint8_t *, (T)) - offsetof(XS, t))
 
-/* }====================================================================== */
+/* }}===================================================================== */
 
 
 /* union for conversions (casting) */
 union GCUnion {
-    struct GCObject gc; /* object header */
-    struct Table tab;
-    struct List l;
-    struct OString str;
-    struct UpVal uv;
-    struct Proto p;
-    union Closure cl;
-    struct OClass cls;
-    struct Instance ins;
-    struct IMethod im;
-    struct UMethod um;
-    struct UserData u;
-    struct toku_State T;
+    struct GCObject gc;  /* object header */
+    struct Table tab;    /* table */
+    struct List l;       /* list */
+    struct OString str;  /* string */
+    struct UpVal uv;     /* upvalue */
+    struct Proto p;      /* function prototype */
+    union Closure cl;    /* closure (C or Tokudae) */
+    struct OClass cls;   /* class */
+    struct Instance ins; /* instance */
+    struct IMethod im;   /* instance method */
+    struct UMethod um;   /* userdata method */
+    struct UserData u;   /* userdata */
+    struct toku_State T; /* thread */
 };
 
 #define cast_gcu(o)     cast(union GCUnion *, (o))

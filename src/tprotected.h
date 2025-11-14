@@ -53,6 +53,17 @@ typedef void (*ProtectedFn)(toku_State *T, void *userdata);
 #define checkstackGC(T,n)   tokuPR_checkstackaux(T,n,tokuG_checkGC(T),(void)0)
 
 
+/*
+** Maximum depth for nested C calls, syntactical nested non-terminals,
+** and other features implemented through recursion in C. (Value must
+** fit in a 16-bit unsigned integer. It must also be compatible with
+** the size of the C stack.)
+*/
+#if !defined(TOKUI_MAXCCALLS)
+#define TOKUI_MAXCCALLS     200
+#endif
+
+
 TOKUI_FUNC void tokuPR_seterrorobj(toku_State *T, int errcode, SPtr oldtop);
 TOKUI_FUNC t_noret tokuPR_throw(toku_State *T, int code);
 TOKUI_FUNC int tokuPR_rawcall(toku_State *T, ProtectedFn fn, void *ud);

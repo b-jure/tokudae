@@ -679,28 +679,27 @@ local fn eqseq(l1, l2) {
 }
 
 
-{ /// testing local function information
+{ # testing local function information
     co = load([=[
-        local x = 2;
-        local A = 5
-                  +
-                  x;
+        local A = fn() {
+            return x;
+        };
         return;
     ]=]);
     local a = 0;
-    /// 'A' should be visible to debugger only after its complete definition
+    # 'A' should be visible to debugger only after its complete definition
     debug.sethook(fn(e, l) {
-        if (l == 3) { /// after addition with '5', local A is active
-            a = a + 1;
-            assert(debug.getlocal(2, 2) == "A");
-        } else if (l == 4) { /// operands are swapped (commutative op)
-            a = a + 1;
-            assert(debug.getlocal(2, 2) == "(temporary)");
+        if (l == 1) {
+            a++;
+            assert(debug.getlocal(2, 1) == "(temporary)");
+        } else if (l == 4) {
+            a++;
+            assert(debug.getlocal(2, 1) == "A");
         }
     }, "l");
-    co(); /// run local function definition
-    debug.sethook(); /// turn off hook
-    assert(a == 2); /// ensure all two lines where hooked
+    co(); # run local function definition
+    debug.sethook(); # turn off hook
+    assert(a == 2); # ensure all two lines where hooked
 }
 
 

@@ -14,7 +14,7 @@
 
 #define vm_dispatch(x)      goto *jmptable[x];
 #define vm_case(label)      L_##label:
-#define vm_break            fetch(); vm_dispatch(I)
+#define vm_break            fetch(); vm_dispatch(O)
 
 
 static const void *const jmptable[NUM_OPCODES] = { /* "ORDER OP" */

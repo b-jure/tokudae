@@ -63,133 +63,6 @@
 #define isIMML(i)       (MIN_IMML <= (i) && (i) <= MAX_IMML)
 
 
-/* 
-** OpCode properties table.
-** "ORDER OP"
-*/
-TOKUI_DEF const OpProperties tokuC_opproperties[NUM_OPCODES] = {
-    /* FORMAT PSH POP CHGTOP */
-    { FormatI, 1, 0, 0 }, /* OP_TRUE */
-    { FormatI, 1, 0, 0 }, /* OP_FALSE */
-    { FormatI, 0, 0, 1 }, /* OP_SUPER */
-    { FormatIL, VD, 0, 0 }, /* OP_NIL */
-    { FormatIL, VD, 0, 0 }, /* OP_POP */
-    { FormatIL, 1, 0, 0 }, /* OP_LOAD */
-    { FormatIS, 1, 0, 0 }, /* OP_CONST */
-    { FormatIL, 1, 0, 0 }, /* OP_CONSTL */
-    { FormatIS, 1, 0, 0 }, /* OP_CONSTI */
-    { FormatIL, 1, 0, 0 }, /* OP_CONSTIL */
-    { FormatIS, 1, 0, 0 }, /* OP_CONSTF */
-    { FormatIL, 1, 0, 0 }, /* OP_CONSTFL */
-    { FormatIL, VD, 0, 0 }, /* OP_VARARGPREP */
-    { FormatIL, VD, 0, 0 }, /* OP_VARARG */
-    { FormatIL, 1, 0, 0 }, /* OP_CLOSURE */
-    { FormatIS, 1, 0, 0 }, /* OP_NEWLIST */
-    { FormatIS, 1, 0, 0 }, /* OP_NEWCLASS */
-    { FormatIS, 1, 0, 0 }, /* OP_NEWTABLE */
-    { FormatIL, 0, 2, 0 }, /* OP_METHOD */
-    { FormatIS, 0, 2, 0 }, /* OP_SETTM */
-    { FormatIL, 0, 2, 0 }, /* OP_SETMT */
-    { FormatIS, 0, 0, 0 }, /* OP_MBIN */
-    { FormatIL, 0, 0, 1 }, /* OP_ADDK */
-    { FormatIL, 0, 0, 1 }, /* OP_SUBK */
-    { FormatIL, 0, 0, 1 }, /* OP_MULK */
-    { FormatIL, 0, 0, 1 }, /* OP_DIVK */
-    { FormatIL, 0, 0, 1 }, /* OP_IDIVK */
-    { FormatIL, 0, 0, 1 }, /* OP_MODK */
-    { FormatIL, 0, 0, 1 }, /* OP_POWK */
-    { FormatIL, 0, 0, 1 }, /* OP_BSHLK */
-    { FormatIL, 0, 0, 1 }, /* OP_BSHRK */
-    { FormatIL, 0, 0, 1 }, /* OP_BANDK */
-    { FormatIL, 0, 0, 1 }, /* OP_BORK */
-    { FormatIL, 0, 0, 1 }, /* OP_BXORK */
-    { FormatIL, 0, 0, 1 }, /* OP_ADDI */
-    { FormatIL, 0, 0, 1 }, /* OP_SUBI */
-    { FormatIL, 0, 0, 1 }, /* OP_MULI */
-    { FormatIL, 0, 0, 1 }, /* OP_DIVI */
-    { FormatIL, 0, 0, 1 }, /* OP_IDIVI */
-    { FormatIL, 0, 0, 1 }, /* OP_MODI */
-    { FormatIL, 0, 0, 1 }, /* OP_POWI */
-    { FormatIL, 0, 0, 1 }, /* OP_BSHLI */
-    { FormatIL, 0, 0, 1 }, /* OP_BSHRI */
-    { FormatIL, 0, 0, 1 }, /* OP_BANDI */
-    { FormatIL, 0, 0, 1 }, /* OP_BORI */
-    { FormatIL, 0, 0, 1 }, /* OP_BXORI */
-    { FormatIS, 0, 1, 1 }, /* OP_ADD */
-    { FormatIS, 0, 1, 1 }, /* OP_SUB */
-    { FormatIS, 0, 1, 1 }, /* OP_MUL */
-    { FormatIS, 0, 1, 1 }, /* OP_DIV */
-    { FormatIS, 0, 1, 1 }, /* OP_IDIV */
-    { FormatIS, 0, 1, 1 }, /* OP_MOD */
-    { FormatIS, 0, 1, 1 }, /* OP_POW */
-    { FormatIS, 0, 1, 1 }, /* OP_BSHL */
-    { FormatIS, 0, 1, 1 }, /* OP_BSHR */
-    { FormatIS, 0, 1, 1 }, /* OP_BAND */
-    { FormatIS, 0, 1, 1 }, /* OP_BOR */
-    { FormatIS, 0, 1, 1 }, /* OP_BXOR */
-    { FormatIL, VD, 0, 1 }, /* OP_CONCAT */
-    { FormatILS, 0, 0, 1 }, /* OP_EQK */
-    { FormatILS, 0, 0, 1 }, /* OP_EQI */
-    { FormatIL, 0, 0, 1 }, /* OP_LTI */
-    { FormatIL, 0, 0, 1 }, /* OP_LEI */
-    { FormatIL, 0, 0, 1 }, /* OP_GTI */
-    { FormatIL, 0, 0, 1 }, /* OP_GEI */
-    { FormatIS, 0, 1, 1 }, /* OP_EQ */
-    { FormatIS, 0, 1, 1 }, /* OP_LT */
-    { FormatIS, 0, 1, 1 }, /* OP_LE */
-    { FormatI, 0, 0, 1 }, /* OP_EQPRESERVE */
-    { FormatI, 0, 0, 1 }, /* OP_UNM */
-    { FormatI, 0, 0, 1 }, /* OP_BNOT */
-    { FormatI, 0, 0, 1 }, /* OP_NOT */
-    { FormatIL, 0, 0, 0 }, /* OP_JMP */
-    { FormatIL, 0, 0, 0 }, /* OP_JMPS */
-    { FormatIS, 0, 0, 0 }, /* OP_TEST */
-    { FormatIS, 0, 1, 0 }, /* OP_TESTPOP */
-    { FormatILLS, VD, 0, 1 }, /* OP_CALL */
-    { FormatILLS, VD, 0, 1 }, /* OP_TAILCALL */
-    { FormatIL, 0, 0, 0 }, /* OP_CLOSE */
-    { FormatIL, 0, 0, 0 }, /* OP_TBC */
-    { FormatILL, VD, 0, 0 }, /* OP_CHECKADJ */
-    { FormatIL, 1, 0, 0 }, /* OP_GETLOCAL */
-    { FormatIL, 0, 1, 0 }, /* OP_SETLOCAL */
-    { FormatIL, 1, 0, 0 }, /* OP_GETUVAL */
-    { FormatIL, 0, 1, 0 }, /* OP_SETUVAL */
-    { FormatILLS, VD, 0, 0 }, /* OP_SETLIST */
-    { FormatILL, 0, 1, 0 }, /* OP_SETPROPERTY */
-    { FormatIL, 0, 0, 1 }, /* OP_GETPROPERTY */
-    { FormatI, 0, 1, 1 }, /* OP_GETINDEX */
-    { FormatIL, 0, 1, 0 }, /* OP_SETINDEX */
-    { FormatIL, 0, 0, 1 }, /* OP_GETINDEXSTR */
-    { FormatILL, 0, 1, 0 }, /* OP_SETINDEXSTR */
-    { FormatIS, 0, 0, 1 }, /* OP_GETINDEXINT */
-    { FormatIL, 0, 0, 1 }, /* OP_GETINDEXINTL */
-    { FormatILS, 0, 1, 0 }, /* OP_SETINDEXINT */
-    { FormatILL, 0, 1, 0 }, /* OP_SETINDEXINTL */
-    { FormatIL, 0, 0, 1 }, /* OP_GETSUP */
-    { FormatI, 0, 1, 1 }, /* OP_GETSUPIDX */
-    { FormatI, 0, 1, 0 }, /* OP_INHERIT */
-    { FormatILL, 0, 0, 0 }, /* OP_FORPREP */
-    { FormatILL, VD, 0, 0 }, /* OP_FORCALL */
-    { FormatILLL, VD, 0, 0 }, /* OP_FORLOOP */
-    { FormatILLS, 0, 0, 0 }, /* OP_RETURN */
-};
-
-
-/* 
-** OpFormat size table (in bytes).
-*/
-TOKUI_DEF const uint8_t tokuC_opsize[FormatN] = { /* "ORDER OPFMT" */
-    SIZE_OPCODE,                             /* FormatI */
-    SIZE_OPCODE+SIZE_ARG_S,                  /* FormatIS */
-    SIZE_OPCODE+SIZE_ARG_S*2,                /* FormatISS */
-    SIZE_OPCODE+SIZE_ARG_L,                  /* FormatIL */
-    SIZE_OPCODE+SIZE_ARG_L+SIZE_ARG_S,       /* FormatILS */
-    SIZE_OPCODE+SIZE_ARG_L*2,                /* FormatILL */
-    SIZE_OPCODE+SIZE_ARG_L*2+SIZE_ARG_S,     /* FormatILLS */
-    SIZE_OPCODE+SIZE_ARG_L*3,                /* FormatILLL */
-};
-
-
 /* limit for difference between lines in relative line info. */
 #define LIMLINEDIFF     0x80
 
@@ -214,7 +87,7 @@ static void savelineinfo(FunctionState *fs, Proto *p, int32_t linenum) {
     int32_t linedif = linenum - fs->prevline;
     int32_t pc = fs->prevpc; /* last coded opcode */
     int32_t opsize = getopSize(p->code[pc]); /* size of last coded opcode */
-    toku_assert(pc < currPC); /* must of emitted opcode */
+    toku_assert(pc < currPC); /* opcode must be emitted */
     if (abs(linedif) >= LIMLINEDIFF || fs->iwthabs++ >= MAXOWTHABS) {
         tokuM_growarray(fs->lx->T, p->abslineinfo, p->sizeabslineinfo,
                         fs->nabslineinfo, INT32_MAX, "lines", AbsLineInfo);
@@ -557,9 +430,9 @@ void tokuC_reserveslots(FunctionState *fs, int32_t n) {
 ** and the opcode 'nretruns' argument is set as TOKU_MULTRET (+1).
 */
 #define mulretinvariant(fs,e) { \
-    uint8_t *pi = &fs->p->code[e->u.info]; UNUSED(pi); \
-    toku_assert((*pi == OP_VARARG && GET_ARG_L(pi, 0) == 0) || \
-                (*pi == OP_CALL && GET_ARG_L(pi, 1) == 0)); }
+    uint8_t *po = &fs->p->code[e->u.info]; UNUSED(po); \
+    toku_assert((*po == OP_VARARG && GET_ARG_L(po, 0) == 0) || \
+                (*po == OP_CALL && GET_ARG_L(po, 1) == 0)); }
 
 
 /* finalize open call or vararg expression */
@@ -608,10 +481,10 @@ static int32_t canmerge(FunctionState *fs, OpCode op, uint8_t *prev) {
 
 
 static int32_t adjuststack(FunctionState *fs, OpCode op, int32_t n) {
-    uint8_t *pi = prevOP(fs);
-    if (canmerge(fs, op, pi)) { /* merge 'op' with previous opcode? */
-        int32_t newn = GET_ARG_L(pi, 0) + n;
-        SET_ARG_L(pi, 0, newn);
+    uint8_t *po = prevOP(fs);
+    if (canmerge(fs, op, po)) { /* merge 'op' with previous opcode? */
+        int32_t newn = GET_ARG_L(po, 0) + n;
+        SET_ARG_L(po, 0, newn);
         return fs->prevpc; /* done; do not code new opcode */
     } else /* otherwise code new opcode */
         return tokuC_emitIL(fs, op, n);
@@ -874,8 +747,8 @@ t_sinline int32_t jumpoffset(uint8_t *jmp) {
 }
 
 
-t_sinline int32_t destinationpc(uint8_t *inst, int32_t pc) {
-    return pc + getopSize(*inst) + jumpoffset(inst);
+t_sinline int32_t destinationpc(uint8_t *po, int32_t pc) {
+    return pc + getopSize(*po) + jumpoffset(po);
 }
 
 
@@ -884,12 +757,12 @@ t_sinline int32_t destinationpc(uint8_t *inst, int32_t pc) {
 ** Used to traverse a list of jumps.
 */
 static int32_t getjump(FunctionState *fs, int32_t pc) {
-    uint8_t *inst = &fs->p->code[pc];
-    int32_t offset = GET_ARG_L(inst, 0);
+    uint8_t *po = &fs->p->code[pc];
+    int32_t offset = GET_ARG_L(po, 0);
     if (offset == 0) /* no offset represents end of the list */
         return NOJMP; /* end of the list */
     else
-        return destinationpc(inst, pc);
+        return destinationpc(po, pc);
 }
 
 
@@ -1062,10 +935,10 @@ static int32_t codefltIK(FunctionState *fs, toku_Number n) {
 
 
 void tokuC_setlistsize(FunctionState *fs, int32_t pc, int32_t lsz) {
-    uint8_t *inst = &fs->p->code[pc];
+    uint8_t *po = &fs->p->code[pc];
     lsz = (lsz != 0 ? tokuO_ceillog2(cast_u32(lsz)) + 1 : 0);
     toku_assert(lsz <= MAX_ARG_S);
-    SET_ARG_S(inst, 0, lsz); /* set size (log2 - 1) */
+    SET_ARG_S(po, 0, lsz); /* set size (log2 - 1) */
 }
 
 
@@ -1080,10 +953,10 @@ void tokuC_setlist(FunctionState *fs, int32_t base, int32_t nelems,
 
 
 void tokuC_settablesize(FunctionState *fs, int32_t pc, int32_t hsize) {
-    uint8_t *inst = &fs->p->code[pc];
+    uint8_t *po = &fs->p->code[pc];
     hsize = (hsize != 0 ? tokuO_ceillog2(cast_u32(hsize)) + 1 : 0);
     toku_assert(hsize <= MAX_ARG_S);
-    SET_ARG_S(inst, 0, hsize);
+    SET_ARG_S(po, 0, hsize);
 }
 
 
@@ -1636,11 +1509,11 @@ static uint8_t *previousopcode(FunctionState *fs) {
 
 static void codeconcat(FunctionState *fs, ExpInfo *e1, ExpInfo *e2,
                                                        int32_t linenum) {
-    uint8_t *inst = previousopcode(fs);
+    uint8_t *po = previousopcode(fs);
     UNUSED(e2);
-    if (*inst == OP_CONCAT) { /* 'e2' is a concatenation? */
-        int32_t n = GET_ARG_L(inst, 0);
-        SET_ARG_L(inst, 0, n + 1); /* will concatenate one more element */
+    if (*po == OP_CONCAT) { /* 'e2' is a concatenation? */
+        int32_t n = GET_ARG_L(po, 0);
+        SET_ARG_L(po, 0, n + 1); /* will concatenate one more element */
     } else { /* 'e2' is not a concatenation */
         e1->u.info = tokuC_emitIL(fs, OP_CONCAT, 2);
         e1->et = EXP_FINEXPR;
@@ -1766,3 +1639,130 @@ void tokuC_finish(FunctionState *fs) {
         }
     }
 }
+
+
+/* 
+** OpCode properties table.
+** "ORDER OP"
+*/
+TOKUI_DEF const OpProperties tokuC_opproperties[NUM_OPCODES] = {
+    /* FORMAT PSH POP CHGTOP */
+    { FormatI, 1, 0, 0 }, /* OP_TRUE */
+    { FormatI, 1, 0, 0 }, /* OP_FALSE */
+    { FormatI, 0, 0, 1 }, /* OP_SUPER */
+    { FormatIL, VD, 0, 0 }, /* OP_NIL */
+    { FormatIL, VD, 0, 0 }, /* OP_POP */
+    { FormatIL, 1, 0, 0 }, /* OP_LOAD */
+    { FormatIS, 1, 0, 0 }, /* OP_CONST */
+    { FormatIL, 1, 0, 0 }, /* OP_CONSTL */
+    { FormatIS, 1, 0, 0 }, /* OP_CONSTI */
+    { FormatIL, 1, 0, 0 }, /* OP_CONSTIL */
+    { FormatIS, 1, 0, 0 }, /* OP_CONSTF */
+    { FormatIL, 1, 0, 0 }, /* OP_CONSTFL */
+    { FormatIL, VD, 0, 0 }, /* OP_VARARGPREP */
+    { FormatIL, VD, 0, 0 }, /* OP_VARARG */
+    { FormatIL, 1, 0, 0 }, /* OP_CLOSURE */
+    { FormatIS, 1, 0, 0 }, /* OP_NEWLIST */
+    { FormatIS, 1, 0, 0 }, /* OP_NEWCLASS */
+    { FormatIS, 1, 0, 0 }, /* OP_NEWTABLE */
+    { FormatIL, 0, 2, 0 }, /* OP_METHOD */
+    { FormatIS, 0, 2, 0 }, /* OP_SETTM */
+    { FormatIL, 0, 2, 0 }, /* OP_SETMT */
+    { FormatIS, 0, 0, 0 }, /* OP_MBIN */
+    { FormatIL, 0, 0, 1 }, /* OP_ADDK */
+    { FormatIL, 0, 0, 1 }, /* OP_SUBK */
+    { FormatIL, 0, 0, 1 }, /* OP_MULK */
+    { FormatIL, 0, 0, 1 }, /* OP_DIVK */
+    { FormatIL, 0, 0, 1 }, /* OP_IDIVK */
+    { FormatIL, 0, 0, 1 }, /* OP_MODK */
+    { FormatIL, 0, 0, 1 }, /* OP_POWK */
+    { FormatIL, 0, 0, 1 }, /* OP_BSHLK */
+    { FormatIL, 0, 0, 1 }, /* OP_BSHRK */
+    { FormatIL, 0, 0, 1 }, /* OP_BANDK */
+    { FormatIL, 0, 0, 1 }, /* OP_BORK */
+    { FormatIL, 0, 0, 1 }, /* OP_BXORK */
+    { FormatIL, 0, 0, 1 }, /* OP_ADDI */
+    { FormatIL, 0, 0, 1 }, /* OP_SUBI */
+    { FormatIL, 0, 0, 1 }, /* OP_MULI */
+    { FormatIL, 0, 0, 1 }, /* OP_DIVI */
+    { FormatIL, 0, 0, 1 }, /* OP_IDIVI */
+    { FormatIL, 0, 0, 1 }, /* OP_MODI */
+    { FormatIL, 0, 0, 1 }, /* OP_POWI */
+    { FormatIL, 0, 0, 1 }, /* OP_BSHLI */
+    { FormatIL, 0, 0, 1 }, /* OP_BSHRI */
+    { FormatIL, 0, 0, 1 }, /* OP_BANDI */
+    { FormatIL, 0, 0, 1 }, /* OP_BORI */
+    { FormatIL, 0, 0, 1 }, /* OP_BXORI */
+    { FormatIS, 0, 1, 1 }, /* OP_ADD */
+    { FormatIS, 0, 1, 1 }, /* OP_SUB */
+    { FormatIS, 0, 1, 1 }, /* OP_MUL */
+    { FormatIS, 0, 1, 1 }, /* OP_DIV */
+    { FormatIS, 0, 1, 1 }, /* OP_IDIV */
+    { FormatIS, 0, 1, 1 }, /* OP_MOD */
+    { FormatIS, 0, 1, 1 }, /* OP_POW */
+    { FormatIS, 0, 1, 1 }, /* OP_BSHL */
+    { FormatIS, 0, 1, 1 }, /* OP_BSHR */
+    { FormatIS, 0, 1, 1 }, /* OP_BAND */
+    { FormatIS, 0, 1, 1 }, /* OP_BOR */
+    { FormatIS, 0, 1, 1 }, /* OP_BXOR */
+    { FormatIL, VD, 0, 1 }, /* OP_CONCAT */
+    { FormatILS, 0, 0, 1 }, /* OP_EQK */
+    { FormatILS, 0, 0, 1 }, /* OP_EQI */
+    { FormatIL, 0, 0, 1 }, /* OP_LTI */
+    { FormatIL, 0, 0, 1 }, /* OP_LEI */
+    { FormatIL, 0, 0, 1 }, /* OP_GTI */
+    { FormatIL, 0, 0, 1 }, /* OP_GEI */
+    { FormatIS, 0, 1, 1 }, /* OP_EQ */
+    { FormatIS, 0, 1, 1 }, /* OP_LT */
+    { FormatIS, 0, 1, 1 }, /* OP_LE */
+    { FormatI, 0, 0, 1 }, /* OP_EQPRESERVE */
+    { FormatI, 0, 0, 1 }, /* OP_UNM */
+    { FormatI, 0, 0, 1 }, /* OP_BNOT */
+    { FormatI, 0, 0, 1 }, /* OP_NOT */
+    { FormatIL, 0, 0, 0 }, /* OP_JMP */
+    { FormatIL, 0, 0, 0 }, /* OP_JMPS */
+    { FormatIS, 0, 0, 0 }, /* OP_TEST */
+    { FormatIS, 0, 1, 0 }, /* OP_TESTPOP */
+    { FormatILLS, VD, 0, 1 }, /* OP_CALL */
+    { FormatILLS, VD, 0, 1 }, /* OP_TAILCALL */
+    { FormatIL, 0, 0, 0 }, /* OP_CLOSE */
+    { FormatIL, 0, 0, 0 }, /* OP_TBC */
+    { FormatILL, VD, 0, 0 }, /* OP_CHECKADJ */
+    { FormatIL, 1, 0, 0 }, /* OP_GETLOCAL */
+    { FormatIL, 0, 1, 0 }, /* OP_SETLOCAL */
+    { FormatIL, 1, 0, 0 }, /* OP_GETUVAL */
+    { FormatIL, 0, 1, 0 }, /* OP_SETUVAL */
+    { FormatILLS, VD, 0, 0 }, /* OP_SETLIST */
+    { FormatILL, 0, 1, 0 }, /* OP_SETPROPERTY */
+    { FormatIL, 0, 0, 1 }, /* OP_GETPROPERTY */
+    { FormatI, 0, 1, 1 }, /* OP_GETINDEX */
+    { FormatIL, 0, 1, 0 }, /* OP_SETINDEX */
+    { FormatIL, 0, 0, 1 }, /* OP_GETINDEXSTR */
+    { FormatILL, 0, 1, 0 }, /* OP_SETINDEXSTR */
+    { FormatIS, 0, 0, 1 }, /* OP_GETINDEXINT */
+    { FormatIL, 0, 0, 1 }, /* OP_GETINDEXINTL */
+    { FormatILS, 0, 1, 0 }, /* OP_SETINDEXINT */
+    { FormatILL, 0, 1, 0 }, /* OP_SETINDEXINTL */
+    { FormatIL, 0, 0, 1 }, /* OP_GETSUP */
+    { FormatI, 0, 1, 1 }, /* OP_GETSUPIDX */
+    { FormatI, 0, 1, 0 }, /* OP_INHERIT */
+    { FormatILL, 0, 0, 0 }, /* OP_FORPREP */
+    { FormatILL, VD, 0, 0 }, /* OP_FORCALL */
+    { FormatILLL, VD, 0, 0 }, /* OP_FORLOOP */
+    { FormatILLS, 0, 0, 0 }, /* OP_RETURN */
+};
+
+
+/* 
+** OpFormat size table (in bytes).
+*/
+TOKUI_DEF const uint8_t tokuC_opsize[FormatN] = { /* "ORDER OPFMT" */
+    SIZE_OPCODE,                             /* FormatI */
+    SIZE_OPCODE+SIZE_ARG_S,                  /* FormatIS */
+    SIZE_OPCODE+SIZE_ARG_S*2,                /* FormatISS */
+    SIZE_OPCODE+SIZE_ARG_L,                  /* FormatIL */
+    SIZE_OPCODE+SIZE_ARG_L+SIZE_ARG_S,       /* FormatILS */
+    SIZE_OPCODE+SIZE_ARG_L*2,                /* FormatILL */
+    SIZE_OPCODE+SIZE_ARG_L*2+SIZE_ARG_S,     /* FormatILLS */
+    SIZE_OPCODE+SIZE_ARG_L*3,                /* FormatILLL */
+};

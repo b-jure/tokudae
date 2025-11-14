@@ -4,6 +4,9 @@
 ** See Copyright Notice in tokudae.h
 */
 
+#define tmarshal_c
+#define TOKU_CORE
+
 #include "tokudaeprefix.h"
 
 #include  <string.h>

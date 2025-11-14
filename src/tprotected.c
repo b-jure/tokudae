@@ -252,12 +252,12 @@ int32_t tokuPR_parse(toku_State *T, BuffReader *Z, const char *name,
                                                    const char *mode) {
     int32_t status;
     struct PParseData p = { .Z = Z, .name = name, .mode = mode };
-    incnnyc(T);
+    incnny(T);
     status = tokuPR_call(T, pparse, &p, savestack(T, T->sp.p), T->errfunc);
     tokuR_freebuffer(T, &p.buff);
     tokuM_freearray(T, p.dyd.actlocals.arr, cast_sizet(p.dyd.actlocals.size));
     tokuM_freearray(T, p.dyd.literals.arr, cast_sizet(p.dyd.literals.size));
     tokuM_freearray(T, p.dyd.gt.arr, cast_sizet(p.dyd.gt.size));
-    decnnyc(T);
+    decnny(T);
     return status;
 }

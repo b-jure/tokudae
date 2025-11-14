@@ -61,6 +61,7 @@ assert(g == nil);
 
 local fn checkerror(msg, f, ...) {
     local s, err = pcall(f, ...);
+    print(s, err);
     assert(!s and string.find(err, msg));
 }
 
@@ -88,16 +89,9 @@ assert(a==1 and x==nil);
 a,x = flatten([1,2], 0, 0);
 assert(a==1 and x==nil);
 
-local maxi = (1 << 31) - 1; /// maximum value for an int (usually)
+local maxi = (1 << 31) - 1; /// maximum value for a 32 bit int
 checkerror("end index out of bounds", flatten, [], 2, maxi);
 checkerror("start index out of bounds", flatten, [], -1, 5);
-if (__heavy) { /// test flatten on big list
-    local bl = [];
-    local lim = 1<<24; /// bytecode limit
-    for (local i = 0; i <= lim; i=i+1)
-        bl[i] = i;
-    checkerror("too many results", flatten, bl);
-}
 flatten([], 5, 0);
 flatten([], 2, 1);
 flatten([], 5, 4);

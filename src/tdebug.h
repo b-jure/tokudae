@@ -73,8 +73,8 @@ TOKUI_FUNC t_noret tokuD_errormsg(toku_State *T);
 TOKUI_FUNC void tokuD_hook(toku_State *T, int32_t event, int32_t line,
                                           int32_t ftransfer,
                                           int32_t ntransfer);
-TOKUI_FUNC void tokuD_hookcall(toku_State *T, CallFrame *cf, int32_t delta);
-TOKUI_FUNC int32_t tokuD_tracecall(toku_State *T, int32_t delta);
+TOKUI_FUNC void tokuD_hookcall(toku_State *T, CallFrame *cf);
+TOKUI_FUNC int32_t tokuD_tracecall(toku_State *T);
 TOKUI_FUNC int32_t tokuD_traceexec(toku_State *T, const uint8_t *pc,
                                               ptrdiff_t stacksize);
 

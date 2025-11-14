@@ -4,7 +4,7 @@
 ** See Copyright Notice in tokudae.h
 */
 
-
+#define tapi_c
 #define TOKU_CORE
 
 #include "tokudaeprefix.h"
@@ -99,9 +99,8 @@ static SPtr index2stack(const toku_State *T, int32_t idx) {
 }
 
 
-/* {======================================================================
-** State manipulation (other functions are defined in tstate.c)
-** ======================================================================= */
+/* {{State manipulation (other functions are defined in tstate.c)========= */
+
 
 TOKU_API toku_CFunction toku_atpanic(toku_State *T, toku_CFunction fpanic) {
     toku_CFunction old_panic;
@@ -130,12 +129,9 @@ TOKU_API toku_Alloc toku_getallocf(toku_State *T, void **ud) {
     return falloc;
 }
 
-/* }====================================================================== */
 
+/* }{Stack manipulation=================================================== */
 
-/* {======================================================================
-** Stack manipulation
-** ======================================================================= */
 
 t_sinline void settop(toku_State *T, int32_t n) {
     CallFrame *cf;
@@ -247,7 +243,7 @@ TOKU_API int32_t toku_checkstack(toku_State *T, int32_t n) {
     toku_lock(T);
     cf = T->cf;
     api_check(T, n >= 0, "negative 'n'");
-    if (T->stackend.p - T->sp.p >= n) /* stack large enough? */
+    if (n && T->stackend.p - T->sp.p > n) /* stack large enough? */
         res = 1;
     else /* need to grow the stack */
         res = tokuT_growstack(T, n, 0);
@@ -258,14 +254,10 @@ TOKU_API int32_t toku_checkstack(toku_State *T, int32_t n) {
 }
 
 
-/* push without lock */
-#define pushvalue(T, idx) \
-    { setobj2s(T, T->sp.p, index2value(T, idx)); api_inctop(T); }
-
-
 TOKU_API void toku_push(toku_State *T, int32_t idx) {
     toku_lock(T);
-    pushvalue(T, idx);
+    setobj2s(T, T->sp.p, index2value(T, idx));
+    api_inctop(T);
     toku_unlock(T);
 }
 
@@ -284,12 +276,9 @@ TOKU_API void toku_xmove(toku_State *src, toku_State *dest, int32_t n) {
     toku_unlock(dest);
 }
 
-/* }====================================================================== */
 
+/* }{Access functions (Stack -> C)======================================== */
 
-/* {======================================================================
-** Access functions (Stack -> T)
-** ======================================================================= */
 
 TOKU_API int32_t toku_is_number(toku_State *T, int32_t idx) {
     toku_Number n;
@@ -438,12 +427,9 @@ TOKU_API toku_State *toku_to_thread(toku_State *T, int32_t idx) {
     return (ttisthread(o) ? thval(o) : NULL);
 }
 
-/* }====================================================================== */
 
+/* }{Ordering & Arithmetic functions====================================== */
 
-/* {======================================================================
-** Ordering & Arithmetic functions
-** ======================================================================= */
 
 TOKU_API void toku_arith(toku_State *T, int32_t op) {
     toku_lock(T);
@@ -487,12 +473,9 @@ TOKU_API int32_t toku_compare(toku_State *T, int32_t index1, int32_t index2,
     return res;
 }
 
-/* }====================================================================== */
 
+/* }{Push functions (C -> Stack)========================================== */
 
-/* {======================================================================
-** Push functions (T -> stack)
-** ======================================================================= */
 
 /* Push nil value on top of the stack. */
 TOKU_API void toku_push_nil(toku_State *T) {
@@ -576,8 +559,9 @@ TOKU_API const char *toku_push_fstring(toku_State *T, const char *fmt, ...) {
 }
 
 
-/* push T closure without locking */
-t_sinline void pushcclosure(toku_State *T, toku_CFunction f, int32_t nup) {
+TOKU_API void toku_push_cclosure(toku_State *T, toku_CFunction f,
+                                 int32_t nup) {
+    toku_lock(T);
     if (nup == 0) {
         setcfval(T, s2v(T->sp.p), f);
         api_inctop(T);
@@ -595,13 +579,6 @@ t_sinline void pushcclosure(toku_State *T, toku_CFunction f, int32_t nup) {
         api_inctop(T);
         tokuG_checkGC(T);
     }
-}
-
-
-TOKU_API void toku_push_cclosure(toku_State *T, toku_CFunction f,
-                                 int32_t nup) {
-    toku_lock(T);
-    pushcclosure(T, f, nup);
     toku_unlock(T);
 }
 
@@ -718,12 +695,9 @@ TOKU_API void toku_push_boundmethod(toku_State *T, int32_t idx) {
     toku_unlock(T);
 }
 
-/* }====================================================================== */
 
+/* }{Get functions (Tokudae -> Stack)===================================== */
 
-/* {======================================================================
-** Get functions (Toku -> stack)
-** ======================================================================= */
 
 TOKU_API int32_t toku_get(toku_State *T, int32_t idx) {
     const TValue *o;
@@ -1027,12 +1001,9 @@ TOKU_API void toku_get_fieldtable(toku_State *T, int32_t idx) {
     toku_unlock(T);
 }
 
-/* }====================================================================== */
 
+/* }{Set functions (Stack -> Tokudae)===================================== */
 
-/* {======================================================================
-** Set functions (stack -> Toku)
-** ======================================================================= */
 
 TOKU_API void toku_set(toku_State *T, int32_t obj) {
     TValue *o;
@@ -1276,38 +1247,8 @@ TOKU_API void toku_set_fieldtable(toku_State *T, int32_t idx) {
     toku_unlock(T);
 }
 
-/* }====================================================================== */
 
-
-/* {======================================================================
-** Status and Error reporting
-** ======================================================================= */
-
-TOKU_API int32_t toku_status(toku_State *T) {
-    return T->status;
-}
-
-
-TOKU_API int32_t toku_error(toku_State *T) {
-    TValue *errobj;
-    toku_lock(T);
-    api_checknelems(T, 1); /* errobj */
-    errobj = s2v(T->sp.p - 1);
-    if (ttisshrstring(errobj) && eqshrstr(strval(errobj), G(T)->memerror)) {
-        tokuM_error(T); /* raise a memory error */
-    } else
-        tokuD_errormsg(T);
-    /* toku_unlock() is called after control leaves the core */
-    toku_assert(0);
-    return 0; /* to prevent warnings */
-}
-
-/* }====================================================================== */
-
-
-/* {======================================================================
-** Call/Load/Dump Tokudae chunks
-** ======================================================================= */
+/* }{Call/Load/Combine/Dump Tokudae chunks================================ */
 
 #define checkresults(T,nargs,nres) \
      api_check(T, (nres) == TOKU_MULTRET \
@@ -1315,8 +1256,11 @@ TOKU_API int32_t toku_error(toku_State *T) {
         "results from function overflow current stack size")
 
 
-TOKU_API void toku_call(toku_State *T, int32_t nargs, int32_t nresults) {
+TOKU_API void toku_callk(toku_State *T, int32_t nargs, int32_t nresults,
+                         toku_KContext cx, toku_KFunction k) {
     SPtr func;
+    UNUSED(cx);
+    UNUSED(k);
     toku_lock(T);
     api_checknelems(T, nargs + 1); /* args + func */
     api_check(T, T->status == TOKU_STATUS_OK,
@@ -1341,20 +1285,22 @@ static void fcall(toku_State *T, void *ud) {
 }
 
 
-TOKU_API int32_t toku_pcall(toku_State *T, int32_t nargs, int32_t nresults,
-                                                          int32_t absmsgh) {
+TOKU_API int32_t toku_pcallk(toku_State *T, int32_t nargs, int32_t nresults,
+                             int32_t msgh, toku_KContext cx, toku_KFunction k){
     struct PCallData pcd;
     int32_t status;
     ptrdiff_t func;
+    UNUSED(cx);
+    UNUSED(k);
     toku_lock(T);
     api_checknelems(T, nargs+1); /* args + func */
     api_check(T, T->status == TOKU_STATUS_OK,
                  "can't do calls on non-normal thread");
     checkresults(T, nargs, nresults);
-    if (absmsgh < 0)
+    if (msgh < 0)
         func = 0;
     else {
-        SPtr o = index2stack(T, absmsgh);
+        SPtr o = index2stack(T, msgh);
         api_check(T, ttisfunction(s2v(o)), "error handler must be a function");
         func = savestack(T, o);
     }
@@ -1453,12 +1399,43 @@ TOKU_API int32_t toku_dump(toku_State *T, toku_Writer fw, void *data,
     return status;
 }
 
-/* }====================================================================== */
+
+/* }{Coroutine functions================================================== */
 
 
-/* {======================================================================
-** Garbage collector
-** ======================================================================= */
+TOKU_API int32_t toku_yieldk(toku_State *T, int32_t nresults,
+                             toku_KContext cx, toku_KFunction k) {
+    UNUSED(T);
+    UNUSED(nresults);
+    UNUSED(cx);
+    UNUSED(k);
+    return 0;
+}
+
+
+TOKU_API int32_t toku_resume(toku_State *T, toku_State *from, int32_t narg,
+                             int32_t *nres) {
+    UNUSED(T);
+    UNUSED(from);
+    UNUSED(narg);
+    UNUSED(nres);
+    return 0;
+}
+
+
+TOKU_API int32_t toku_status(toku_State *T) {
+    return T->status;
+}
+
+
+TOKU_API int32_t toku_isyieldable(toku_State *T) {
+    UNUSED(T);
+    return 0;
+}
+
+
+/* }{Garbage collector API================================================ */
+
 
 TOKU_API int32_t toku_gc(toku_State *T, int32_t option, ...) {
     va_list argp;
@@ -1532,12 +1509,9 @@ TOKU_API int32_t toku_gc(toku_State *T, int32_t option, ...) {
     return res;
 }
 
-/* }====================================================================== */
 
+/* }{Warning-related functions============================================ */
 
-/* {======================================================================
-** Warning-related functions
-** ======================================================================= */
 
 TOKU_API void toku_setwarnf(toku_State *T, toku_WarnFunction fwarn, void *ud) {
     toku_lock(T);
@@ -1553,12 +1527,9 @@ TOKU_API void toku_warning(toku_State *T, const char *msg, int32_t cont) {
     toku_unlock(T);
 }
 
-/* }====================================================================== */
 
+/* }{Miscellaneous functions============================================== */
 
-/* {======================================================================
-** Miscellaneous functions
-** ====================================================================== */
 
 TOKU_API uint32_t toku_numbertocstring(toku_State *T, int32_t idx,
                                                       char *buff) {
@@ -1583,6 +1554,21 @@ TOKU_API size_t toku_stringtonumber(toku_State *T, const char *s, int32_t *f) {
 TOKU_API toku_Number toku_version(toku_State *T) {
     UNUSED(T);
     return TOKU_VERSION_NUM;
+}
+
+
+TOKU_API int32_t toku_error(toku_State *T) {
+    TValue *errobj;
+    toku_lock(T);
+    api_checknelems(T, 1); /* errobj */
+    errobj = s2v(T->sp.p - 1);
+    if (ttisshrstring(errobj) && eqshrstr(strval(errobj), G(T)->memerror)) {
+        tokuM_error(T); /* raise a memory error */
+    } else
+        tokuD_errormsg(T);
+    /* toku_unlock() is called after control leaves the core */
+    toku_assert(0);
+    return 0; /* to prevent warnings */
 }
 
 
@@ -1685,12 +1671,9 @@ TOKU_API uint16_t toku_numuservalues(toku_State *T, int32_t idx) {
     return getuserdata(T, idx)->nuv;
 }
 
-/* }====================================================================== */
 
+/* }{Debug API (other functions are defined in tdebug.c)================== */
 
-/* {{=====================================================================
-** Debug functions (other functions are defined in tdebug.c)
-** ======================================================================= */
 
 /*
 ** Sets 'frame' in 'toku_Debug'; 'level' is 'CallFrame' level.
@@ -1841,9 +1824,6 @@ TOKU_API void toku_upvaluejoin(toku_State *T, int32_t idx1, int32_t n1,
     tokuG_objbarrier(T, f1, *up1);
 }
 
-/* }{=====================================================================
-** Opcode
-** ======================================================================= */
 
 static void fill_opcode_args(toku_State *T, uint8_t *pi, toku_Opcode *opc) {
     UNUSED(T); /* maybe unused */
@@ -2054,7 +2034,7 @@ static int32_t setExtraI(toku_Opdesc *opd, int32_t imm, int32_t l) {
 
 /*
 **
-** Description legend:
+** Description Legend:
 **
 ** pc           <- integer, current offset in the bytecode
 ** nextra       <- integer, total number of extra arguments
@@ -2408,7 +2388,7 @@ static void setdescription(toku_State *T, toku_Opdesc *opd,
         case OP_EQI: DEqI(opd, opc->args[0]); break;
         case OP_EQPRESERVE: DEqp(opd); break;
         case OP_CONCAT: DConcat(opd, opc->args[0]); break;
-        case OP_CALL: DCall(opd, opc->args[0]+1, opc->args[1]-1); break;
+        case OP_CALL: DCall(opd, opc->args[0], opc->args[1]-1); break;
         case OP_CLOSE: DClose(opd, opc->args[0]); break;
         case OP_TBC: DTbc(opd, opc->args[0]); break;
         case OP_CHECKADJ: DCheck(opd, opc->args[0]); break;
@@ -2421,7 +2401,7 @@ static void setdescription(toku_State *T, toku_Opdesc *opd,
         case OP_FORPREP: DForPrep(opd, opc->args[0], opc->args[1]); break;
         case OP_FORCALL: DForCall(opd, opc->args[0], opc->args[1]-1); break;
         case OP_TAILCALL:
-            DTailCall(opd, opc->args[0]+1, opc->args[1]-1, opc->args[2]);
+            DTailCall(opd, opc->args[0], opc->args[1]-1, opc->args[2]);
             break;
         case OP_SETLOCAL:
             get = 0; /* fall through */
@@ -2622,4 +2602,4 @@ TOKU_API int32_t toku_getfunction(toku_State *T, const toku_Cinfo *src,
     return 0;
 }
 
-/* }}===================================================================== */
+/* }}EOF================================================================== */

@@ -371,7 +371,7 @@
 
 
 /* {======================================================================
-** Dependencies with C99
+** Dependencies with C99 and GCC
 ** ======================================================================= */
 
 
@@ -395,6 +395,19 @@
 */
 #if !defined(toku_getlocaledecpoint)
 #define toku_getlocaledecpoint()    (localeconv()->decimal_point[0])
+#endif
+
+
+/*
+** @TOKU_KCONTEXT - the type of the context ('cx') for continuation
+** functions. It must be a numerical type; Tokudae will use 'intptr_t' if
+** available, otherwise it will use 'ptrdiff_t' (the nearest thing to
+** 'intptr_t' in C89).
+*/
+#if defined(INTPTR_MAX) /* even in C99 this type is optional */
+#define TOKU_KCONTEXT   intptr_t
+#else
+#define TOKU_KCONTEXT   ptrdiff_t
 #endif
 
 
@@ -426,13 +439,13 @@
 ** ======================================================================= */
 
 /*
-** @TOKUI_MAXSTACK - stack size limit.
+** @TOKU_MAXSTACK - stack size limit.
 ** CHANGE it if you need a different limit. This limit is arbitrary;
 ** its only purpose is to stop Tokudae from consuming unlimited stack
 ** space (and to reserve some numbers for pseudo-indices).
-** (It must fit into (max(size_t)/32 - 1000) and (max(int)/2 - 1000).)
+** (It must fit into INT32_MAX/2.)
 */
-#define TOKUI_MAXSTACK      (1 << 23)
+#define TOKU_MAXSTACK       (INT32_MAX / 2)
 
 
 /*

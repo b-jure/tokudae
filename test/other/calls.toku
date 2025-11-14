@@ -19,7 +19,7 @@ assert(typeof(f) == "function");
 assert(!pcall(typeof));
 
 
-/// testing local-function recursion
+# testing local-function recursion
 fact = false;
 {
   local res = 1;
@@ -32,7 +32,7 @@ fact = false;
 assert(fact == false);
 fact = nil;
 
-{ /// testing declarations
+{ # testing declarations
     local class X {
         fn x(x) { return x + self.i; }
     };
@@ -68,20 +68,20 @@ fact = nil;
     }
 }
 
-t = nil; /// 'declare' t
+t = nil; # 'declare' t
 fn f(a,b,c) {
     local d = "a";
     t=[a,b,c,d];
 }
 
-f(      /// this line change must be valid
+f(      # this line change must be valid
   1,2);
 assert(t[0] == 1 and t[1] == 2 and t[2] == nil and t[3] == nil);
-f(1,2,   /// this one too
+f(1,2,   # this one too
       3,4);
 assert(t[0] == 1 and t[1] == 2 and t[2] == 3 and t[3] == "a");
 
-t = nil; /// delete 't'
+t = nil; # delete 't'
 
 fn fat(x) {
     if (x <= 1)
@@ -137,7 +137,7 @@ a = (class {
 })();
 assert(a.deep(30000) == 101);
 
-{ /// tail calls x varargs
+{ # tail calls x varargs
     local fn foo(x, ...) { local a = [...]; return x, a[0], a[1]; }
 
     local fn foo1(x) { return foo(10, x, x + 1); }
@@ -145,7 +145,7 @@ assert(a.deep(30000) == 101);
     local a, b, c = foo1(-2);
     assert(a == 10 and b == -2 and c == -1);
 
-    /// tail calls x metamethods
+    # tail calls x metamethods
     local z = setmetatable(class, { __call = foo })();
     local fn foo2(x) { return z(10, x); };
     a, b, c = foo2(100);
@@ -172,7 +172,7 @@ assert(a.deep(30000) == 101);
 }
 
 
-{ /// C-stack overflow while handling C-stack overflow
+{ # C-stack overflow while handling C-stack overflow
     local fn infloop() {
         assert(pcall(infloop));
     }
@@ -182,8 +182,8 @@ assert(a.deep(30000) == 101);
 
 
 
-{ /// tail calls x chain of __call
-    local n = 10000; /// depth
+{ # tail calls x chain of __call
+    local n = 10000; # depth
 
     local fn foo() {
         if (n == 0)
@@ -194,7 +194,7 @@ assert(a.deep(30000) == 101);
         }
     }
 
-    /// build a chain of __call metamethods ending in function 'foo'
+    # build a chain of __call metamethods ending in function 'foo'
     foreach i in range(15)
         foo = setmetatable(class, { __call = foo })();
 
@@ -322,9 +322,9 @@ a = nil;
 assert(a == 23 and (fn (x) { return x*2; })(20) == 40);
 
 
-/// testing closures
+# testing closures
 
-/// fixed-point operator
+# fixed-point operator
 local Z = fn(le) {
     local fn a(f) {
         return le(fn(x) { return f(f)(x); });
@@ -333,7 +333,7 @@ local Z = fn(le) {
 };
 
 
-/// non-recursive factorial
+# non-recursive factorial
 local F = fn(f) {
     return fn(n) {
         if (n == 0) return 1;
@@ -357,7 +357,7 @@ assert(f(9, 16) == 10+11+12+13+10+9+16+10);
 
 
 
-/// testing multiple returns
+# testing multiple returns
 
 local fn unlpack(l, i) {
     i = i or 0;
@@ -393,14 +393,14 @@ a = ret2([unlpack([1,2,3]), unlpack([3,2,1]), unlpack(["a", "b"])]);
 assert(a[0] == 1 and a[1] == 3 and a[2] == "a" and a[3] == "b");
 
 
-/// testing calls with 'incorrect' arguments
+# testing calls with 'incorrect' arguments
 rawget((class)(), "x", 1);
 rawset((class)(), "x", 1, 2);
 assert(math.sin(1,2) == math.sin(1));
 
 
-/// test for generic load
-local x = "/// a comment\0\0\0\n  x = 10 + \n23; \
+# test for generic load
+local x = "# a comment\0\0\0\n  x = 10 + \n23; \
            local a = fn() { x = \"hi\"; }; \
            return \"\0\";";
 local fn read1(x) {
@@ -420,7 +420,7 @@ a = assert(load(read1(x), "modname", "t", __G));
 assert(a() == "\0" and __G.x == 33);
 
 a = assert(load(fn() { return nil; }));
-a(); /// empty chunk
+a(); # empty chunk
 
 assert(!load(fn() { return true; }));
 
@@ -428,11 +428,11 @@ assert(!load(fn() { return true; }));
 {
     local l = [nil, "return ", "3;"];
     local f, msg = load(|| :: return list.remove(l, 0));
-    assert(f() == nil); /// should read the empty chunk
+    assert(f() == nil); # should read the empty chunk
 }
 
 
-{ /// loading a binary long string interrupted by GC cycles
+{ # loading a binary long string interrupted by GC cycles
     local f = string.dump(|| {
         return "01234567890123456789012345678901234567890123456789"
     });
@@ -446,17 +446,17 @@ cannotload("unexpected symbol", load("*a = 123"));
 cannotload("hhi", load(fn() { error("hhi"); }));
 
 
-{ /// any value is valid for __ENV
+{ # any value is valid for __ENV
     assert(load("return __ENV;", nil, nil, 123)() == 123);
 }
 
 
-{ /// load when __ENV is not first upvalue
+{ # load when __ENV is not first upvalue
     local x;
     XX = 123;
     local fn h() {
-        local y=x; /// use 'x', so that it becomes 1st upvalue
-        return XX; /// global name
+        local y=x; # use 'x', so that it becomes 1st upvalue
+        return XX; # global name
     };
     local d = string.dump(h);
     x = load(d, "", "b");
@@ -468,7 +468,7 @@ cannotload("hhi", load(fn() { error("hhi"); }));
 }
 
 
-{ /// test generic load with nested functions
+{ # test generic load with nested functions
     local x = [=[
         return fn(x) {
             return fn(y) {
@@ -483,7 +483,7 @@ cannotload("hhi", load(fn() { error("hhi"); }));
 }
 
 
-{ /// test for long method names
+{ # test for long method names
     local t = {x = 1};
     fn t._012345678901234567890123456789012345678901234567890123456789(self) {
         return self.x;
@@ -502,7 +502,7 @@ cannotload("hhi", load(fn() { error("hhi"); }));
 }
 
 
-{ /// test for dump/undump with upvalues
+{ # test for dump/undump with upvalues
     local a, b = 20, 30;
     x = load(string.dump(|x| {
         if x == "set" {
@@ -515,7 +515,7 @@ cannotload("hhi", load(fn() { error("hhi"); }));
     assert(debug.setupvalue(x, 0, "hi") == "a");
     assert(x() == "hi");
     assert(debug.setupvalue(x, 1, 13) == "b");
-    assert(!debug.setupvalue(x, 2, 10)); /// only 2 upvalues
+    assert(!debug.setupvalue(x, 2, 10)); # only 2 upvalues
     x("set");
     assert(x() == 23);
     x("set");
@@ -523,7 +523,7 @@ cannotload("hhi", load(fn() { error("hhi"); }));
 }
 
 
-{ /// test for dump/undump with many upvalues
+{ # test for dump/undump with many upvalues
     local nup = 5000;
     local prog = ["local a0"];
     local i;
@@ -538,7 +538,7 @@ cannotload("hhi", load(fn() { error("hhi"); }));
     local f = assert(load(prog))();
     assert(f() == sum);
 
-    f = load(string.dump(f)); /// main chunk now has many upvalues
+    f = load(string.dump(f)); # main chunk now has many upvalues
     local a = 10;
     local h = || { return a };
     for (i = 0; i < nup; i++)
@@ -547,10 +547,10 @@ cannotload("hhi", load(fn() { error("hhi"); }));
 }
 
 
-{ /// test binary chunks
+{ # test binary chunks
     print("testing binary chunks");
     local headformat = "c8BBc6BiBI1BjBn";
-    local header = [ /// header components
+    local header = [ # header components
         "\eTokudae",            # signature
         0x10,                   # version 1.0 (0x10)
         0,                      # format
@@ -567,7 +567,7 @@ cannotload("hhi", load(fn() { error("hhi"); }));
 
     local c = string.dump(fn() {
         local a = 1; local b = 3;
-        local f = || { return a + b + __ENV.c }; /// upvalues
+        local f = || { return a + b + __ENV.c }; # upvalues
         local s1 = "a constant";
         local s2 = "another constant";
         return a + b * 3;
@@ -575,18 +575,18 @@ cannotload("hhi", load(fn() { error("hhi"); }));
 
     assert(assert(load(c))() == 10);
 
-    /// check header
+    # check header
     local l = [string.unpack(headformat, c)];
     foreach i in range(header.len)
         assert(l[i] == header[i]);
 
-    /// Testing corrupted header.
-    /// A single wrong byte in the head invalidates the chunk,
-    /// except for the Tokudae float check. (If numbers are long double,
-    /// the representation may need padding, and changing that padding
-    /// will not invalidate the chunk.)
+    # Testing corrupted header.
+    # A single wrong byte in the head invalidates the chunk,
+    # except for the Tokudae float check. (If numbers are long double,
+    # the representation may need padding, and changing that padding
+    # will not invalidate the chunk.)
     local headlen = string.packsize(headformat);
-    headlen = headlen - string.packsize("n"); /// remove float check
+    headlen = headlen - string.packsize("n"); # remove float check
     for (local i = 0; i < headlen; i++) {
         local s = (i > 0 and string.substr(c, 0, i - 1) or "") ..
             string.char((string.byte(string.substr(c, i, i)) + 1) & 0xFF) ..
@@ -595,7 +595,7 @@ cannotload("hhi", load(fn() { error("hhi"); }));
         assert(!load(s));
     }
 
-    /// loading truncated binary chunks
+    # loading truncated binary chunks
     foreach i in range(len(c) - 1) {
         local st, msg = load(string.substr(c, 0, i));
         assert(!st and string.find(msg, "truncated"));
@@ -603,7 +603,7 @@ cannotload("hhi", load(fn() { error("hhi"); }));
 }
 
 
-{ /// check reuse of strings in dumps
+{ # check reuse of strings in dumps
     print("testing reuse of strings in dumps");
     local str = "|" .. string.repeat("X", 50) .. "|";
     local foo = load(string.fmt([=[
@@ -614,32 +614,33 @@ cannotload("hhi", load(fn() { error("hhi"); }));
             || :: return str
         ];
     ]=], str));
-    /// count occurrences of 'str' inside the dump
+    # count occurrences of 'str' inside the dump
     local dump = string.dump(foo);
     local _, count = reg.gsub(dump, str, {});
-    /// there should be only two occurrences:
-    /// one inside the source, other the string itself.
+    # there should be only two occurrences:
+    # one inside the source, other the string itself.
     assert(count == 2);
 }
 
-/// test parameter adjustment
+# test parameter adjustment
 assert((fn() { return nil; })(4) == nil);
 assert((fn() { local a; return a; })(4) == nil);
 assert((fn(a) { return a; })() == nil);
 
 
-{ /// function as function argument with 'return' as body
+{ # function as function argument with 'return' as body
     local fn a(x,y) :: assert(y == 5);
     a(|| :: return, 5);
     a = |x,y| { assert(x == 5); };
     a(5, || return);
 }
 
-if __heavy { /// test stack/bytecode limit
-    print("testing stack/bytecode limit");
+if __heavy { # test stack/bytecode limit
     local blim <final> = 16_777_215;
     local inuse = debug.stackinuse();
-    if (debug.maxstack - inuse - 10 > blim) { /// test bytecode limit 
+    if (debug.maxstack - inuse - 10 > blim) { # free stack is larger than bytecode limit?
+        print("testing bytecode limit");
+        (Message or print)("skipped stack limit test");
         local code = "return 10" .. string.repeat(",10", blim - 2);
         local res, msg = load(code .. ";");
         assert(res and !msg);
@@ -647,15 +648,18 @@ if __heavy { /// test stack/bytecode limit
         assert(res.len == blim-1 and res.last == 10);
         code = code .. ",10;";
         res, msg = load(code);
-        assert(!res and string.find(msg, "too much stack space"));
-    } else { /// test stack size limit
+        assert(!res and string.find(msg, "too many stack slots"));
+    } else if __veryheavy { # otherwise the stack will overflow first
+        print("testing stack limit");
+        (Message or print)("skipped bytecode limit test");
         local fn foverflow(func) { return [func()]; }
         local code = "return 10" .. string.repeat(",10", debug.maxstack);
         local res, msg = load(code .. ";");
         assert(res and !msg);
         res, msg = pcall(foverflow, res);
         assert(!res and string.find(msg, "stack overflow"));
-    }
+    } else
+        (Message or print)("skipped stack/bytecode limit test");
 } else
     (Message or print)("skipped stack/bytecode limit test");
 

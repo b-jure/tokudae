@@ -362,7 +362,7 @@ static int32_t db_sethook(toku_State *T) {
     } else {
         const char *smask = tokuL_check_string(T, arg+2);
         tokuL_check_type(T, arg+1, TOKU_T_FUNCTION);
-        count = cast_i32(tokuL_opt_integer(T, arg + 3, 0));
+        count = cast_i32(tokuL_opt_integer(T, arg+3, 0));
         func = hookf; mask = makemask(smask, count);
     }
     tokuL_get_subtable(T, TOKU_CTABLE_INDEX, HOOKKEY);
@@ -459,18 +459,45 @@ static void setdesc(toku_State *T, toku_Opcode *opc) {
 }
 
 
-static int32_t db_getcode(toku_State *T) {
-    int32_t t = toku_type(T, 0);
-    toku_Opcode opc;
-    toku_Cinfo ci;
-    if (t != TOKU_T_FUNCTION) { /* not a function? */
+static void push_opctable(toku_State *T, toku_Opcode *opc) {
+    toku_push_table(T, 5);
+    if (opc->args[0] != -1) { /* opcode has at least one argument? */
+        uint32_t i = 0;
+        toku_push_list(T, 1);
+        do {
+            toku_push_integer(T, opc->args[i]);
+            toku_set_index(T, -2, i);
+        } while (i+1 < t_arraysize(opc->args) && opc->args[++i] != -1);
+        toku_set_field_str(T, -2, "args");
+    }
+    toku_push_integer(T, opc->line);
+    toku_set_field_str(T, -2, "line");
+    toku_push_integer(T, opc->offset);
+    toku_set_field_str(T, -2, "offset");
+    toku_push_integer(T, opc->op);
+    toku_set_field_str(T, -2, "op");
+    toku_push_string(T, opc->name);
+    toku_set_field_str(T, -2, "name");
+    setdesc(T, opc);
+}
+
+
+static void checkforlevel(toku_State *T) {
+    if (toku_type(T, 0) != TOKU_T_FUNCTION) { /* not a function? */
         toku_Debug ar;
         toku_Integer level = tokuL_check_integer(T, 0); /* must be level */
         if (!toku_getstack(T, cast_i32(level), &ar))
-            return tokuL_error_arg(T, 0, "level out of range");
+            tokuL_error_arg(T, 0, "level out of range");
         toku_getinfo(T, "f", &ar);
         toku_replace(T, 0);
     }
+}
+
+
+static int32_t db_getcode(toku_State *T) {
+    toku_Opcode opc;
+    toku_Cinfo ci;
+    checkforlevel(T);
     tokuL_check_arg(T, !toku_is_cfunction(T, 0), 0,
                        "C functions do not have bytecode");
     toku_setntop(T, 1);
@@ -479,30 +506,62 @@ static int32_t db_getcode(toku_State *T) {
     if (t_likely(toku_getopcode(T, &ci, 0, &opc))) {
         int i = 0;
         do {
-            toku_push_table(T, 5);
-            if (opc.args[0] != -1) { /* opcode has at least one argument? */
-                uint32_t j = 0;
-                toku_push_list(T, 1);
-                do {
-                    toku_push_integer(T, opc.args[j]);
-                    toku_set_index(T, -2, j);
-                } while (j+1 < t_arraysize(opc.args) && opc.args[++j] != -1);
-                toku_set_field_str(T, -2, "args");
-            }
-            toku_push_integer(T, opc.line);
-            toku_set_field_str(T, -2, "line");
-            toku_push_integer(T, opc.offset);
-            toku_set_field_str(T, -2, "offset");
-            toku_push_integer(T, opc.op);
-            toku_set_field_str(T, -2, "op");
-            toku_push_string(T, opc.name);
-            toku_set_field_str(T, -2, "name");
-            setdesc(T, &opc);
+            push_opctable(T, &opc);
             toku_set_index(T, -2, i);
             i++;
         } while (toku_getopcode_next(T, &opc));
     }
     return 1; /* return the bytecode list */
+}
+
+
+/* userrdata for 'iter_opcodes' and 'db_opcodes' */
+struct OpcodeIter {
+    toku_Opcode opc;
+    int32_t n; /* current opcode number */
+    uint8_t valid; /* true if the current 'opc' was filled */
+};
+
+#define toOI(p)     cast(struct OpcodeIter *, (p))
+
+
+static int iter_opcodes(toku_State *T) {
+    struct OpcodeIter *oi = toOI(toku_to_userdata(T, toku_upvalueindex(0)));
+    if (oi->valid) { /* current opcode was filled? */
+        toku_push_integer(T, oi->n++);
+        push_opctable(T, &oi->opc);
+        oi->valid = cast_u8(toku_getopcode_next(T, &oi->opc));
+        return 2; /* opcode index + opcode table */
+    } else { /* otherwise no more opcodes */
+        toku_push_nil(T);
+        return 1;
+    }
+}
+
+
+// TODO: add docs
+static int db_opcodes(toku_State *T) {
+    struct OpcodeIter *oi;
+    toku_Integer init;
+    toku_Cinfo ci;
+    checkforlevel(T);
+    tokuL_check_type(T, 0, TOKU_T_FUNCTION);
+    if (t_unlikely(toku_is_cfunction(T, -1)))
+        tokuL_error_arg(T, 0, "C functions do not have bytecode");
+    init = tokuL_opt_integer(T, 1, 0);
+    toku_getcompinfo(T, 0, &ci);
+    toku_push_userdata(T, sizeof(struct OpcodeIter), 0);
+    oi = toOI(toku_to_userdata(T, -1));
+    if (init <= INT32_MIN && init <= INT32_MAX) { /* 'init' in range? */
+        oi->valid = cast_u8(toku_getopcode(T, &ci, cast_i32(init), &oi->opc));
+        oi->n = cast_i32(init);
+    } else { /* otherwise 'init' out of range */
+        oi->valid = 0u;
+        oi->n = 0;
+    }
+    toku_push(T, 0); /* set as upvalue to prevent collection while iterating */
+    toku_push_cclosure(T, iter_opcodes, 2); /* push iterator */
+    return 1; /* iterator */
 }
 
 
@@ -524,7 +583,7 @@ static const tokuL_Entry dblib[] = {
     {"traceback", db_traceback},
     {"stackinuse", db_stackinuse},
     {"getcode", db_getcode},
-    {"cstacklimit", NULL},
+    {"opcodes", db_opcodes},
     {"maxstack", NULL},
     {NULL, NULL}
 };
@@ -532,9 +591,7 @@ static const tokuL_Entry dblib[] = {
 
 int32_t tokuopen_debug(toku_State *T) {
     tokuL_push_lib(T, dblib);
-    toku_push_integer(T, TOKUI_MAXCCALLS);
-    toku_set_field_str(T, -2, "cstacklimit");
-    toku_push_integer(T, TOKUI_MAXSTACK);
+    toku_push_integer(T, TOKU_MAXSTACK);
     toku_set_field_str(T, -2, "maxstack");
     return 1;
 }

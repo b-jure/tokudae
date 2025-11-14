@@ -34,10 +34,10 @@
 
 /*
 ** Pseudo-indices
-** (-TOKUI_MAXSTACK is the minimum valid index; we keep some free empty
+** (-TOKU_MAXSTACK is the minimum valid index; we keep some free empty
 ** space after that to help overflow detection)
 */
-#define TOKU_CLIST_INDEX        (-TOKUI_MAXSTACK - 1000)
+#define TOKU_CLIST_INDEX        (-TOKU_MAXSTACK - 1000)
 #define TOKU_CTABLE_INDEX       (TOKU_CLIST_INDEX - 1)
 #define toku_upvalueindex(i)    (TOKU_CTABLE_INDEX - 1 - (i))
 
@@ -47,6 +47,16 @@
 #define TOKU_CLIST_GLOBALS      1
 #define TOKU_CLIST_LAST         TOKU_CLIST_GLOBALS
     
+
+/* thread status */
+#define TOKU_STATUS_OK          0 /* ok */
+#define TOKU_STATUS_YIELD       1 /* thread is suspended */
+#define TOKU_STATUS_ERUNTIME    2 /* runtime error */
+#define TOKU_STATUS_ESYNTAX     3 /* syntax (compiler) error */
+#define TOKU_STATUS_EMEM        4 /* memory related error */
+#define TOKU_STATUS_EERROR      5 /* error while handling error */
+#define TOKU_STATUS_NUM         6 /* total number of status codes */
+
 
 /* types of values */
 #define TOKU_T_NONE             (-1)
@@ -69,6 +79,8 @@
 /* minimum stack space available to a C function */
 #define TOKU_MINSTACK       20
 
+/* Other constants are defined right above the functions that use them. */
+
 /* }{Types================================================================ */
 
 /* Tokudae thread state */
@@ -84,9 +96,15 @@ typedef TOKU_UNSIGNED toku_Unsigned;
 /* type for floating point numbers */
 typedef TOKU_NUMBER toku_Number;
 
+/* type for continuation-function contexts */
+typedef TOKU_KCONTEXT toku_KContext;
+
 
 /* type of C function registered with Tokudae */
 typedef int32_t (*toku_CFunction)(toku_State *T);
+
+/* type of function for continuations */
+typedef int32_t (*toku_KFunction)(toku_State *T, int status, toku_KContext cx);
 
 /* type of function that de/allocates memory */
 typedef void *(*toku_Alloc)(void *ptr, void *ud, size_t osz, size_t nsz);
@@ -181,16 +199,15 @@ TOKU_API toku_State *toku_to_thread(toku_State *T, int32_t idx);
 
 TOKU_API void toku_arith(toku_State *T, int32_t op); 
 
-
-/* Ordering operations */
+/* order operations */
 #define TOKU_ORD_EQ         0
 #define TOKU_ORD_LT         1
 #define TOKU_ORD_LE         2
 #define TOKU_ORD_NUM        3
 
-TOKU_API int32_t toku_rawequal(toku_State *T, int32_t idx1, int32_t idx2); 
 TOKU_API int32_t toku_compare(toku_State *T, int32_t idx1, int32_t idx2,
-                                                           int32_t op); 
+                              int32_t op); 
+TOKU_API int32_t toku_rawequal(toku_State *T, int32_t idx1, int32_t idx2); 
 
 /* }{Push functions (C -> Stack)========================================== */
 
@@ -250,29 +267,35 @@ TOKU_API int32_t toku_set_uservalue(toku_State *T, int32_t idx, uint16_t n);
 TOKU_API void toku_set_methodtable(toku_State *T, int32_t idx); 
 TOKU_API void toku_set_fieldtable(toku_State *T, int32_t idx);
 
-/* }{Status and Error reporting=========================================== */
-
-/* thread status codes */
-#define TOKU_STATUS_OK          0 /* ok */
-#define TOKU_STATUS_ERUNTIME    1 /* runtime error */
-#define TOKU_STATUS_ESYNTAX     2 /* syntax (compiler) error */
-#define TOKU_STATUS_EMEM        3 /* memory related error */
-#define TOKU_STATUS_EERROR      4 /* error while handling error */
-#define TOKU_STATUS_NUM         5 /* total number of status codes */
-
-TOKU_API int32_t toku_status(toku_State *T); 
-TOKU_API int32_t toku_error(toku_State *T); 
-
 /* }{Call/Load/Combine/Dump Tokudae chunks================================ */
 
-TOKU_API void    toku_call(toku_State *T, int32_t nargs, int32_t nresults); 
-TOKU_API int32_t toku_pcall(toku_State *T, int32_t nargs, int32_t nresults,
-                                                          int32_t absmsgh); 
+// TODO: add docs + implement
+TOKU_API void toku_callk(toku_State *T, int32_t nargs, int32_t nresults,
+                         toku_KContext cx, toku_KFunction k); 
+#define toku_call(T,n,r)        toku_callk(T, (n), (r), 0, NULL)  
+
+// TODO: add docs + implement
+TOKU_API int32_t toku_pcallk(toku_State *T, int32_t nargs, int32_t nresults,
+                             int32_t msgh, toku_KContext cx, toku_KFunction k);
+#define toku_pcall(T,n,r,f)     toku_pcallk(T, (n), (r), (f), 0, NULL)
+
 TOKU_API int32_t toku_load(toku_State *T, toku_Reader freader, void *userdata,
                            const char *chunkname, const char *mode); 
 TOKU_API int32_t toku_combine(toku_State *T, const char *chunkname, int32_t n);
 TOKU_API int32_t toku_dump(toku_State *T, toku_Writer fw, void *data,
                                                           int32_t strip);
+
+/* }{Coroutine functions================================================== */
+
+// TODO: add docs + implement all of these except 'toku_status'
+TOKU_API int32_t toku_yieldk(toku_State *T, int32_t nresults,
+                             toku_KContext cx, toku_KFunction k);
+TOKU_API int32_t toku_resume(toku_State *T, toku_State *from, int32_t narg,
+                             int32_t *nres);
+TOKU_API int32_t toku_status(toku_State *T);
+TOKU_API int32_t toku_isyieldable(toku_State *T);
+
+#define toku_yield(T,n)	    toku_yieldk(T, (n), 0, NULL)
 
 /* }{Garbage collector API================================================ */
 
@@ -308,6 +331,7 @@ TOKU_API uint32_t toku_numbertocstring(toku_State *T, int32_t idx, char *buff);
 TOKU_API size_t toku_stringtonumber(toku_State *T, const char *s, int32_t *f); 
 
 TOKU_API toku_Number    toku_version(toku_State *T);
+TOKU_API int32_t        toku_error(toku_State *T); 
 TOKU_API toku_Unsigned  toku_len(toku_State *T, int32_t idx); 
 TOKU_API size_t         toku_lenudata(toku_State *T, int32_t idx);
 TOKU_API int32_t        toku_nextfield(toku_State *T, int32_t idx); 
@@ -373,6 +397,7 @@ TOKU_API uint16_t       toku_numuservalues(toku_State *T, int32_t idx);
 #define TOKU_MASK_RET       (1 << TOKU_HOOK_RET)
 #define TOKU_MASK_LINE      (1 << TOKU_HOOK_LINE)
 #define TOKU_MASK_COUNT     (1 << TOKU_HOOK_COUNT)
+/* TOKU_MASK_CALL is also for tail calls */
 
 TOKU_API int32_t toku_getstack(toku_State *T, int32_t level, toku_Debug *ar); 
 TOKU_API int32_t toku_getinfo(toku_State *T, const char *what, toku_Debug *ar); 

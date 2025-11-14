@@ -34,10 +34,23 @@ __opts = {
 
 /* false if not running heavy tests */
 __heavy = __G.__heavy or true; /* default is true */
+/* similar to __heavy but usually for tests that surpass stack limits */
+__veryheavy = __G.__veryheavy or false; /* default is false */
 /* false if runnning non-portable tests or assuming posix/windows environment */
 __port = __G.__port or false; /* default is false on windows and posix */
 /* false if not reporting messages of (parts of) tests not performed */
 __skipmsg = __G.__skipmsg or true; /* default is true */
+
+/*
+** If we are running tests in isolation then we must communicate the
+** above flags to those processes, do it by setting environment variable.
+** (__skipmsg is ignored.)
+*/
+local TOKU_INIT = string.fmt([=[
+    __heavy = %s;
+    __port = %s;
+    __veryheavy = %s;
+    ]=], __heavy, __port, __veryheavy);
 
 /*
 ** Specific programs/devices/files used when rebuilding the
@@ -446,16 +459,17 @@ local fn loginput(msg) :: if isatty() stdout.write(fmt("[%s]: %s\n", MAGENTA("IN
 local fn logcmd(msg)   :: if isatty() stdout.write(fmt("[%s]: %s\n", RED("CMD"), msg));
 
 
-/* temporary output file */
+/* class instance for temporary files */
 local tempfile = (class {
     __gc = || {
         assert(typeof(self) == "instance");
-        if self.file {
-            loginfo(fmt("removing temporary output file '%s'...", self.file));
-            rm(self.file);
+        foreach _,fname in indices(self.files) {
+            loginfo(fmt("removing temporary file '%s'...", fname));
+            rm(fname);
         }
     };
 })();
+tempfile.files = [];
 
 
 local fn print_test_result(stat, filepath, c) {
@@ -464,10 +478,6 @@ local fn print_test_result(stat, filepath, c) {
         s ..= "  " .. gettime(c);
     print(s);
 }
-
-
-/* function (assigned later) */
-local prompt_run_failed_test;
 
 
 /*
@@ -481,10 +491,26 @@ local fn run_test(filepath) {
         stdout.write(fmt("Currently running '%s'...", YELLOW(filepath)));
         stdout.flush();
     }
-    local stat, msg, code, c;
-    if __opts.run_isolated
-        stat, msg, code = execute(buildcmd(prog, filepath, dev_null12));
-    else { /* otherwise run in the same global environment */
+    local stat, msg, code, c, f;
+    if __opts.run_isolated {
+        local oldenv = getenv("TOKU_INIT");
+        setenv("TOKU_INIT", TOKU_INIT);
+        if (!popen_file) {
+            local files = tempfile.files;
+            popen_file = assert(tmpname());
+            files[files.len] = popen_file;
+        }
+        f, msg, code = popen(buildcmd(prog, filepath, ">", popen_file, "2>&1"));
+        stat = !!f;
+        if stat { /* popen had no errors? */
+            stat = (getargs(2, f.close()) == 0);
+            local fpopen = assert(io.open(popen_file, "rb"));
+            msg = fpopen.read("a");
+            fpopen.close();
+        } else
+            f.close();
+        setenv("TOKU_INIT", oldenv);
+    } else { /* otherwise run in the same global environment */
         stat, msg = xpcall(runfile, traceback, filepath);
         c = clock();
     }
@@ -499,16 +525,14 @@ local fn run_test(filepath) {
         time_in_dbg = clock() - c;
     }
     if !stat { /* test failed? */
-        if __opts.run_isolated and msg and code
-            msg = msg .. " (code " .. tostr(code) .. ")";
         failed_tests[failed_tests.len] = { /* add it to failed tests list */
             testname = filepath,
             errormsg = msg,
         };
         if __opts.errors /* print errors of failed tests? */
-            print(msg);
+            print(msg == "" and "<empty string>" or msg);
         if __opts.abort_on_fail { /* abort on first failed test? */
-            prompt_run_failed_test();
+            display_skipped();
             exit(1, true);
         }
     }
@@ -548,31 +572,6 @@ local fn run_tests(tsuite, tlist) {
         testsuite_headerfmt(tsuite, true);
     }
 }
-
-
-prompt_run_failed_test = || {
-    /* re-run only if they were run in isolation and input is terminal */
-    if failed_tests.len == 1 and __opts.run_isolated and isatty() {
-        loginput("Would you like to run the failed test directly " ..
-                 "before exiting [yYnN] (default 'y'): ");
-        loop { /* repeat until valid option */
-            local opt = stdin.read("l");
-            opt = (opt == "") and "y" or opt;
-            switch opt {
-                case "y": case "Y": { /* re-run failed tests */
-                    local testname = failed_tests[0].testname;
-                    failed_tests[0] = nil; /* reset 'failed_tests' list */
-                    __opts.run_isolated = false; /* run tests directly */
-                    __opts.reprint_failed = false; /* do not re-print error */
-                    run_tests("failed_test", [testname]); /* run the failed test */
-                    /* fall through */
-                }
-                case "n": case "N": return; /* do not run; done */
-                default: loginput("Unrecognized option try one of [yYnN] (default 'y'): ");
-            }
-        }
-    }
-};
 
 
 /*
@@ -1085,7 +1084,6 @@ local fn run_args() {
         run_testsuites(__opts.tests_script, flatten(__opts.testsuites_to_run));
     else if (__opts.cli_tests.len == 0) /* no explicit testsuites and tests? */
         run_all_testsuites(__opts.tests_script); /* run all from tests script */
-    prompt_run_failed_test();
     display_skipped(); /* display skip messages (if any) */
     if __opts.reprint_failed { /* reprint failed tests? */
         local n = failed_tests.len;
@@ -1114,7 +1112,8 @@ local fn set_output_options() {
 
         /* file for redirecting 'stdout' and 'stderr' when running a test */
         local out = assert(tmpname());
-        tempfile.file = out;
+        local files = tempfile.files;
+        files[files.len] = out;
 
         /* replace 'print' while testing */
         __G.print = fn(...) {

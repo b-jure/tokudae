@@ -336,7 +336,6 @@ syn match tokudaeFunc /\<debug\.setlocal\>/
 syn match tokudaeFunc /\<debug\.setupvalue\>/
 syn match tokudaeFunc /\<debug\.traceback\>/
 syn match tokudaeFunc /\<debug\.stackinuse\>/
-syn match tokudaeFunc /\<debug\.cstacklimit\>/
 syn match tokudaeFunc /\<debug\.maxstack\>/
 "-List library----}{
 syn match tokudaeFunc /\<list\.insert\>/

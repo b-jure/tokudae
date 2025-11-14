@@ -36,10 +36,23 @@ __opts = {
 
 /* false if not running heavy tests */
 __heavy = __G.__heavy or true; /* default is true */
+/* similar to __heavy but usually for tests that surpass stack limits */
+__veryheavy = __G.__veryheavy or false; /* default is false */
 /* false if runnning non-portable tests or assuming posix/windows environment */
 __port = __G.__port or false; /* default is false on windows and posix */
 /* false if not reporting messages of (parts of) tests not performed */
 __skipmsg = __G.__skipmsg or true; /* default is true */
+
+/*
+** If we are running tests in isolation then we must communicate the
+** above flags to those processes, do it by setting environment variable.
+** (__skipmsg is ignored.)
+*/
+local TOKU_INIT = string.fmt([=[
+    __heavy = %s;
+    __port = %s;
+    __veryheavy = %s;
+    ]=], __heavy, __port, __veryheavy);
 
 /*
 ** Specific programs/devices/files used when rebuilding the
@@ -171,9 +184,9 @@ local find,runfile,typeof,error,indices = reg.find,runfile,typeof,error,indices;
 local output,sfind,substr,tostr = io.output,string.find,string.substr,tostr;
 local len,remove,byte,clock = len,list.remove,string.byte,os.clock;
 local tmpname,fields,gc,rm,flatten = os.tmpname,fields,gc,os.remove,list.flatten;
-local exit,getinfo = os.exit,debug.getinfo;
+local exit,getinfo,getenv = os.exit,debug.getinfo,os.getenv;
 local char,dbg,gmatch,repeat = string.char,debug.debug,reg.gmatch,string.repeat;
-local startswith,ostime = string.startswith,os.time;
+local startswith,ostime,setenv = string.startswith,os.time,os.setenv;
 
 
 /* upvalues for timing execution */
@@ -470,8 +483,21 @@ local fn print_test_result(stat, filepath, c) {
 }
 
 
-/* function (assigned later) */
-local prompt_run_failed_test;
+/*
+** Displays messages of (parts of) skipped tests.
+*/
+local fn display_skipped() {
+    if __skipmsg {
+        if __opts.run_isolated {
+            loginfo("no information on (parts of) skipped tests (if any), " ..
+                    "as tests were ran in isolation ('-i')");
+        } else if 0 < skip_msgs.len {
+            print("\nSkip messages:");
+            foreach _,msg in indices(skip_msgs)
+                print(YELLOW("> ") .. msg);
+        }
+    }
+}
 
 
 /*
@@ -488,20 +514,23 @@ local fn run_test(filepath) {
     }
     local stat, msg, code, c, f;
     if __opts.run_isolated {
+        local oldenv = getenv("TOKU_INIT");
+        setenv("TOKU_INIT", TOKU_INIT);
         if (!popen_file) {
             local files = tempfile.files;
             popen_file = assert(tmpname());
             files[files.len] = popen_file;
         }
-        f, msg, code = popen(prog .. " " .. filepath .. "&>" .. popen_file);
+        f, msg, code = popen(buildcmd(prog, filepath, "&>", popen_file));
         stat = !!f;
         if stat { /* popen had no errors? */
-            stat = getargs(2, f.close()) == 0;
+            stat = (getargs(2, f.close()) == 0);
             local fpopen = assert(io.open(popen_file, "rb"));
             msg = fpopen.read("a");
             fpopen.close();
         } else
             f.close();
+        setenv("TOKU_INIT", oldenv);
     } else { /* otherwise run in the same global environment */
         stat, msg = xpcall(runfile, traceback, filepath);
         c = clock();
@@ -524,7 +553,7 @@ local fn run_test(filepath) {
         if __opts.errors /* print errors of failed tests? */
             print(msg == "" and "<empty string>" or msg);
         if __opts.abort_on_fail { /* abort on first failed test? */
-            prompt_run_failed_test();
+            display_skipped();
             exit(1, true);
         }
     }
@@ -564,31 +593,6 @@ local fn run_tests(tsuite, tlist) {
         testsuite_headerfmt(tsuite, true);
     }
 }
-
-
-prompt_run_failed_test = || {
-    /* re-run only if they were run in isolation and input is terminal */
-    if failed_tests.len == 1 and __opts.run_isolated and isatty() {
-        loginput("Would you like to run the failed test directly " ..
-                 "before exiting [yYnN] (default 'n'): ");
-        loop { /* repeat until valid option */
-            local opt = stdin.read("l");
-            opt = (opt == "") and "n" or opt;
-            switch opt {
-                case "y": case "Y": { /* re-run failed tests */
-                    local testname = failed_tests[0].testname;
-                    failed_tests[0] = nil; /* reset 'failed_tests' list */
-                    __opts.run_isolated = false; /* run tests directly */
-                    __opts.reprint_failed = false; /* do not re-print error */
-                    run_tests("failed_test", [testname]); /* run the failed test */
-                    /* fall through */
-                }
-                case "n": case "N": return; /* do not run; done */
-                default: loginput("Unrecognized option try one of [yYnN] (default 'y'): ");
-            }
-        }
-    }
-};
 
 
 /*
@@ -1025,23 +1029,6 @@ local fn handle_cli_args() {
 }
 
 
-/*
-** Displays messages of (parts of) skipped tests.
-*/
-local fn display_skipped() {
-    if __skipmsg {
-        if __opts.run_isolated {
-            loginfo("no information on (parts of) skipped tests (if any), " ..
-                    "as tests were ran in isolation ('-i')");
-        } else if 0 < skip_msgs.len {
-            print("\nSkip messages:");
-            foreach _,msg in indices(skip_msgs)
-                print(YELLOW("> ") .. msg);
-        }
-    }
-}
-
-
 /* auxiliary to 'display_run_information' */
 local fn get_maximum_line_length_in_information() {
     local max = 0;
@@ -1101,7 +1088,6 @@ local fn run_args() {
         run_testsuites(__opts.tests_script, flatten(__opts.testsuites_to_run));
     else if (__opts.cli_tests.len == 0) /* no explicit testsuites and tests? */
         run_all_testsuites(__opts.tests_script); /* run all from tests script */
-    prompt_run_failed_test();
     display_skipped(); /* display skip messages (if any) */
     if __opts.reprint_failed { /* reprint failed tests? */
         local n = failed_tests.len;
@@ -1187,7 +1173,7 @@ local fn set_output_options() {
 
 local fn report(fatal, msg, st, what, code) {
     if !st {
-        loginfo(fmt("fail, %s (%s -> %d)", msg, what, code));
+        loginfo(fmt("fail, %s (%s with %s code %d)", msg, what, what, code));
         if (fatal) exit(1, true);
     }
     return st;
@@ -1228,8 +1214,8 @@ else if !out_tests and __opts.rebuild { /* rebuild standalone interpreter? */
     cmd = buildcmd("cd", dir, "&&", cmd, "clean", dev_null1, "&&", cmd);
     cmd = buildcmd(cmd, dev_null1); /* redirect 'stdout' to null */
     logcmd(cmd);
-    if !report(false, msg, execute(cmd)) { /* rebuild failed? */
-        loginfo("rebuild failed, exiting...");
+    if !report(false, "rebuild", execute(cmd)) { /* rebuild failed? */
+        loginfo("exiting...");
         rmoldprog(true);
         exit(1, true);
     }
