@@ -664,7 +664,7 @@ static void rethook(toku_State *T, CallFrame *cf, int32_t nres) {
             delta = !!p->isvararg * (cf->u.t.nvarargs + p->arity + 1);
         }
         cf->func.p += delta; /* if vararg, back to virtual function */
-        ftransfer = cast_u16(firstres - cf->func.p) - 1;
+        ftransfer = cast_i32(firstres - cf->func.p) - 1;
         toku_assert(ftransfer >= 0);
         tokuD_hook(T, TOKU_HOOK_RET, -1, ftransfer, nres); /* call it */
         cf->func.p -= delta; /* if vararg, back to original function */

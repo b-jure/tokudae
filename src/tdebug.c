@@ -524,9 +524,6 @@ static const char *funcnamefromcode(toku_State *T, const Proto *p, int32_t pc,
 
 /*
 ** Try to find a name for a function based on how it was called.
-** WARNING: always first check if the function was called as a hook,
-** as the 'cf->u.t.savedpc' might point after the relevant instruction
-** and this would mess up symbolic execution (see 'tokuD_traceexec').
 */
 static const char *funcnamefromcall(toku_State *T, CallFrame *cf,
                                                    const char **name) {
