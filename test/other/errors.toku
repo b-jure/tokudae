@@ -307,28 +307,29 @@ for (local i=60-10; i<=60; i++) { /// check border cases around 60
 
 /// testing line error
 
-local fn lineerror(s, l) {
+local fn lineerror(s, l, w) {
     local err,msg = pcall(load(s));
     local line = tonum(reg.match(msg, ":(%d+):"));
     assert(line == l or (!line and !l));
+    if (w) assert(string.find(msg, w));
 }
 
 lineerror("local a;\n foreach i in {} { \n print(i); \n }", 2);
-lineerror("\n local a; \n foreach k,v in 3 \n { \n print(k); \n }", 3);
-lineerror("\n\n foreach k,v in \n 3 \n { \n print(k); \n }", 4);
-lineerror("fn a.x.y() {\na=a+1;\n}", 1);
+lineerror("\n local a; \n foreach k,v in 3 \n { \n print(k); \n }", 3, "to call");
+lineerror("\n\n foreach k,v in \n 3 \n { \n print(k); \n }", 4, "to call");
+lineerror("fn a.x.y() {\na=a+1;\n}", 1, "index");
 
-lineerror("a = \na\n+\n{};", 3);
-lineerror("a = \n3\n+\n(\n4\n/\nprint);", 6);
-lineerror("a = \nprint\n+\n(\n4\n/\n7);", 3);
+lineerror("a = \na\n+\n{};", 3, "arithmetic");
+lineerror("a = \n3\n+\n(\n4\n/\nprint);", 6, "arithmetic");
+lineerror("a = \nprint\n+\n(\n4\n/\n7);", 3, "arithmetic");
 
-lineerror("a\n=\n-\n\nprint\n;", 3);
+lineerror("a\n=\n-\n\nprint\n;", 3, "arithmetic");
 
 lineerror([=[
 a
 (     /// <<
 23);
-]=], 2);
+]=], 2, "call");
 
 lineerror([=[
 local a = {x = 13};
@@ -338,7 +339,7 @@ x
 (     /// <<
 23
 );
-]=], 5);
+]=], 5, "call");
 
 lineerror([=[
 local a = {x = 13};
@@ -348,17 +349,17 @@ x
 (
 23 + a
 );
-]=], 6);
+]=], 6, "arithmetic");
 
 local p = [=[
     fn g() { f(); }
     fn f(x) { error("a", XX); }
     g();
 ]=];
-XX=3;lineerror((p), 3);
-XX=0;lineerror((p), false);
-XX=1;lineerror((p), 2);
-XX=2;lineerror((p), 1);
+XX=3;lineerror((p), 3, "a");
+XX=0;lineerror((p), false, "a");
+XX=1;lineerror((p), 2, "a");
+XX=2;lineerror((p), 1, "a");
 __G.XX, __G.g, __G.f = nil;
 
 
@@ -366,7 +367,7 @@ lineerror([=[
 local b = false;
 if (!b) {
   error("test");
-}]=], 3);
+}]=], 3, "test");
 
 lineerror([=[
 local b = false;
@@ -374,7 +375,7 @@ if (!b)
   if (!b)
     if (!b)
       error("test");
-]=], 5);
+]=], 5, "test");
 
 lineerror([=[
 __ENV = 1;
@@ -382,21 +383,21 @@ fn foo() {
   local a = 10;
   return a;
 }
-]=], 2);
+]=], 2, "index");
 
 
 lineerror([=[
   local a = 0;
   local b = 1;
   local c = b % a;
-]=], 3);
+]=], 3, "attempt");
 
 {
     /// Force a negative estimate for base line. Error in opcode 3
     /// (after VARARGPREP, GETUVAL, GETINDEXSTR), with first absolute
     /// line information (forced by too many lines) in opcode 0.
     local s = string.fmt("%s return __A.x;", string.repeat("\n", 300));
-    lineerror(s, 301);
+    lineerror(s, 301, "index");
 }
 
 

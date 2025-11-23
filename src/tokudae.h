@@ -28,7 +28,7 @@
 #define TOKU_SIGNATURE      "\x1bTokudae"
 
 
-/* option for multiple returns in 'toku_pcall' and 'toku_call' */
+/* option for multiple returns in 'toku_[p]call[k]' */
 #define TOKU_MULTRET        (-1)
 
 
@@ -51,10 +51,10 @@
 /* thread status */
 #define TOKU_STATUS_OK          0 /* ok */
 #define TOKU_STATUS_YIELD       1 /* thread is suspended */
-#define TOKU_STATUS_ERUNTIME    2 /* runtime error */
-#define TOKU_STATUS_ESYNTAX     3 /* syntax (compiler) error */
+#define TOKU_STATUS_ERUN        2 /* runtime error */
+#define TOKU_STATUS_ESYNTAX     3 /* syntax (compile-time) error */
 #define TOKU_STATUS_EMEM        4 /* memory related error */
-#define TOKU_STATUS_EERROR      5 /* error while handling error */
+#define TOKU_STATUS_EERR        5 /* error while handling error */
 #define TOKU_STATUS_NUM         6 /* total number of status codes */
 
 
@@ -79,7 +79,7 @@
 /* minimum stack space available to a C function */
 #define TOKU_MINSTACK       20
 
-/* Other constants are defined right above the functions that use them. */
+/* (Other constants are defined right above the functions that use them.) */
 
 /* }{Types================================================================ */
 
@@ -269,12 +269,12 @@ TOKU_API void toku_set_fieldtable(toku_State *T, int32_t idx);
 
 /* }{Call/Load/Combine/Dump Tokudae chunks================================ */
 
-// TODO: add docs + implement
+// TODO: add docs
 TOKU_API void toku_callk(toku_State *T, int32_t nargs, int32_t nresults,
                          toku_KContext cx, toku_KFunction k); 
 #define toku_call(T,n,r)        toku_callk(T, (n), (r), 0, NULL)  
 
-// TODO: add docs + implement
+// TODO: add docs
 TOKU_API int32_t toku_pcallk(toku_State *T, int32_t nargs, int32_t nresults,
                              int32_t msgh, toku_KContext cx, toku_KFunction k);
 #define toku_pcall(T,n,r,f)     toku_pcallk(T, (n), (r), (f), 0, NULL)
@@ -287,11 +287,12 @@ TOKU_API int32_t toku_dump(toku_State *T, toku_Writer fw, void *data,
 
 /* }{Coroutine functions================================================== */
 
-// TODO: add docs + implement all of these except 'toku_status'
+// TODO: add docs + implement all of these (except 'toku_status')
 TOKU_API int32_t toku_yieldk(toku_State *T, int32_t nresults,
                              toku_KContext cx, toku_KFunction k);
 TOKU_API int32_t toku_resume(toku_State *T, toku_State *from, int32_t narg,
                              int32_t *nres);
+// TODO: update docs
 TOKU_API int32_t toku_status(toku_State *T);
 TOKU_API int32_t toku_isyieldable(toku_State *T);
 

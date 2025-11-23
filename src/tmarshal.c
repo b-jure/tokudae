@@ -89,9 +89,9 @@ typedef struct MarshalState {
 */
 static void dump_block(MarshalState *M, const void *b, size_t size) {
     if (D(M).status == 0) { /* do not write anything in case we have errors */
-        toku_lock(T);
+        toku_lock(M->T);
         D(M).status = (*D(M).writer)(M->T, b, size, D(M).data);
-        toku_unlock(T);
+        toku_unlock(M->T);
         M->offset += size;
     }
 }
@@ -630,10 +630,10 @@ TClosure *tokuZ_undump(toku_State *T, BuffReader *Z, const char *name) {
     check_header(&M);
     cl = tokuF_newTclosure(T, load_int(&M));
     setclTval2s(T, T->sp.p, cl);
-    tokuT_incsp(T);
+    tokuPR_incsp(T);
     M.h = tokuH_new(T); /* create list of saved strings */
     settval2s(T, T->sp.p, M.h); /* anchor it */
-    tokuT_incsp(T);
+    tokuPR_incsp(T);
     cl->p = tokuF_newproto(T);
     tokuG_objbarrier(T, cl, cl->p);
     load_function(&M, cl->p);

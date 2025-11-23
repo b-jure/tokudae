@@ -63,6 +63,14 @@ typedef ptrdiff_t       t_mem;
 
 
 /*
+** @UNUSED - marks variable unused to avoid compiler warnings.
+*/
+#if !defined(UNUSED)
+#define UNUSED(x)           ((void)(x))
+#endif
+
+
+/*
 ** Allow threaded code by default on GNU C compilers.
 ** What this allows is usage of jump table, meaning the use of
 ** local labels inside arrays, making opcode dispatch O(1)
@@ -120,30 +128,8 @@ typedef ptrdiff_t       t_mem;
 ** Tokudae core (C API).
 */
 #if !defined(toku_lock)
-#define toku_lock(T)        UNUSED(0)
-#define toku_unlock(T)      UNUSED(0)
-#endif
-
-
-
-/*
-** These macros allow user-defined action to be taken each time
-** thread is created/deleted and/or state is opened/closed.
-*/
-#if !defined(tokui_userstateopen)
-#define tokui_userstateopen(T)          UNUSED(T)
-#endif
-
-#if !defined(tokui_userstateclose)
-#define tokui_userstateclose(T)         UNUSED(T)
-#endif
-
-#if !defined(tokui_userstatethread)
-#define tokui_userstatethread(T,C1)     UNUSED(T)
-#endif
-
-#if !defined(tokui_userstatefree)
-#define tokui_userstatefree(T,C1)       UNUSED(T)
+#define toku_lock(T)        UNUSED(T)
+#define toku_unlock(T)      UNUSED(T)
 #endif
 
 
@@ -151,14 +137,6 @@ typedef ptrdiff_t       t_mem;
 /*
 ** Casting via macros.
 */
-
-/*
-** @UNUSED - marks variable unused to avoid compiler
-** warnings.
-*/
-#if !defined(UNUSED)
-#define UNUSED(x)           ((void)(x))
-#endif
 
 
 /* type casts (a macro highlights casts in the code) */
@@ -342,7 +320,7 @@ typedef void (*voidf)(void);
 #else
 /* realloc stack keeping its size */
 #define condmovestack(T,pre,pos)  \
-    { int sz_ = stacksize(T); pre; tokuT_reallocstack((T), sz_, 0); pos; }
+    { int sz_ = stacksize(T); pre; tokuPR_reallocstack((T), sz_, 0); pos; }
 #endif
 
 

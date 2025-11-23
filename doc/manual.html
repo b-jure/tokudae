@@ -1417,12 +1417,13 @@ assert(getmetatable(Example).__init);</pre>
         <p>
         A to-be-closed variable behaves like an immutable local variable,
         except that its value is <em>closed</em> whenever the variable
-        goes out of scope, including normal block termination,
-        exiting its block by <b>break</b>/<b>continue</b>/<b>return</b>,
+        goes out of scope,
+        including normal block termination,
+        exiting its block by <b>break</b>, <b>continue</b>, <b>return</b>
         or exiting by an error.
         <br/><br/>
-        Here, to <em>close</em> a value means to call its <code>__close</code>
-        metamethod.
+        Here, to <em>close</em> a value means to call its
+        <code>__close</code> metamethod.
         When calling the metamethod,
         the value itself is passed as the first argument.
         If there was an error,
@@ -2771,7 +2772,7 @@ assert(player.lol == "lol");</pre>
                 no errors.
             </li>
             <li>
-                <b><a name="TOKU_STATUS_ERUNTIME"><code>TOKU_STATUS_ERUNTIME</code></a>:</b>
+                <b><a name="TOKU_STATUS_ERUN"><code>TOKU_STATUS_ERUN</code></a>:</b>
                 a runtime error.
             </li>
             <li>
@@ -2780,7 +2781,7 @@ assert(player.lol == "lol");</pre>
                 For such errors, Tokudae does not call the message handler.
             </li>
             <li>
-                <b><a name="TOKU_STATUS_EERROR"><code>TOKU_STATUS_EERROR</code></a>: </b>
+                <b><a name="TOKU_STATUS_EERR"><code>TOKU_STATUS_EERR</code></a>: </b>
                 error while running the message handler.
             </li>
             <li>
@@ -4780,9 +4781,9 @@ typedef struct toku_Cinfo {
         The <a href="#toku_pcall"><code>toku_pcall</code></a> function returns one
         of the following status codes:
         <a href="#TOKU_STATUS_OK"><code>TOKU_STATUS_OK</code></a>,
-        <a href="#TOKU_STATUS_ERUNTIME"><code>TOKU_STATUS_ERUNTIME</code></a>,
+        <a href="#TOKU_STATUS_ERUN"><code>TOKU_STATUS_ERUN</code></a>,
         <a href="#TOKU_STATUS_EMEM"><code>TOKU_STATUS_EMEM</code></a> or
-        <a href="#TOKU_STATUS_EERROR"><code>TOKU_STATUS_EERROR</code></a>.
+        <a href="#TOKU_STATUS_EERR"><code>TOKU_STATUS_EERR</code></a>.
         </p>
 
         <!-- toku_load -->

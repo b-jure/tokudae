@@ -19,7 +19,7 @@
 
 
 /* get pointer to opcode from 'ExpInfo' */
-#define getpi(fs,e)     (&(fs)->p->code[(e)->u.info])
+#define getpo(fs,e)         (&(fs)->p->code[(e)->u.info])
 
 
 /* sizes in bytes */
@@ -130,6 +130,7 @@ typedef enum { /* "ORDER OP" */
 ** OU{x} - open upvalue at index 'x'
 ** G{x} - global variable, key is K{x}:string
 ** L{x} - local variable in 'p->locals[x]'
+** TOP - stack top
 **
 ** operation     args           description
 ** ------------------------------------------------------------------------ */
@@ -196,7 +197,7 @@ OP_BAND,/*         V1 V2 S 'V1 & V2'                                        */
 OP_BOR,/*          V1 V2 S 'V1 | V2'                                        */
 OP_BXOR,/*         V1 V2 S 'V1 ^ V2'                                        */
 
-OP_CONCAT,/*       L           'V{-L} = V{-L} .. V{L - 1}'                  */
+OP_CONCAT,/*       L           'V{L} = V{L} .. V{LAST}'                     */
 
 OP_EQK,/*          V L S       '(V == K{L}) == S'                           */
 
@@ -210,7 +211,7 @@ OP_EQ,/*           V1 V2 S     '(V1 == V2) == S'                            */
 OP_LT,/*           V1 V2 S     '(V1 < V2)  (if (S) swap operands)'          */
 OP_LE,/*           V1 V2 S     '(V1 <= V2)'                                 */
 
-OP_EQPRESERVE,/*   V1 V2   'V1 == V2 (preserves V1 operand)'                */
+OP_EQPRESERVE,/*   V1 V2   'V2 = (V1 == V2)'                                */
 
 OP_UNM,/*          V       '-V'                                             */
 OP_BNOT,/*         V       '~V'                                             */
@@ -328,6 +329,8 @@ TOKUI_DEC(const uint8_t tokuC_opsize[FormatN];)
     int32_t left_ = tokuC_storevar(fs, v, 0); tokuC_fixline(fs, ln); \
     tokuC_pop(fs, left_); }
 
+#define tokuC_setmultret(fs,e)      tokuC_setreturns(fs, e, TOKU_MULTRET)
+
 TOKUI_FUNC int32_t tokuC_emitS(FunctionState *fs, int32_t a);
 TOKUI_FUNC int32_t tokuC_emitI(FunctionState *fs, uint8_t i);
 TOKUI_FUNC int32_t tokuC_emitIS(FunctionState *fs, uint8_t i, int32_t a);
@@ -345,7 +348,7 @@ TOKUI_FUNC void tokuC_removelastjump(FunctionState *fs);
 TOKUI_FUNC void tokuC_checkstack(FunctionState *fs, int32_t n);
 TOKUI_FUNC void tokuC_reserveslots(FunctionState *fs, int32_t n);
 TOKUI_FUNC void tokuC_setreturns(FunctionState *fs, ExpInfo *e, int32_t nret);
-TOKUI_FUNC void tokuC_setmulret(FunctionState *fs, ExpInfo *e);
+TOKUI_FUNC void tokuC_setmultret(FunctionState *fs, ExpInfo *e);
 TOKUI_FUNC int32_t tokuC_nil(FunctionState *fs, int32_t n);
 TOKUI_FUNC void tokuC_load(FunctionState *fs, int32_t stk);
 TOKUI_FUNC int32_t tokuC_remove(FunctionState *fs, int32_t n);

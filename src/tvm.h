@@ -35,8 +35,9 @@
 */
 #define tokuV_finishfastset(T,t,v)      tokuG_barrierback(T, obj2gco(t), v)
 
-
-TOKUI_FUNC void tokuV_call(toku_State *T, SPtr fn, int nreturns);
+TOKUI_FUNC void tokuV_finishOp(toku_State *T);
+TOKUI_FUNC void tokuV_execute(toku_State *T, CallFrame *cf);
+TOKUI_FUNC void tokuPR_call(toku_State *T, SPtr fn, int nreturns);
 TOKUI_FUNC void tokuV_concat(toku_State *T, int n);
 TOKUI_FUNC toku_Integer tokuV_divi(toku_State *T, toku_Integer x,
                                                   toku_Integer y);
@@ -50,7 +51,6 @@ TOKUI_FUNC void tokuV_unarithm(toku_State *T, const TValue *v,
 TOKUI_FUNC int tokuV_ordereq(toku_State *T, const TValue *v1, const TValue *v2);
 TOKUI_FUNC int tokuV_orderlt(toku_State *T, const TValue *v1, const TValue *v2);
 TOKUI_FUNC int tokuV_orderle(toku_State *T, const TValue *v1, const TValue *v2);
-TOKUI_FUNC void tokuV_execute(toku_State *T, CallFrame *cf);
 TOKUI_FUNC void tokuV_rawsetstr(toku_State *T, const TValue *o,
                                                const TValue *k,
                                                const TValue *v);

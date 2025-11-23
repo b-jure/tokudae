@@ -407,8 +407,7 @@ static int32_t fltK(FunctionState *fs, toku_Number n) {
 /* adjust 'maxstack' */
 void tokuC_checkstack(FunctionState *fs, int32_t n) {
     int32_t newstack = fs->sp + n;
-    toku_assert(newstack >= 0);
-    if (fs->p->maxstack < newstack) {
+    if (newstack > fs->p->maxstack) {
         tokuP_checklimit(fs, newstack, MAX_CODE, "stack slots");
         fs->p->maxstack = newstack;
     }
@@ -427,55 +426,69 @@ void tokuC_reserveslots(FunctionState *fs, int32_t n) {
 /*
 ** Non-finalized expression with multiple returns must be open,
 ** meaning the emitted code is either a vararg or call opcode,
-** and the opcode 'nretruns' argument is set as TOKU_MULTRET (+1).
+** and the opcode 'nretruns' argument is set as TOKU_MULTRET + 1 (0).
 */
-#define mulretinvariant(fs,e) { \
-    uint8_t *po = &fs->p->code[e->u.info]; UNUSED(po); \
+#define multretinvariant(fs,e) { \
+    uint8_t *po = getpo(fs, e); UNUSED(po); \
     toku_assert((*po == OP_VARARG && GET_ARG_L(po, 0) == 0) || \
                 (*po == OP_CALL && GET_ARG_L(po, 1) == 0)); }
 
 
-/* finalize open call or vararg expression */
-static void setreturns(FunctionState *fs, ExpInfo *e, int32_t nret) {
-    mulretinvariant(fs, e);
-    toku_assert(TOKU_MULTRET <= nret);
-    nret++; /* return count is biased by 1 to represent TOKU_MULTRET */
+/*
+** Sets number of returns in multi-ret expression.
+** This does not reserve a stack slot, it assumes the slots are
+** already checked by the parser, will be ensured by the callee or
+** dynamically by the VM. Additionally the expression 'e' still
+** holds the pc in 'info' as stack index in this context would
+** be irrelevant.
+*/
+void tokuC_setreturns(FunctionState *fs, ExpInfo *e, int32_t nres) {
+    multretinvariant(fs, e);
+    toku_assert(TOKU_MULTRET <= nres);
+    nres++; /* return count is biased by 1 to represent TOKU_MULTRET */
     if (e->et == EXP_CALL) { /* call opcode? */
         if (fs->callcheck) { /* this call has a check? */
             toku_assert(*prevOP(fs) == OP_CHECKADJ);
-            if (nret != TOKU_MULTRET + 1) { /* fixed number of results? */
+            if (nres != TOKU_MULTRET + 1) { /* fixed number of results? */
                 /* adjust number of results at runtime */
-                SET_ARG_L(prevOP(fs), 1, nret);
+                SET_ARG_L(prevOP(fs), 1, nres);
             } else /* otherwise CHECKADJ is not needed */
                 removelastopcode(fs);
             fs->callcheck = 0; /* call check is resolved */
         } else /* otherwise just set call returns */
-            SET_ARG_L(getpi(fs, e), 1, nret);
-    } else /* otherwise vararg opcode */
-        SET_ARG_L(getpi(fs, e), 0, nret);
+            SET_ARG_L(getpo(fs, e), 1, nres);
+    } else { /* otherwise vararg opcode */
+        toku_assert(*getpo(fs, e) == OP_VARARG);
+        SET_ARG_L(getpo(fs, e), 0, nres);
+    }
     toku_assert(!fs->callcheck);
     e->et = EXP_FINEXPR; /* closed */
 }
 
 
-void tokuC_setreturns(FunctionState *fs, ExpInfo *e, int32_t nret) {
-    toku_assert(0 <= nret); /* for TOKU_MULTRET use 'tokuC_setmulret' */
-    setreturns(fs, e, nret);
-    tokuC_reserveslots(fs, nret);
-}
-
-
-void tokuC_setmulret(FunctionState *fs, ExpInfo *e) {
-    setreturns(fs, e, TOKU_MULTRET);
+/*
+** Similar to 'tokuC_setreturns', except here we might reserve a
+** stack slot. If the expression is a call, we just set the number of
+** returns, the stack slot for the result is already ensured as it is
+** inserted in-place of the callee. However for the vararg expressions
+** we must reserve a stack slot.
+*/
+void tokuC_setoneret(FunctionState *fs, ExpInfo *e) {
+    if (e->et == EXP_VARARG || e->et == EXP_CALL) {
+        tokuC_reserveslots(fs, (e->et == EXP_VARARG));
+        tokuC_setreturns(fs, e, 1);
+        e->u.info = fs->sp - 1; /* set stack index of the result */
+        e->et == EXP_FINEXPR; /* mark as finalized */
+    }
 }
 
 
 #define istargetpc(fs)      ((fs)->lasttarget == currPC)
 
 static int32_t canmerge(FunctionState *fs, OpCode op, uint8_t *prev) {
-    if (prev && *prev == op && fs->pcdo != currPC && !istargetpc(fs)) {
+    if (prev && *prev == op && fs->pcdo != currPC && !istargetpc(fs))
         return (op == OP_POP || (op == OP_NIL && !fs->nonilmerge));
-    } else /* otherwise differing opcodes, start of loop or in a jump */
+    else /* otherwise differing opcodes, start of loop or in a jump */
         return 0; /* can't merge */
 }
 
@@ -858,47 +871,48 @@ void tokuC_const2v(FunctionState *fs, ExpInfo *e, TValue *v) {
 int32_t tokuC_dischargevars(FunctionState *fs, ExpInfo *v) {
     switch (v->et) {
         case EXP_UVAL:
-            v->u.info = tokuC_emitIL(fs, OP_GETUVAL, v->u.info);
+            tokuC_emitIL(fs, OP_GETUVAL, v->u.info);
             break;
         case EXP_LOCAL:
-            v->u.info = tokuC_emitIL(fs, OP_GETLOCAL, v->u.var.sidx);
+            tokuC_emitIL(fs, OP_GETLOCAL, v->u.var.sidx);
             break;
         case EXP_INDEXED:
             freeslots(fs, 2);
-            v->u.info = tokuC_emitI(fs, OP_GETINDEX);
+            tokuC_emitI(fs, OP_GETINDEX);
             break;
         case EXP_INDEXSTR:
             freeslots(fs, 1);
-            v->u.info = tokuC_emitIL(fs, OP_GETINDEXSTR, v->u.info);
+            tokuC_emitIL(fs, OP_GETINDEXSTR, v->u.info);
             break;
         case EXP_INDEXINT:
             freeslots(fs, 1);
-            v->u.info = getindexint(fs, v);
+            tindexint(fs, v);
             break;
         case EXP_INDEXSUPER:
             freeslots(fs, 2);
-            v->u.info = tokuC_emitI(fs, OP_GETSUPIDX);
+            tokuC_emitI(fs, OP_GETSUPIDX);
             break;
         case EXP_DOTSUPER: case EXP_INDEXSUPERSTR:
             freeslots(fs, 1);
-            v->u.info = tokuC_emitIL(fs, OP_GETSUP, v->u.info);
+            tokuC_emitIL(fs, OP_GETSUP, v->u.info);
             break;
         case EXP_DOT:
             freeslots(fs, 1);
-            v->u.info = tokuC_emitIL(fs, OP_GETPROPERTY, v->u.info);
+            tokuC_emitIL(fs, OP_GETPROPERTY, v->u.info);
             break;
         case EXP_CALL: case EXP_VARARG:
-            tokuC_setreturns(fs, v, 1); /* default is one value returned */
-            toku_assert(v->et == EXP_FINEXPR);
-            /* fall through */
+            tokuC_setoneret(fs, v); /* default is one value returned */
+            return 1; /* true; expression was a variable */
         case EXP_SUPER:
-            v->et = EXP_FINEXPR;
-            return 1; /* done */
-        default: return 0; /* expression is not a variable */
+            v->et = EXP_FINEXPR; /* mark as finalized */
+            v->u.info = fs->sp - 1; /* stack slot is already reserved */
+            return 1; /* true; expression was a variable */
+        default: return 0; /* false; expression is not a variable */
     }
-    tokuC_reserveslots(fs, 1);
-    v->et = EXP_FINEXPR;
-    return 1;
+    v->info = fs->sp; /* set the stack index */
+    v->et = EXP_FINEXPR; /* mark as finalized */
+    tokuC_reserveslots(fs, 1); /* reserve stack slot for the expression */
+    return 1; /* true; expression was a variable */
 }
 
 
@@ -970,30 +984,31 @@ static void discharge2stack(FunctionState *fs, ExpInfo *e) {
     if (!tokuC_dischargevars(fs, e)) {
         switch (e->et) {
             case EXP_NIL:
-                e->u.info = codenil(fs, 1);
+                codenil(fs, 1);
                 break;
             case EXP_FALSE:
-                e->u.info = tokuC_emitI(fs, OP_FALSE);
+                tokuC_emitI(fs, OP_FALSE);
                 break;
             case EXP_TRUE:
-                e->u.info = tokuC_emitI(fs, OP_TRUE);
+                tokuC_emitI(fs, OP_TRUE);
                 break;
             case EXP_INT:
-                e->u.info = codeintIK(fs, e->u.i);
+                codeintIK(fs, e->u.i);
                 break;
             case EXP_FLT:
-                e->u.info = codefltIK(fs, e->u.n);
+                codefltIK(fs, e->u.n);
                 break;
             case EXP_STRING:
                 string2K(fs, e);
             /* fall through */
             case EXP_K:
-                e->u.info = codeK(fs, e->u.info);
+                codeK(fs, e->u.info);
                 break;
-            default: return;
+            default: return; /* already finalized */
         }
+        e->et = EXP_FINEXPR; /* mark as finalized */
+        e->u.info = fs->sp; /* set stack index */
         tokuC_reserveslots(fs, 1);
-        e->et = EXP_FINEXPR;
     }
 }
 
@@ -1006,7 +1021,7 @@ static void discharge2stack(FunctionState *fs, ExpInfo *e) {
 void tokuC_exp2stack(FunctionState *fs, ExpInfo *e) {
     discharge2stack(fs, e);
     toku_assert(!fs->callcheck); /* should already be resolved */
-    if (hasjumps(e)) {
+    if (hasjumps(e)) { /* expression has a jump list? */
         int32_t final = currPC; /* position after the expression */
         patchlistaux(fs, e->f, final);
         patchlistaux(fs, e->t, final);
@@ -1072,6 +1087,13 @@ void tokuC_indexed(FunctionState *fs, ExpInfo *var, ExpInfo *key,
         var->u.info = key->u.info;
         var->et = EXP_INDEXED;
     }
+}
+
+
+void tokuC_super(FunctionState *fs, ExpInfo *inst) {
+    tokuC_exp2stack(fs, inst);
+    e->u.info = tokuC_emitI(fs, OP_SUPER);
+    e->et = EXP_SUPER;
 }
 
 
@@ -1507,16 +1529,9 @@ static uint8_t *previousopcode(FunctionState *fs) {
 }
 
 
-static void codeconcat(FunctionState *fs, ExpInfo *e1, ExpInfo *e2,
-                                                       int32_t linenum) {
-    uint8_t *po = previousopcode(fs);
-    UNUSED(e2);
-    if (*po == OP_CONCAT) { /* 'e2' is a concatenation? */
-        int32_t n = GET_ARG_L(po, 0);
-        SET_ARG_L(po, 0, n + 1); /* will concatenate one more element */
-    } else { /* 'e2' is not a concatenation */
-        e1->u.info = tokuC_emitIL(fs, OP_CONCAT, 2);
-        e1->et = EXP_FINEXPR;
+static void codeconcat(FunctionState *fs, ExpInfo *e1, int32_t linenum) {
+    if (*previousopcode(fs) != OP_CONCAT) {
+        tokuC_emitIL(fs, OP_CONCAT, e1->u.info);
         tokuC_fixline(fs, linenum);
     }
     freeslots(fs, 1);
@@ -1564,7 +1579,7 @@ void tokuC_binary(FunctionState *fs, ExpInfo *e1, ExpInfo *e2,
             break;
         case OPR_CONCAT:
             tokuC_exp2stack(fs, e2); /* second operand must be on stack */
-            codeconcat(fs, e1, e2, linenum);
+            codeconcat(fs, e1, linenum);
             break;
         case OPR_NE: case OPR_EQ:
             codeEq(fs, e1, e2, opr);

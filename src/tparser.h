@@ -52,7 +52,7 @@ typedef enum expt {
      * 'n' = floating value; */
     EXP_FLT,
     /* registered constant value;
-     * 'info' = index in 'constants'; */
+     * 'info' = index in 'k'; */
     EXP_K,
     /* upvalue variable;
      * 'info' = index of upvalue in 'upvals'; */
@@ -66,20 +66,22 @@ typedef enum expt {
     /* indexed variable; */
     EXP_INDEXED,
     /* variable indexed with literal string;
-     * 'info' = index in 'constants'; */
+     * 'info' = index in 'k'; */
     EXP_INDEXSTR,
     /* variable indexed with constant integer;
-     * 'info' = index in 'constants'; */
+     * 'info' = index in 'k'; */
     EXP_INDEXINT,
-    /* indexed 'super'; */
+    /* indexed 'super';
+     * 'info' = stack index of the key; */
     EXP_INDEXSUPER,
     /* indexed 'super' with literal string;
-     * 'info' = index in 'constants'; */
+     * 'info' = index of string constant in 'k'; */
     EXP_INDEXSUPERSTR,
     /* indexed variable with '.';
-     * 'info' = index in 'constants'; */
+     * 'info' = index of string constant in 'k'; */
     EXP_DOT,
-    /* indexed 'super' with '.'; */
+    /* indexed 'super' with '.';
+     * 'info' = index of string constant in 'k'; */
     EXP_DOTSUPER,
     /* function call;
      * 'info' = pc; */
@@ -87,28 +89,26 @@ typedef enum expt {
     /* vararg expression '...';
      * 'info' = pc; */
     EXP_VARARG,
-    /* finalized expression */
+    /* finalized expression
+     * 'info' = stack index; */
     EXP_FINEXPR,
 } expt;
 
 
-/*
-** Expression descriptor.
-*/
-typedef struct ExpInfo {
+typedef struct ExpInfo { /* expression information */
     expt et;
     union {
-        toku_Number n; /* floating constant */
-        toku_Integer i; /* integer constant  */
-        OString *str; /* string literal */
-        struct {
+        toku_Number n; /* for EXP_FLT */
+        toku_Integer i; /* for EXP_INT */
+        OString *str; /* for EXP_STRING */
+        int32_t info; /* for generic use */
+        struct { /* for local variables */
             int32_t vidx; /* compiler index */
             int32_t sidx; /* stack slot index */
-        } var; /* local var */
-        int32_t info; /* pc or tome other generic information */
+        } var;
     } u;
-    int32_t t; /* jmp to patch if true */
-    int32_t f; /* jmp to patch if false */
+    int32_t t; /* patch list of 'jump if true' */
+    int32_t f; /* patch list of 'jump if false' */
 } ExpInfo;
 
 

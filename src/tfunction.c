@@ -183,7 +183,7 @@ static void checkclosetm(toku_State *T, SPtr level) {
 /*
 ** Insert value at the given stack level into the to-be-closed list.
 */
-void tokuF_newtbcvar(toku_State *T, SPtr level) {
+void tokuF_newtbcupval(toku_State *T, SPtr level) {
     toku_assert(level > T->tbclist.p);
     if (t_isfalse(s2v(level)))
         return; /* false doesn't need to be closed */
@@ -242,9 +242,10 @@ static void poptbclist(toku_State *T) {
 
 /* 
 ** Call '__close' method on 'obj' with error object 'err'.
+** The boolean 'yy' controls whether the call is yieldable.
 ** (This function assumes EXTRA_STACK.)
 */
-static void callclosemm(toku_State *T, TValue *obj, TValue *err) {
+static void callclosemm(toku_State *T, TValue *obj, TValue *err, int32_t yy) {
     SPtr top = T->sp.p;
     SPtr func = top;
     const TValue *method = tokuTM_objget(T, obj, TM_CLOSE);
@@ -252,8 +253,11 @@ static void callclosemm(toku_State *T, TValue *obj, TValue *err) {
     setobj2s(T, top++, obj); /* with 'self' as the 1st argument */
     if (err != NULL) /* there was an error? */
         setobj2s(T, top++, err); /* error object wil be the 2nd argument */
-    T->sp.p = top; /* add function and arguments */
-    tokuV_call(T, func, 0);
+    T->sp.p = top; /* assuming 'EXTRA_STACK' */
+    if (yy)
+        tokuPR_call(T, func, 0);
+    else
+        tokuPR_callnoyield(T, func, 0);
 }
 
 
@@ -264,7 +268,8 @@ static void callclosemm(toku_State *T, TValue *obj, TValue *err) {
 ** the 'level' of the upvalue being closed, as everything after that
 ** won't be used again.
 */
-static void prepcallclose(toku_State *T, SPtr level, int32_t status) {
+static void prepcallclose(toku_State *T, SPtr level, int32_t status,
+                                                     int32_t yy) {
     TValue *uv = s2v(level); /* value being closed */
     TValue *errobj;
     switch (status) {
@@ -278,7 +283,7 @@ static void prepcallclose(toku_State *T, SPtr level, int32_t status) {
             errobj = s2v(level + 1); /* error object goes after 'uv' */
             tokuPR_seterrorobj(T, status, level + 1); /* set error object */
     }
-    callclosemm(T, uv, errobj);
+    callclosemm(T, uv, errobj, yy);
 }
 
 
@@ -286,13 +291,13 @@ static void prepcallclose(toku_State *T, SPtr level, int32_t status) {
 ** Close all up-values and to-be-closed variables up to (stack) 'level'.
 ** Returns (restored) level.
 */
-SPtr tokuF_close(toku_State *T, SPtr level, int32_t status) {
+SPtr tokuF_close(toku_State *T, SPtr level, int32_t status, int32_t yy) {
     ptrdiff_t levelrel = savestack(T, level);
     tokuF_closeupval(T, level);
     while (T->tbclist.p >= level) {
         SPtr tbc = T->tbclist.p;
         poptbclist(T);
-        prepcallclose(T, tbc, status);
+        prepcallclose(T, tbc, status, yy);
         level = restorestack(T, levelrel);
     }
     return level;

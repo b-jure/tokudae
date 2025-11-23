@@ -53,9 +53,10 @@ TOKUI_FUNC UpVal *tokuF_findupval(toku_State *T, SPtr level);
 TOKUI_FUNC void tokuF_unlinkupval(UpVal *upval);
 TOKUI_FUNC const char *tokuF_getlocalname(const Proto *fn, int32_t lnum,
                                                            int32_t pc);
-TOKUI_FUNC void tokuF_newtbcvar(toku_State *T, SPtr level);
+TOKUI_FUNC void tokuF_newtbcupval(toku_State *T, SPtr level);
 TOKUI_FUNC void tokuF_closeupval(toku_State *T, SPtr level);
-TOKUI_FUNC SPtr tokuF_close(toku_State *T, SPtr level, int32_t status);
+TOKUI_FUNC SPtr tokuF_close(toku_State *T, SPtr level, int32_t status,
+                            int32_t yy);
 TOKUI_FUNC void tokuF_freeupval(toku_State *T, UpVal *upval);
 TOKUI_FUNC void tokuF_free(toku_State *T, Proto *fn);
 

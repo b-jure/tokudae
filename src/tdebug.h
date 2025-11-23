@@ -12,7 +12,11 @@
 #include "tstate.h"
 
 
-#define relpc(pc, p)    cast_i32((pc) - (p)->code - cast_i32(SIZE_OPCODE))
+/*
+** This assumes 'pc' points one byte after the opcode.
+** (See 'savestate' in 'tokuV_execute'.)
+*/
+#define relpc(pc, p)    cast_i32((pc) - (p)->code - 1)
 
 
 /* active Tokudae function (given call frame) */

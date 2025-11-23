@@ -644,7 +644,7 @@ static GCObject *gettobefin(GState *gs) {
 /* protected finalizer */
 static void pgc(toku_State *T, void *userdata) {
     UNUSED(userdata);
-    tokuV_call(T, T->sp.p - 2, 0);
+    tokuPR_call(T, T->sp.p - 2, 0);
 }
 
 
@@ -665,7 +665,7 @@ static void callgc(toku_State *T) {
         setobj2s(T, T->sp.p++, tm); /* push finalizer... */
         setobj2s(T, T->sp.p++, &v); /* ...and its argument */
         T->cf->status |= CFST_FIN; /* will run a finalizer */
-        status = tokuPR_call(T, pgc, NULL, savestack(T,T->sp.p-2), T->errfunc);
+        status = tokuPR_pcall(T, pgc, NULL, savestack(T,T->sp.p-2), T->errfunc);
         T->cf->status &= cast_u8(~CFST_FIN); /* not running a finalizer */
         T->allowhook = old_allowhook; /* restore hooks */
         gs->gcstop = old_gcstop; /* restore state */

@@ -31,10 +31,4 @@
     { (T)->sp.p++; \
       api_check(T, (T)->sp.p <= (T)->cf->top.p, "stack overflow"); }
 
-
-#define hastocloseCfunc(n)      ((n) < TOKU_MULTRET)
-
-#define codeNresults(n)         (-(n) - 3)
-#define decodeNresults(n)       (-(n) - 3)
-
 #endif

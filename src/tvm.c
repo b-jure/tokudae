@@ -1095,6 +1095,78 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 }
 
 
+/*
+** Finish execution of an opcode interrupted by a yield.
+*/
+void tokuV_finishOp(toku_State *T) {
+    CallFrame *cf = T->cf;
+    StkId base = cf->func.p + 1;
+    uint8_t *po = cf->u.t.savedpc - 1; /* interrupted opcode */
+    OpCode op = *po;
+    switch (op) { /* finish its execution */
+        case OP_CONCAT: {
+            SPtr first = base + GET_ARG_L(po, 0);
+            SPtr sp = T->sp.p - 1; /* sp when 'tokuTM_tryconcat' was called */
+            int32_t total = cast_i32(sp - first - 1); /* yet to concatenate */
+            setobjs2s(T, sp - 2, sp); /* move the result down */
+            T->sp.p = sp - 1; /* sp is one after last element (at sp-2) */
+            toku_assert(total >= 1);
+            tokuV_concat(T, total); /* concatenate rest (may yield again) */
+            break;
+        }
+        case OP_EQ: {
+            int32_t condexp = GET_ARG_S(po, 0);
+            int32_t cond = !t_isfalse(s2v(T->sp.p - 1));
+            settt(s2v(T->sp.p - 3), booleans[cond == condexp]);
+            T->sp.p -= 2; /* remove 2nd operand and the __eq result */
+            break;
+        }
+        case OP_LT: case OP_LE:
+            settt(s2v(T->sp.p - 3), booleans[!t_isfalse(s2v(T->sp.p - 1))]);
+            T->sp.p -= 2; /* remove 2nd operand and the __lt/__le result */
+            break;
+        case OP_EQPRESERVE:
+            settt(s2v(T->sp.p - 2), booleans[!t_isfalse(s2v(T->sp.p - 1))]);
+            T->sp.p--; /* remove the __eq result */
+            break;
+        case OP_MBIN:
+            setobjs2s(T, T->sp.p - 3, T->sp.p - 1); /* move down the result */
+            T->sp.p -= 2; /* remove 2nd operand and the metamethod result */
+            break;
+        case OP_UNM: case OP_BNOT:
+            setobjs2s(T, T->sp.p - 2, T->sp.p - 1);
+            T->sp.p--; /* remove the __unm/__bnot result */
+            break;
+        case OP_CLOSE: /* yielded closing variables */
+            cf->u.t.savedpc--; /* repeat instruction to close other vars. */
+            return; /* done; 'savedpc' is already correct */
+        case OP_SETPROPERTY: case OP_SETINDEX: case OP_SETINDEXSTR:
+        case OP_SETINDEXINT: case OP_SETINDEXINTL:
+            T->sp.p--; /* remove the value */
+            break;
+        case OP_GETINDEXSTR: case OP_GETPROPERTY:
+        case OP_GETINDEXINT: case OP_GETINDEXINTL:
+            setobjs2s(T, T->sp.p - 2, T->sp.p - 1);
+            T->sp.p--; /* remove __getidx result */
+            break;
+        case OP_GETINDEX:
+            setobjs2s(T, T->sp.p - 3, T->sp.p - 1);
+            T->sp.p -= 2; /* remove value and the __getidx result */
+            break;
+        case OP_RETURN: { /* yielded closing variables */
+            SPtr stk = base + GET_ARG_L(po, 0);
+            T->sp.p = stk + cf->u2.nres;
+            /* repeat opcode to close other vars. and complete the return */
+            cf->u.l.savedpc--;
+            return; /* done; 'savedpc' is already correct */
+        }
+        default: /* only these other opcodes can yield */
+            toku_assert(op==OP_FORCALL || op==OP_CALL || op==OP_TAILCALL);
+    }
+    cf->u.t.savedpc = po + getopSize(op); /* advance to the next opcode */
+}
+
+
 /* {======================================================================
 ** Macros for arithmetic/bitwise/comparison operations on numbers.
 ** ======================================================================= */
@@ -1197,7 +1269,7 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
         setfval(res, fop(T, n1, n2)); \
         sp--; /* v2 */ \
         pc += getopSize(OP_MBIN); \
-    }/* else fall through to 'OP_MBIN' */}
+    } else toku_assert(*pc == OP_MBIN); }
 
 
 /* arithmetic operations with stack operands for floats */
@@ -1270,7 +1342,7 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
         setival(res, op(i1, i2)); \
         sp--; /* v2 */ \
         pc += getopSize(OP_MBIN); \
-    }/* fall through to OP_MBIN */}
+    } else toku_assert(*pc == OP_MBIN); }
 
 
 
@@ -1370,13 +1442,25 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 /* store global 'sp' */
 #define storesp(T)          (T->sp.p = sp)
 
+/* store global 'sp' into 'savedsp' in case of yields */
+#define savesp(T)           (cf->u.t.savedsp = sp)
+
 
 /*
 ** Store global 'pc' and 'sp', must be done before fetching the
 ** opcode arguments (via fetch_l/fetch_s) in order to properly fetch
-** debug information for the error message (if error occurrs).
+** debug information for the error message (if error occurs).
+** (The 'pc' already consumed the opcode, so 'savedpc' is one byte
+** after the opcode.)
 */
 #define savestate(T)        (storepc(T), storesp(T))
+
+/*
+** Similar to 'savestate' except this also stores the current stack
+** pointer to correctly continue the opcode that was interrupted by
+** a yield.
+*/
+#define savestatesp(T)      (savestate(T), savesp(T))
 
 
 /* collector might of reallocated stack, so update global 'trap' */
@@ -1431,12 +1515,15 @@ void tokuV_execute(toku_State *T, CallFrame *cf) {
 #endif
 startfunc:
     trap = T->hookmask;
-    toku_assert(cf->u.t.savedpc == cf->u.t.retpc);
-    toku_assert(cf->u.t.savedpc == cf_func(cf)->p->code);
+    pc = cf->u.t.savedpc;
+    goto pos_returning;
 returning: /* trap is already set */
+    /* 'savedpc' is pointing one byte after the previous CALL */
+    toku_assert(*(cf->u.t.savedpc - 1) == OP_CALL);
+    pc = cf->u.t.savedpc + getopSize(OP_CALL) - 1;
+pos_returning:
     cl = cf_func(cf);
     k = cl->p->k;
-    pc = cf->u.t.retpc;
     if (t_unlikely(trap)) /* hooks? */
         trap = tokuD_tracecall(T);
     base = cf->func.p + 1;
@@ -1625,7 +1712,7 @@ returning: /* trap is already set */
                 vm_break;
             }
             vm_case(OP_MBIN) {
-                savestate(T);
+                savestatesp(T);
                 /* operands are already swapped */
                 tokuTM_trybin(T, peek(1), peek(0), sp-2, asTM(fetch_s()));
                 updatetrap(cf);
@@ -1779,13 +1866,13 @@ returning: /* trap is already set */
                 vm_break;
             }
             vm_case(OP_CONCAT) {
-                int32_t total;
+                SPtr first;
                 savestate(T);
-                total = fetch_l();
-                tokuV_concat(T, total);
+                first = STK(fetch_l());
+                tokuV_concat(T, cast_i32(sp - first));
                 updatetrap(cf);
                 checkGC(T);
-                sp -= total - 1;
+                sp = first + 1;
                 vm_break;
             }
             vm_case(OP_EQK) {
@@ -1883,7 +1970,7 @@ returning: /* trap is already set */
                     toku_Integer i = ival(v);
                     setival(v, intop(^, ~t_castS2U(0), i));
                 } else {
-                    savestate(T);
+                    savestatesp(T);
                     tokuTM_tryunary(T, v, sp-1, TM_BNOT);
                     updatetrap(cf);
                 }
@@ -1915,10 +2002,9 @@ returning: /* trap is already set */
                 func = STK(fetch_l());
                 nres = fetch_l() - 1;
                 UNUSED(fetch_s());
-                if ((newcf = precall(T, func, nres)) == NULL) /* C call? */
+                if ((newcf = tokuPR_precall(T, func, nres)) == NULL) /* C? */
                     updatetrap(cf); /* done (C function already returned) */
                 else { /* Tokudae call */
-                    cf->u.t.retpc = pc; /* after return, continue at 'pc' */
                     cf = newcf; /* run function in this same C frame */
                     goto startfunc;
                 }
@@ -1939,13 +2025,14 @@ returning: /* trap is already set */
                     toku_assert(T->tbclist.p < base); /* no tbc variables */
                     toku_assert(base == cf->func.p + 1);
                 }
-                nres = pretailcall(T, cf, func, cast_i32(T->sp.p-func), delta);
+                nres = tokuPR_pretailcall(T, cf, func, cast_i32(T->sp.p-func),
+                                             delta);
                 if (nres < 0) /* Tokudae function? */
                     goto startfunc; /* execute the callee */
                 else { /* otherwise C function */
                     cf->func.p -= delta; /* restore 'func' (if vararg) */
-                    poscall(T, cf, nres); /* finish caller */
-                    updatetrap(cf); /* 'poscall' can change hooks */
+                    tokuPR_poscall(T, cf, nres); /* finish caller */
+                    updatetrap(cf); /* 'tokuPR_poscall' can change hooks */
                     goto ret; /* caller returns after the tail call */
                 }
             }
@@ -1957,7 +2044,7 @@ returning: /* trap is already set */
             }
             vm_case(OP_TBC) {
                 savestate(T);
-                tokuF_newtbcvar(T, STK(fetch_l()));
+                tokuF_newtbcupval(T, STK(fetch_l()));
                 vm_break;
             }
             vm_case(OP_CHECKADJ) {
@@ -2018,6 +2105,7 @@ returning: /* trap is already set */
                 TValue *o;
                 TValue *prop;
                 savestate(T);
+                savesp(T);
                 o = peek(fetch_l());
                 prop = K(fetch_l());
                 toku_assert(ttisstring(prop));
@@ -2028,7 +2116,7 @@ returning: /* trap is already set */
             }
             vm_case(OP_GETPROPERTY) {
                 TValue *prop;
-                savestate(T);
+                savestatesp(T);
                 prop = K(fetch_l());
                 toku_assert(ttisstring(prop));
                 tokuV_getstr(T, peek(0), prop, sp - 1);
@@ -2147,7 +2235,7 @@ returning: /* trap is already set */
                 int32_t offset;
                 savestate(T);
                 /* create to-be-closed upvalue (if any) */
-                tokuF_newtbcvar(T, STK(fetch_l()) + VAR_TBC);
+                tokuF_newtbcupval(T, STK(fetch_l()) + VAR_TBC);
                 offset = fetch_l();
                 pc += offset;
                 /* go to the next opcode */
@@ -2169,7 +2257,7 @@ returning: /* trap is already set */
                 setobjs2s(T, stk + VAR_N + VAR_STATE, stk + VAR_STATE);
                 setobjs2s(T, stk + VAR_N + VAR_CNTL, stk + VAR_CNTL);
                 T->sp.p = stk + VAR_N + VAR_CNTL + 1;
-                tokuV_call(T, stk + VAR_N + VAR_ITER, fetch_l());
+                tokuPR_call(T, stk + VAR_N + VAR_ITER, fetch_l());
                 updatetrap(cf);
                 updatestack(cf); /* stack may have changed */
                 sp = T->sp.p; /* correct sp for next opcode */
@@ -2209,9 +2297,9 @@ returning: /* trap is already set */
                 }
                 if (cl->p->isvararg) /* vararg function? */
                     cf->func.p -= cf->u.t.nvarargs + cl->p->arity + 1;
-                T->sp.p = stk + nres; /* set stk ptr for 'poscall' */
-                poscall(T, cf, nres);
-                updatetrap(cf); /* 'poscall' can change hooks */
+                T->sp.p = stk + nres; /* set stk ptr for 'tokuPR_poscall' */
+                tokuPR_poscall(T, cf, nres);
+                updatetrap(cf); /* 'tokuPR_poscall' can change hooks */
                 /* return from Tokudae function */
             ret: /* return from Tokudae function */
                 if (cf->status & CFST_FRESH) /* top-level function? */

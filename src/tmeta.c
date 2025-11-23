@@ -169,21 +169,21 @@ void tokuTM_callset(toku_State *T, const TValue *f, const TValue *o,
     setobj2s(T, func + 2, k);
     setobj2s(T, func + 3, v);
     T->sp.p = func + 4;
-    tokuV_call(T, func, 0);
+    tokuPR_call(T, func, 0);
 }
 
 
 /* call __getidx metamethod */
 void tokuTM_callgetres(toku_State *T, const TValue *f, const TValue *o,
                                       const TValue *k, SPtr res) {
-    ptrdiff_t result = savestack(T, res);
+    ptrdiff_t relres = savestack(T, res);
     SPtr func = T->sp.p;
     setobj2s(T, func, f);
     setobj2s(T, func + 1, o);
     setobj2s(T, func + 2, k);
     T->sp.p = func + 3;
-    tokuV_call(T, func, 1);
-    res = restorestack(T, result);
+    tokuPR_call(T, func, 1);
+    res = restorestack(T, relres);
     setobjs2s(T, res, --T->sp.p);
 }
 
@@ -191,14 +191,18 @@ void tokuTM_callgetres(toku_State *T, const TValue *f, const TValue *o,
 /* call binary method and store the result in 'res' */
 void tokuTM_callbinres(toku_State *T, const TValue *f, const TValue *o1,
                                       const TValue *o2, SPtr res) {
-    ptrdiff_t result = savestack(T, res);
+    ptrdiff_t relres = savestack(T, res);
     SPtr func = T->sp.p;
     setobj2s(T, func, f);
     setobj2s(T, func + 1, o1);
     setobj2s(T, func + 2, o2);
     T->sp.p += 3; /* assuming EXTRA_STACK */
-    tokuV_call(T, func, 1);
-    res = restorestack(T, result);
+    /* metamethod may yield only when called from Tokudae code */
+    if (isTokudaecode(T->cf))
+        tokuPR_call(T, func, 1);
+    else
+        tokuPR_callnoyield(T, func, 1);
+    res = restorestack(T, relres);
     setobj2s(T, res, s2v(--T->sp.p));
 }
 
@@ -237,18 +241,18 @@ void tokuTM_trybin(toku_State *T, const TValue *v1, const TValue *v2,
 
 void tokuTM_callunaryres(toku_State *T, const TValue *fn,
                                         const TValue *o, SPtr res) {
-    ptrdiff_t result = savestack(T, res);
+    ptrdiff_t relres = savestack(T, res);
     SPtr func = T->sp.p;
     setobj2s(T, func, fn);
     setobj2s(T, func + 1, o);
     T->sp.p += 2; /* assuming EXTRA_STACK */
-    tokuV_call(T, func, 1);
-    res = restorestack(T, result);
+    tokuPR_call(T, func, 1);
+    res = restorestack(T, relres);
     setobj2s(T, res, s2v(--T->sp.p));
 }
 
 
-static int32_t callunMT(toku_State *T, const TValue *o, SPtr res, TM event) {
+static int32_t callunTM(toku_State *T, const TValue *o, SPtr res, TM event) {
     const TValue *fn = tokuTM_objget(T, o, event);
     if (t_likely(!notm(fn))) {
         tokuTM_callunaryres(T, fn, o, res);
@@ -259,7 +263,7 @@ static int32_t callunMT(toku_State *T, const TValue *o, SPtr res, TM event) {
 
 
 void tokuTM_tryunary(toku_State *T, const TValue *o, SPtr res, TM event) {
-    if (t_unlikely(!callunMT(T, o, res, event))) {
+    if (t_unlikely(!callunTM(T, o, res, event))) {
         TValue dummy;
         setival(&dummy, 0);
         tokuD_binoperror(T, o, &dummy, event);

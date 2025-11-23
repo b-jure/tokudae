@@ -133,12 +133,12 @@ TOKU_API toku_Alloc toku_getallocf(toku_State *T, void **ud) {
 /* }{Stack manipulation=================================================== */
 
 
-t_sinline void settop(toku_State *T, int32_t n) {
-    CallFrame *cf;
-    SPtr func, newtop;
+TOKU_API void toku_setntop(toku_State *T, int32_t n) {
+    CallFrame *cf = T->cf;
+    SPtr func = cf->func.p;
+    SPtr newtop;
     ptrdiff_t diff;
-    cf = T->cf;
-    func = cf->func.p;
+    toku_lock(T);
     if (n >= 0) {
         api_check(T, n <= (cf->top.p - func + 1), "new top too large");
         diff = ((func + 1) + n) - T->sp.p;
@@ -151,16 +151,10 @@ t_sinline void settop(toku_State *T, int32_t n) {
     api_check(T, T->tbclist.p < T->sp.p, "previous pop of an unclosed slot");
     newtop = T->sp.p + diff;
     if (diff < 0 && T->tbclist.p >= newtop) {
-        toku_assert(hastocloseCfunc(cf->nresults));
+        toku_assert(cf->status & CFST_TBC); /* must have the mark */
         newtop = tokuF_close(T, newtop, CLOSEKTOP);
     }
     T->sp.p = newtop; /* set new top */
-}
-
-
-TOKU_API void toku_setntop(toku_State *T, int32_t n) {
-    toku_lock(T);
-    settop(T, n);
     toku_unlock(T);
 }
 
@@ -246,7 +240,7 @@ TOKU_API int32_t toku_checkstack(toku_State *T, int32_t n) {
     if (n && T->stackend.p - T->sp.p > n) /* stack large enough? */
         res = 1;
     else /* need to grow the stack */
-        res = tokuT_growstack(T, n, 0);
+        res = tokuPR_growstack(T, n, 0);
     if (res && cf->top.p < T->sp.p + n)
         cf->top.p = T->sp.p + n; /* adjust frame top */
     toku_unlock(T);
@@ -667,7 +661,7 @@ TOKU_API void toku_push_instance(toku_State *T, int32_t idx) {
     api_check(T, ttisclass(o), "class expected");
     setclsval2s(T, func, classval(o));
     api_inctop(T);
-    tokuV_call(T, func, 1);
+    tokuPR_call(T, func, 1);
     tokuG_checkGC(T);
     toku_unlock(T);
 }
@@ -1259,54 +1253,77 @@ TOKU_API void toku_set_fieldtable(toku_State *T, int32_t idx) {
 TOKU_API void toku_callk(toku_State *T, int32_t nargs, int32_t nresults,
                          toku_KContext cx, toku_KFunction k) {
     SPtr func;
-    UNUSED(cx);
-    UNUSED(k);
     toku_lock(T);
-    api_checknelems(T, nargs + 1); /* args + func */
+    api_check(T, k == NULL || !isTokudae(T->cf),
+                 "cannot use continuations inside hooks");
+    api_checknelems(T, nargs + 1);
     api_check(T, T->status == TOKU_STATUS_OK,
-                 "can't do calls on non-normal thread");
+                 "cannot do calls on non-normal thread");
     checkresults(T, nargs, nresults);
     func = T->sp.p - nargs - 1;
-    tokuV_call(T, func, nresults);
+    if (k != NULL && yieldable(T)) { /* need to prepare continuation? */
+        T->cf->u.c.k = k; /* save continuation */
+        T->cf->u.c.cx = cx; /* save continuation context */
+        /* (unprotected call does not save error recovery information) */
+        tokuPR_call(T, func, nresults); /* do the call */
+    } else /* otherwise no continuation or thread is not yieldable */
+        tokuPR_callnoyield(T, func, nresults);
     adjustresults(T, nresults);
     toku_unlock(T);
 }
 
 
-struct PCallData {
+struct CallData { /* data for 'fcall' */
     SPtr func;
     int32_t nresults;
 };
 
 
 static void fcall(toku_State *T, void *ud) {
-    struct PCallData *pcd = cast(struct PCallData*, ud);
-    tokuV_call(T, pcd->func, pcd->nresults);
+    struct CallData *cd = cast(struct CallData*, ud);
+    tokuPR_callnoyield(T, cd->func, cd->nresults);
 }
 
 
 TOKU_API int32_t toku_pcallk(toku_State *T, int32_t nargs, int32_t nresults,
-                             int32_t msgh, toku_KContext cx, toku_KFunction k){
-    struct PCallData pcd;
+                             int32_t ferr, toku_KContext cx, toku_KFunction k){
+    struct CallData cd;
     int32_t status;
     ptrdiff_t func;
-    UNUSED(cx);
-    UNUSED(k);
     toku_lock(T);
-    api_checknelems(T, nargs+1); /* args + func */
+    api_check(T, k == NULL || !isTokudae(T->cf),
+                 "cannot use continuation inside hooks");
+    api_checknelems(T, nargs + 1);
     api_check(T, T->status == TOKU_STATUS_OK,
-                 "can't do calls on non-normal thread");
+                 "cannot do calls on non-normal thread");
     checkresults(T, nargs, nresults);
-    if (msgh < 0)
-        func = 0;
+    if (ferr < 0) /* error function is not an absolute index? */
+        func = 0; /* there is no error function */
     else {
-        SPtr o = index2stack(T, msgh);
+        SPtr o = index2stack(T, ferr);
         api_check(T, ttisfunction(s2v(o)), "error handler must be a function");
         func = savestack(T, o);
     }
-    pcd.func = T->sp.p - (nargs + 1); /* function to be called */
-    pcd.nresults = nresults;
-    status = tokuPR_call(T, fcall, &pcd, savestack(T, pcd.func), func);
+    cd.func = T->sp.p - (nargs + 1); /* function to be called */
+    if (k == NULL || !yieldable(T)) { /* no continuation or not yieldable? */
+        /* do a 'conventional' protected call */
+        cd.nresults = nresults;
+        status = tokuPR_pcall(T, fcall, &cd, savestack(T, cd.func), func);
+    } else { /* prepare continuation (call is already protected by 'resume') */
+        CallFrame *cf = T->cf;
+        cf->u.c.k = k; /* save continuation */
+        cf->u.c.cx = cx; /* save continuation context */
+        /* save information for error recovery */
+        cf->u2.funcidx = cast_i32(savestack(cd.func));
+        cf->u.c.old_errfunc = T->errfunc;
+        T->errfunc = func;
+        setoah(cf, T->allowhook);
+        cf->status |= CFST_YPCALL; /* function can do error recovery */
+        tokuPR_call(T, cd.func, nresults); /* do the call */
+        cf->status &= ~(CFST_YPCALL);
+        T->errfunc = cf->u.c.old_errfunc;
+        status = TOKU_STATUS_OK; /* if it is here, there were no errors */
+    }
     adjustresults(T, nresults);
     toku_unlock(T);
     return status;
@@ -1637,11 +1654,9 @@ TOKU_API void toku_toclose(toku_State *T, int32_t idx) {
     o = index2stack(T, idx);
     api_check(T, T->tbclist.p < o,
                   "given level below or equal to the last marked slot");
-    tokuF_newtbcvar(T, o); /* create new to-be-closed upvalue */
+    tokuF_newtbcupval(T, o); /* create new to-be-closed upvalue */
     nresults = T->cf->nresults;
-    if (!hastocloseCfunc(nresults)) /* function not yet marked? */
-        T->cf->nresults = codeNresults(nresults); /* mark it */
-    toku_assert(hastocloseCfunc(T->cf->nresults)); /* must be marked */
+    T->cf->status |= CFST_TBC; /* mark function that it has TBC slots */
     toku_unlock(T);
 }
 
@@ -1650,10 +1665,10 @@ TOKU_API void toku_closeslot(toku_State *T, int32_t idx) {
     SPtr level;
     toku_lock(T);
     level = index2stack(T, idx);
-    api_check(T, hastocloseCfunc(T->cf->nresults) && T->tbclist.p == level,
+    api_check(T, (T->cf->status & CFST_TBC) && (T->tbclist.p == level),
                  "no variable to close at the given level");
     level = tokuF_close(T, level, CLOSEKTOP);
-    setnilval(s2v(level)); /* closed */
+    setnilval(s2v(level));
     toku_unlock(T);
 }
 
@@ -2205,8 +2220,7 @@ static void descOrdI(toku_Opdesc *opd, int32_t imm, int32_t ordop) {
 }
 
 static void DConcat(toku_Opdesc *opd, int32_t i) {
-    int32_t n = DX("for (int32_t i=%d; 1<i; i--)", i);
-    n += DA(n, " { sptr[-i] = concat(sptr[-i], sptr[-i+1]); } ");
+    int32_t n = DX("base[%d] = concat(base[%d], top); ", i, i);
     DAX(n, "sptr -= %d;", i - 1);
 }
 

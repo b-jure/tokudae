@@ -27,7 +27,7 @@ typedef void (*ProtectedFn)(toku_State *T, void *userdata);
 */
 #define tokuPR_checkstackaux(T,n,pre,pos) \
     if (t_unlikely((T)->stackend.p - (T)->sp.p <= (n))) \
-        { pre; tokuT_growstack(T, (n), 1); pos; } \
+        { pre; tokuPR_growstack(T, (n), 1); pos; } \
     else { condmovestack(T, pre, pos); }
 
 
@@ -64,13 +64,25 @@ typedef void (*ProtectedFn)(toku_State *T, void *userdata);
 #endif
 
 
-TOKUI_FUNC void tokuPR_seterrorobj(toku_State *T, int errcode, SPtr oldtop);
-TOKUI_FUNC t_noret tokuPR_throw(toku_State *T, int code);
-TOKUI_FUNC int tokuPR_rawcall(toku_State *T, ProtectedFn fn, void *ud);
-TOKUI_FUNC int tokuPR_call(toku_State *T, ProtectedFn fn, void *ud,
-                                          ptrdiff_t top, ptrdiff_t errfunc);
-TOKUI_FUNC int tokuPR_close(toku_State *T, ptrdiff_t level, int status);
-TOKUI_FUNC int tokuPR_parse(toku_State *T, BuffReader *Z, const char *name,
-                                                          const char *mode); 
+TOKUI_FUNC t_noret tokuPR_throw(toku_State *T, int32_t code);
+TOKUI_FUNC t_noret tokuPR_errerr(toku_State *T);
+TOKUI_FUNC void tokuPR_incsp(toku_State *T);
+TOKUI_FUNC void tokuPR_seterrorobj(toku_State *T, int32_t errcode, SPtr oldsp);
+TOKUI_FUNC int32_t tokuPR_growstack(toku_State *T, int32_t n,
+                                    int32_t raiseerr);
+TOKUI_FUNC int32_t tokuPR_reallocstack(toku_State *T, int32_t nsz,
+                                       int32_t raiseerr);
+TOKUI_FUNC int32_t tokuPR_runprotected(toku_State *T, ProtectedFn fn, void *ud);
+TOKUI_FUNC int32_t tokuPR_pcall(toku_State *T, ProtectedFn fn, void *ud,
+                                ptrdiff_t oldsp, ptrdiff_t errfunc);
+TOKUI_FUNC void tokuPR_poscall(toku_State *T, CallFrame *cf, int32_t nres);
+TOKUI_FUNC CallFrame *tokuPR_precall(toku_State *T, SPtr func, int32_t nres);
+TOKUI_FUNC int32_t tokuPR_pretailcall(toku_State *T, CallFrame *cf, SPtr func,
+                                      int32_t narg1, int32_t delta);
+TOKUI_FUNC void tokuPR_call(toku_State *T, SPtr func, int32_t nres);
+TOKUI_FUNC void tokuPR_callnoyield(toku_State *T, SPtr func, int32_t nres);
+TOKUI_FUNC int32_t tokuPR_close(toku_State *T, ptrdiff_t lvl, int32_t status);
+TOKUI_FUNC int32_t tokuPR_parse(toku_State *T, BuffReader *Z, const char *name,
+                                const char *mode); 
 
 #endif

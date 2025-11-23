@@ -284,7 +284,7 @@ static int32_t symbexec(const Proto *p, int32_t lastpc, int32_t sp) {
                 change = 0;
                 break;
             case OP_CONCAT:
-                symsp -= GET_ARG_L(i, 0) - 1;
+                symsp = GET_ARG_L(i, 0);
                 change = (symsp == sp);
                 break;
             case OP_SETLIST:
@@ -757,13 +757,13 @@ t_noret tokuD_errormsg(toku_State *T) {
         setobjs2s(T, T->sp.p, T->sp.p - 1); /* move argument */
         setobjs2s(T, T->sp.p - 1, errfunc); /* push function */
         T->sp.p++; /* assume EXTRA_STACK */
-        tokuV_call(T, T->sp.p - 2, 1); /* call it */
+        tokuPR_call(T, T->sp.p - 2, 1); /* call it */
     }
     if (ttisnil(s2v(T->sp.p - 1))) { /* error object is nil? */
         /* change it to a proper message */
         setstrval2s(T, T->sp.p - 1, tokuS_newlit(T, "<no error object>"));
     }
-    tokuPR_throw(T, TOKU_STATUS_ERUNTIME);
+    tokuPR_throw(T, TOKU_STATUS_ERUN);
 }
 
 
@@ -1078,7 +1078,7 @@ int32_t tokuD_tracecall(toku_State *T) {
     CallFrame *cf = T->cf;
     Proto *p = cf_func(cf)->p;
     cf->u.t.trap = 1; /* ensure hooks will be checked */
-    if (cf->u.t.savedpc == p->code) { /* not returning? */
+    if (cf->u.t.savedpc == p->code) { /* not resuming or returrning? */
         if (p->isvararg) /* vararg function? */
             return 0; /* hooks will start at VARARGPREP opcode */
         else /* otherwise check 'call' hook */
@@ -1111,12 +1111,18 @@ int32_t tokuD_traceexec(toku_State *T, const uint8_t *pc, ptrdiff_t stacksz) {
     }
     cf->u.t.savedpc = pc + 1; /* hooks assume current opcode is consumed */
     counthook = (mask & TOKU_MASK_COUNT) && (--T->hookcount == 0);
-    if (counthook) { /* opcode count hook is on and count reached 0? */
+    if (counthook) /* opcode count hook is on and count reached 0? */
         resethookcount(T); /* reset count */
+    else if (!(mask & TOKU_MASK_LINE))
+        return 1; /* no line hook and count != 0; nothing to be done now */
+    if (cf->status & CFST_HOOKYIELD) { /* hook yielded last time? */
+        cf->status &= ~CFST_HOOKYIELD; /* erase mark */
+        return 1; /* do not call hook again (VM yielded, so it did not move) */
+    }
+    if (counthook) {
         T->sp.p = cf->func.p + 1 + stacksz; /* save 'sp' */
         tokuD_hook(T, TOKU_HOOK_COUNT, -1, 0, 0); /* call count hook */
-    } else if (!(mask & TOKU_MASK_LINE))
-        return 1; /* no line hook and count != 0; nothing to be done now */
+    }
     if (mask & TOKU_MASK_LINE) { /* line hook? */
         /* 'T->oldpc' may be invalid; use zero in this case */
         int32_t oldpc = (T->oldpc < p->sizecode) ? T->oldpc : 0;
@@ -1128,6 +1134,12 @@ int32_t tokuD_traceexec(toku_State *T, const uint8_t *pc, ptrdiff_t stacksz) {
             tokuD_hook(T, TOKU_HOOK_LINE, newline, 0, 0); /* call line hook */
         }
         T->oldpc = npci; /* 'pc' of last call to line hook */
+    }
+    if (T->status == TOKU_STATUS_YIELD) { /* did hook yield? */
+        if (counthook)
+            T->hookcount = 1; /* undo decrement to zero */
+        cf->status |= CFST_HOOKYIELD; /* mark that it yielded */
+        tokuPR_throw(T, TOKU_STATUS_YIELD); /* do the yield */
     }
     return 1; /* keep 'trap' on */
 }

@@ -54,7 +54,6 @@
 ** instruction.)
 */
 
-
 /* true if this thread does not have non-yieldable calls in the stack */
 #define yieldable(T)	(((T)->nCcalls & 0xffff0000) == 0)
 
@@ -122,7 +121,7 @@ typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
 ** called because of an error.
 */
 #define getcfstrecst(cf)    (((cf)->status >> CFST_RECST) & 7)
-#define setcfstrecst(cf,st)  \
+#define setcfstrecst(cf,st) \
         check_exp(((st) & 7) == (st), /* status must fit in three bits */ \
                   ((cf)->status = ((cf)->status & ~(7u << CFST_RECST))  \
                                   | (cast_u32(st) << CFST_RECST)))
@@ -135,7 +134,7 @@ typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
 #define isTokudaecode(cf)   (!((cf)->callstatus & (CFST_C | CFST_HOOKED)))
 
 
-/* set/get 'allowhook' from status */
+/* set/get original 'allowhook' from status */
 #define setoah(cf,v)  \
         ((cf)->status = ((v) ? (cf)->status|CFST_OAH  \
                              : (cf)->status & ~CFST_OAH))
@@ -144,13 +143,13 @@ typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
 
 typedef struct CallFrame {
     SIndex func; /* function stack index */
-    SIndex top;  /* top for this function */
+    SIndex top; /* top for this function */
     struct CallFrame *prev, *next; /* dynamic call link */
     union {
         struct { /* only for Tokudae functions */
             const uint8_t *savedpc; /* current pc (1 byte after the opcode) */
-            const uint8_t *retpc; /* execution continues here after return */
-            volatile t_signal trap; /* tracing lines/count or stack realloc */
+            SIndex savedsp; /* saved stack pointer in case of yields */
+            volatile t_signal trap; /* tracing lines/count or stack changed */
             int32_t nvarargs; /* number of extra args. in vararg function */
         } t;
         struct { /* only for C functions */
@@ -159,11 +158,19 @@ typedef struct CallFrame {
             ptrdiff_t old_errfunc; /* offset of message handler */
         } c;
     } u;
-    int32_t nresults; /* number of wanted results from this function */
+    union {
+        int32_t funcidx; /* called-function index */
+        int32_t nyield; /* number of values yielded */
+        int32_t nres; /* number of values returned */
+    } u2;
+    uint32_t nresults; /* number of wanted results from this function + 1 */
     uint32_t extraargs; /* number of call, init and/or bound (meta)methods */
     uint16_t status; /* call status */
 } CallFrame;
 
+
+/* 'nresults' in CallFrame are biased with 1 because of TOKU_MULTRET */
+#define cfnres(n)       ((n) + 1)
 
 /* maximum number of calls through init/call/bound (meta)methods */
 #define CALLCHAIN_MAX   UINT8_MAX
@@ -339,11 +346,7 @@ union GCUnion {
 
 
 TOKUI_FUNC CallFrame *tokuT_newcf(toku_State *T);
-TOKUI_FUNC int32_t tokuT_reallocstack(toku_State *T, int32_t size,
-                                                     int32_t raiseerr);
-TOKUI_FUNC int32_t tokuT_growstack(toku_State *T, int32_t n, int32_t raiseerr);
 TOKUI_FUNC void tokuT_shrinkstack(toku_State *T);
-TOKUI_FUNC void tokuT_incsp(toku_State *T);
 TOKUI_FUNC void tokuT_incCstack(toku_State *T);
 TOKUI_FUNC void tokuT_checkCstack(toku_State *T);
 TOKUI_FUNC int32_t tokuT_resetthread(toku_State *T, int32_t status);

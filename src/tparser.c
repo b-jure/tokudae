@@ -285,7 +285,8 @@ static OString *str_expectname(Lexer *lx) {
 ** Semantic error; variant of syntax error without 'near <token>'.
 */
 t_noret tokuP_semerror(Lexer *lx, const char *err) {
-    lx->t.tk = 0;
+    lx->t.tk = 0; /* remove "near <token>" from final message */
+    lx->line = lx->lastline; /* back to line of last used token */
     tokuY_syntaxerror(lx, err);
 }
 
@@ -571,7 +572,7 @@ static void open_func(Lexer *lx, FunctionState *fs, Scope *s) {
     p->maxstack = 2; /* stack slots 0/1 are always valid */
     fs->kcache = tokuH_new(T); /* create table for function */
     settval2s(T, T->sp.p, fs->kcache); /* anchor it */
-    tokuT_incsp(T);
+    tokuPR_incsp(T);
     enterscope(fs, s, 0); /* start top-level scope */
 }
 
@@ -817,15 +818,12 @@ static void superkw(Lexer *lx, ExpInfo *e) {
     tokuY_scan(lx); /* skip 'super' */
     varlit(lx, "self", e); /* get instance */
     toku_assert(e->et == EXP_LOCAL); /* (must be a local variable) */
-    tokuC_exp2stack(fs, e); /* put instance on stack */
     if (check(lx, '[')) /* index access? */
         indexed(lx, e, 1);
-    else if (check(lx, '.')) /* field access? */
+    else if (check(lx, '.')) /* dotted access? */
         getdotted(lx, e, 1);
-    else { /* get superclass */
-        tokuC_emitI(fs, OP_SUPER);
-        e->et = EXP_SUPER;
-    }
+    else /* get superclass of the instance */
+        tokuC_super(fs, e);
 }
 
 
@@ -857,8 +855,8 @@ static void call(Lexer *lx, ExpInfo *e) {
     tokuY_scan(lx); /* skip '(' */
     if (!check(lx, ')')) { /* have arguments? */
         explist(lx, e);
-        if (eismulret(e)) /* last argument is a call or vararg? */
-            tokuC_setmulret(fs, e); /* it returns all values (finalize it) */
+        if (eismultret(e)) /* last argument is a call or vararg? */
+            tokuC_setmultret(fs, e); /* it returns all values (finalize it) */
         else /* otherwise... */
             tokuC_exp2stack(fs, e); /* put last argument value on stack */
     } else /* otherwise no arguments */
@@ -936,8 +934,8 @@ static void closelistfield(FunctionState *fs, LConstructor *c) {
 static void lastlistfield(FunctionState *fs, LConstructor *c) {
     if (c->tostore == 0) return;
     checklistlimit(fs, c);
-    if (eismulret(&c->v)) { /* last item has multiple returns? */
-        tokuC_setmulret(fs, &c->v);
+    if (eismultret(&c->v)) { /* last item has multiple returns? */
+        tokuC_setmultret(fs, &c->v);
         tokuC_setlist(fs, c->l->u.info, c->narray, TOKU_MULTRET);
         c->narray--; /* do not count last expression */
     } else {
@@ -1098,7 +1096,7 @@ static void classbody(Lexer *lx, int32_t pc, int32_t linenum, int32_t exp) {
         int32_t havemt = 0; /* no metatable */
         Scope s;
         settval2s(T, T->sp.p, t); /* anchor it */
-        tokuT_incsp(T);
+        tokuPR_incsp(T);
         enterscope(fs, &s, 0);
         do {
             if (match(lx, TK_LOCAL)) { /* localstm? */
@@ -1346,27 +1344,29 @@ static void checkreadonly(Lexer *lx, ExpInfo *var) {
 }
 
 
-/* adjust left and right side of an assignment */
+/*
+** Adjust the number of results from the right side of the assignment
+** to fit the variables in the left side.
+*/
 static void adjustassign(Lexer *lx, int32_t nvars, int32_t nexps, ExpInfo *e) {
     FunctionState *fs = lx->fs;
     int32_t need = nvars - nexps;
-    if (eismulret(e)) {
-        need++; /* do not count '...' or the function being called */
-        if (need > 0) { /* more variables than values? */
-            tokuC_setreturns(fs, e, need);
-            need = 0; /* no more values needed */
-        } else /* otherwise more values than variables */
-            tokuC_setreturns(fs, e, 0); /* call should return no values */
+    tokuC_checkstack(fs, need);
+    if (eismultret(e)) {
+        int32_t extra = ++need; /* discount last expression itself */
+        if (extra < 0) /* have extra expressions? */
+            extra = 0; /* call/vararg expression should not return results */
+        tokuC_setreturns(fs, e, extra);
     } else {
-        if (e->et != EXP_VOID) /* have one or more expressions? */
+        if (e->et != EXP_VOID) /* have at least one expression? */
             tokuC_exp2stack(fs, e); /* finalize the last expression */
         if (need > 0) { /* more variables than values? */
-            tokuC_nil(fs, need); /* assign them as nil */
-            return; /* done */
+            tokuC_nil(fs, need); /* assign them nil values */
+            return; /* done; 'tokuC_nil' already reserved stack slots */
         }
     }
-    if (need > 0) /* more variables than values? */
-        tokuC_reserveslots(fs, need); /* slots for call results or varargs */
+    if (need > 0) /* more variables than call/vararg results? */
+        tokuC_reserveslots(fs, need); /* reserve stack slots for results */
     else /* otherwise more values than variables */
         tokuC_pop(fs, -need); /* pop them (if any) */
 }
@@ -2494,12 +2494,12 @@ static void returnstm(Lexer *lx) {
     tokuY_scan(lx); /* skip 'return' */
     if (!boundary(lx) && !check(lx, ';')) { /* have return values ? */
         nres = explist(lx, &e); /* get return values */
-        if (eismulret(&e)) { /* last expressions is a call or vararg? */
+        if (eismultret(&e)) { /* last expressions is a call or vararg? */
             int32_t iscall = (e.et == EXP_CALL);
-            tokuC_setmulret(fs, &e); /* returns all results (finalize it) */
+            tokuC_setmultret(fs, &e); /* returns all results (finalize it) */
             if (iscall && nres==1 && !fs->scope->havetbcvar) { /* tail call? */
                 toku_assert(getopSize(OP_TAILCALL) == getopSize(OP_CALL));
-                *getpi(fs, &e) = OP_TAILCALL;
+                *getpo(fs, &e) = OP_TAILCALL;
             }
             nres = TOKU_MULTRET; /* 'return' will return all values */
         } else /* otherwise 'return' will return 'nres' values */
@@ -2595,10 +2595,10 @@ TClosure *tokuP_parse(toku_State *T, BuffReader *Z, Buffer *buff,
     FunctionState fs = {0};
     TClosure *cl = tokuF_newTclosure(T, 1);
     setclTval2s(T, T->sp.p, cl); /* anchor main function closure */
-    tokuT_incsp(T);
+    tokuPR_incsp(T);
     lx.tab = tokuH_new(T); /* create table for scanner */
     settval2s(T, T->sp.p, lx.tab); /* anchor it */
-    tokuT_incsp(T);
+    tokuPR_incsp(T);
     fs.p = cl->p = tokuF_newproto(T);
     tokuG_objbarrier(T, cl, cl->p);
     fs.p->source = tokuS_new(T, name);
