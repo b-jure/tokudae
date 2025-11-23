@@ -148,7 +148,6 @@ typedef struct CallFrame {
     union {
         struct { /* only for Tokudae functions */
             const uint8_t *savedpc; /* current pc (1 byte after the opcode) */
-            SIndex savedsp; /* saved stack pointer in case of yields */
             volatile t_signal trap; /* tracing lines/count or stack changed */
             int32_t nvarargs; /* number of extra args. in vararg function */
         } t;

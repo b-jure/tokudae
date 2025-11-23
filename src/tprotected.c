@@ -66,13 +66,13 @@
 
 #define gstatus(extra)      ((extra) & 0xff)
 
-#define incccall(extra)     ((extra) + 0x100u)
+#define incc_call(extra)    ((extra) + 0x100u)
 #define gccall(extra)       cast_u32(((extra) & 0xff00) >> 8u)
 
-#define inccinit(extra)     ((extra) + 0x10000u)
+#define incc_init(extra)    ((extra) + 0x10000u)
 #define gcinit(extra)       cast_u32(((extra) & 0xff0000) >> 16u)
 
-#define inccmethod(extra)   ((extra) + 0x1000000u)
+#define incc_method(extra)  ((extra) + 0x1000000u)
 #define gcmethod(extra)     cast_u32(((extra) & 0xff000000) >> 24u)
 
 
@@ -197,8 +197,6 @@ static void relstack(toku_State *T) {
     for (CallFrame *cf = T->cf; cf != NULL; cf = cf->prev) {
         cf->func.offset = savestack(T, cf->func.p);
         cf->top.offset = savestack(T, cf->top.p);
-        if (isTokudae(cf) && cf->u.t.savedsp.p != NULL)
-            cf->u.t.savedsp.offset = savestack(T, cf->u.t.savedsp.p);
     }
 }
 
@@ -212,11 +210,8 @@ static void correctstack(toku_State *T) {
     for (CallFrame *cf = T->cf; cf != NULL; cf = cf->prev) {
         cf->func.p = restorestack(T, cf->func.offset);
         cf->top.p = restorestack(T, cf->top.offset);
-        if (isTokudae(cf)) {
+        if (isTokudae(cf))
             cf->u.t.trap = 1; /* signal to update 'trap' in 'tokuV_execute' */
-            if (cf->u.t.savedsp.offset != 0) /* have stack pointer offset? */
-                cf->u.t.savedsp.p = restorestack(T, cf->u.t.savedsp.offset);
-        }
     }
 }
 
@@ -529,7 +524,7 @@ t_sinline uint32_t trymetacall(toku_State *T, SPtr func, uint32_t extra) {
     auxinsertf(T, func, f);
     if (t_unlikely(gccall(extra) == CALLCHAIN_MAX))
         tokuD_runerror(T, "'__call' chain too long");
-    return incccall(extra);
+    return incc_call(extra);
 }
 
 
@@ -565,7 +560,7 @@ retry:
         case TOKU_VUMETHOD: /* UserData method */
             callbmethod(T, func, umval, setudval2s, ud, extra, UMethod);
         retry_bm:
-            extra = inccmethod(extra);
+            extra = incc_method(extra);
             goto retry; /* try again with method object */
         case TOKU_VCLASS: { /* Class object */
             if (!callclass(T, &func, extra)) { /* no __init? */
@@ -573,7 +568,7 @@ retry:
                 moveresults(T, func, 1, nres, 0); /* instance is returned */
                 return NULL; /* done */
             }
-            extra = inccinit(extra);
+            extra = incc_init(extra);
             goto retry; /* try again with __init */
         }
         default: /* try __call metamethod */
@@ -627,16 +622,19 @@ retry:
         case TOKU_VUMETHOD: /* UserData method */
             callbmethod(T, func, umval, setudval2s, ud, extra, UMethod);
         retry_bm:
-            extra = inccmethod(extra);
+            extra = incc_method(extra);
             /* return tokuPR_pretailcall(T, cf, func, narg1 + 2, delta); */
             narg1 += 2;
             goto retry; /* try again with method object */
         case TOKU_VCLASS: { /* Class object */
+            // TODO: this does not need poscall, maybe just mimic Tokudae function?
+            // Additionally check the details around 'delta' for this...
+            // TAILCALL for 'tokuV_finishOp' is the last thing to check before testing
             if (!callclass(T, &func, extra)) { /* no __init? */
                 T->sp.p = func + 1; /* leave only class instance */
                 return 1; /* returns class instance */
             }
-            extra = inccinit(extra);
+            extra = incc_init(extra);
             goto retry1; /* try again with __init */
         }
         default:

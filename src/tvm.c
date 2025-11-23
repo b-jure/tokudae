@@ -1442,9 +1442,6 @@ void tokuV_finishOp(toku_State *T) {
 /* store global 'sp' */
 #define storesp(T)          (T->sp.p = sp)
 
-/* store global 'sp' into 'savedsp' in case of yields */
-#define savesp(T)           (cf->u.t.savedsp = sp)
-
 
 /*
 ** Store global 'pc' and 'sp', must be done before fetching the
@@ -1454,13 +1451,6 @@ void tokuV_finishOp(toku_State *T) {
 ** after the opcode.)
 */
 #define savestate(T)        (storepc(T), storesp(T))
-
-/*
-** Similar to 'savestate' except this also stores the current stack
-** pointer to correctly continue the opcode that was interrupted by
-** a yield.
-*/
-#define savestatesp(T)      (savestate(T), savesp(T))
 
 
 /* collector might of reallocated stack, so update global 'trap' */
@@ -1712,7 +1702,7 @@ pos_returning:
                 vm_break;
             }
             vm_case(OP_MBIN) {
-                savestatesp(T);
+                savestate(T);
                 /* operands are already swapped */
                 tokuTM_trybin(T, peek(1), peek(0), sp-2, asTM(fetch_s()));
                 updatetrap(cf);
@@ -1970,7 +1960,7 @@ pos_returning:
                     toku_Integer i = ival(v);
                     setival(v, intop(^, ~t_castS2U(0), i));
                 } else {
-                    savestatesp(T);
+                    savestate(T);
                     tokuTM_tryunary(T, v, sp-1, TM_BNOT);
                     updatetrap(cf);
                 }
@@ -2116,7 +2106,7 @@ pos_returning:
             }
             vm_case(OP_GETPROPERTY) {
                 TValue *prop;
-                savestatesp(T);
+                savestate(T);
                 prop = K(fetch_l());
                 toku_assert(ttisstring(prop));
                 tokuV_getstr(T, peek(0), prop, sp - 1);

@@ -329,7 +329,6 @@ CallFrame *tokuT_newcf(toku_State *T) {
     T->cf->next = cf;
     cf->prev = T->cf;
     cf->next = NULL;
-    cf->u.t.savedsp.p = NULL;
     cf->u.t.trap = 0;
     T->ncf++;
     return cf;
