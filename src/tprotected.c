@@ -40,7 +40,7 @@
 ** Bit to be set for "wanted" in 'poscall' and in 'moveresults' to check
 ** if the function has to-be-closed variables.
 */
-#define TBCBIT      bitmask(WIDTH_ARG_L)
+#define TBCBIT      cast_u32(bitmask(WIDTH_ARG_L))
 
 
 /*
@@ -159,7 +159,7 @@ t_noret tokuPR_throw(toku_State *T, int32_t errcode) {
         GState *gs = G(T);
         toku_State *mainT = gs->mainthread;
         tokuT_resetthread(T, errcode); /* close all upvalues */
-        T->status = errcode; /* mark it as "dead" */
+        T->status = cast_u8(errcode); /* mark it as "dead" */
         if (mainT->errjmp) { /* mainthread has error handler? */
             /* copy over error object */
             setobjs2s(T, mainT->sp.p++, T->sp.p - 1);
@@ -172,6 +172,16 @@ t_noret tokuPR_throw(toku_State *T, int32_t errcode) {
             abort();
         }
     }
+}
+
+
+t_noret tokuPR_throwbaselevel(toku_State *T, int32_t errcode) {
+    if (T->errjmp) {
+        /* unroll error entries up to the first level */
+        while (T->errjmp->prev != NULL)
+            T->errjmp = T->errjmp->prev;
+    }
+    tokuPR_throw(T, errcode);
 }
 
 
@@ -219,7 +229,7 @@ static void correctstack(toku_State *T) {
 // TODO: update docs
 t_noret tokuPR_errerr(toku_State *T) {
     OString *msg = tokuS_newlit(T, "error in error handling");
-    setsvalue2s(T, T->sp.p, msg);
+    setstrval2s(T, T->sp.p, msg);
     T->sp.p++; /* assume EXTRA_STACK */
     tokuPR_throw(T, TOKU_STATUS_EERR);
 }
@@ -371,21 +381,19 @@ t_sinline void genmoveresults(toku_State *T, SPtr res, int32_t nres,
                               int32_t wanted) {
     SPtr firstresult = T->sp.p - nres; /* index of first result */
     int32_t i;
-    if (nres > fwanted) /* have extra results? */
-        nres = fwanted; /* discard them */
+    if (nres > wanted) /* have extra results? */
+        nres = wanted; /* discard them */
     for (i = 0; i < nres; i++) /* move all the results */
         setobjs2s(T, res + i, firstresult + i);
-    for (; i < fwanted; i++) /* complete wanted number of results */
+    for (; i < wanted; i++) /* complete wanted number of results */
         setnilval(s2v(res + i));
-    T->sp.p = res + fwanted; /* stack pointer points after the last result */
+    T->sp.p = res + wanted; /* stack pointer points after the last result */
 }
 
 
 /* move call results and if needed close variables */
 t_sinline void moveresults(toku_State *T, SPtr res, int32_t nres,
                            uint32_t fwanted) {
-    int32_t i;
-    SPtr firstresult;
     switch (fwanted) {
         case 0 + 1: /* no values needed */
             T->sp.p = res;
@@ -401,12 +409,12 @@ t_sinline void moveresults(toku_State *T, SPtr res, int32_t nres,
             genmoveresults(T, res, nres, nres);
             break;
         default: { /* two/more results and/or to-be-closed variables */
-            int32_t wanted = (fwanted & ~(TBCBIT)) - 1;
+            int32_t wanted = cast_i32(fwanted & ~TBCBIT) - 1;
             if (fwanted & TBCBIT) { /* to-be-closed variables? */
                 T->cf->u2.nres = nres;
                 T->cf->status |= CFST_CLSRET; /* in case of yields */
                 res = tokuF_close(T, res, CLOSEKTOP, 1);
-                T->cf->status &= ~CFST_CLSRET;
+                T->cf->status &= cast_u16(~CFST_CLSRET);
                 if (T->hookmask) { /* if needed, call hook after '__close's */
                     ptrdiff_t savedres = savestack(T, res);
                     rethook(T, T->cf, nres);
@@ -528,6 +536,16 @@ t_sinline uint32_t trymetacall(toku_State *T, SPtr func, uint32_t extra) {
 }
 
 
+/*
+** Prepares the call to a function (C, or Tokudae). For C functions,
+** also do the call. The function to be called is at '*func'.
+** The arguments are on the stack, right after the function.
+** Returns the CallFrame to be executed, if it was a Tokudae function.
+** Otherwise (a C function) returns NULL, with all the results on the
+** stack, starting at the original function position.
+** If the 'func' is a class object without __init, it returns the newly
+** allocated instance of that class without running any hooks.
+*/
 CallFrame *tokuPR_precall(toku_State *T, SPtr func, int32_t nres) {
     uint32_t extra = 0; /* extraargs + status */
 retry:
@@ -564,8 +582,7 @@ retry:
             goto retry; /* try again with method object */
         case TOKU_VCLASS: { /* Class object */
             if (!callclass(T, &func, extra)) { /* no __init? */
-                toku_assert(!hastocloseCfunc(nres));
-                moveresults(T, func, 1, nres, 0); /* instance is returned */
+                moveresults(T, func, 1, cfnres(nres)); /* return instance */
                 return NULL; /* done */
             }
             extra = incc_init(extra);
@@ -627,9 +644,6 @@ retry:
             narg1 += 2;
             goto retry; /* try again with method object */
         case TOKU_VCLASS: { /* Class object */
-            // TODO: this does not need poscall, maybe just mimic Tokudae function?
-            // Additionally check the details around 'delta' for this...
-            // TAILCALL for 'tokuV_finishOp' is the last thing to check before testing
             if (!callclass(T, &func, extra)) { /* no __init? */
                 T->sp.p = func + 1; /* leave only class instance */
                 return 1; /* returns class instance */
@@ -744,7 +758,7 @@ static int32_t finishpcallk(toku_State *T,  CallFrame *cf) {
         tokuT_shrinkstack(T); /* restore stack size in case of overflow */
         setcfstrecst(cf, TOKU_STATUS_OK); /* clear original status */
     }
-    cf->status &= ~CFST_YPCALL;
+    cf->status &= cast_u16(~CFST_YPCALL);
     T->errfunc = cf->u.c.old_errfunc;
     /* if it is here, there were errors or yields; unlike 'toku_pcallk',
        do not change status */
@@ -780,7 +794,7 @@ static void finishCcall(toku_State *T, CallFrame *cf) {
             status = finishpcallk(T, cf); /* finish it */
         adjustresults(T, TOKU_MULTRET); /* finish 'toku_callk' */
         toku_unlock(T);
-        n = (*kf)(T, status, cf->u.c.ctx); /* call continuation */
+        n = (*kf)(T, status, cf->u.c.cx); /* call continuation */
         toku_lock(T);
         api_checknelems(T, n);
     }
@@ -826,9 +840,9 @@ static CallFrame *findpcall(toku_State *T) {
 ** coroutine error handler and should not kill the coroutine.)
 */
 static int resume_error(toku_State *T, const char *msg, int narg) {
-    api_checkpop(T, narg);
+    api_checknelems(T, narg);
     T->sp.p -= narg; /* remove args from the stack */
-    setsvalue2s(T, T->sp.p, tokuS_new(T, msg)); /* push error message */
+    setstrval2s(T, T->sp.p, tokuS_new(T, msg)); /* push error message */
     api_inctop(T);
     toku_unlock(T);
     return TOKU_STATUS_ERUN;
@@ -860,7 +874,7 @@ static void resume(toku_State *T, void *ud) {
             if (cf->u.c.k != NULL) { /* does it have a continuation? */
                 toku_unlock(T);
                 /* call continuation */
-                n = (*cf->u.c.k)(T, TOKU_STATUS_YIELD, cf->u.c.ctx);
+                n = (*cf->u.c.k)(T, TOKU_STATUS_YIELD, cf->u.c.cx);
                 toku_lock(T);
                 api_checknelems(T, n);
             }
@@ -913,7 +927,7 @@ TOKU_API int32_t toku_resume(toku_State *T, toku_State *from, int32_t narg,
     if (t_likely(!errorstatus(status)))
         toku_assert(status == T->status); /* normal end or yield */
     else { /* unrecoverable error */
-        T->status = status; /* mark thread as 'dead' */
+        T->status = cast_u8(status); /* mark thread as 'dead' */
         tokuPR_seterrorobj(T, status, T->sp.p); /* push error message */
         T->cf->top.p = T->sp.p;
     }
@@ -925,7 +939,7 @@ TOKU_API int32_t toku_resume(toku_State *T, toku_State *from, int32_t narg,
 }
 
 
-TOKU_API int32_t toku_isyieldable(toku__State *T) {
+TOKU_API int32_t toku_isyieldable(toku_State *T) {
     return yieldable(T);
 }
 
@@ -940,7 +954,7 @@ struct PCloseData {
 /* auxiliary function to call 'tokuF_close' in protected mode */
 static void closep(toku_State *T, void *ud) {
     struct PCloseData *cd = cast(struct PCloseData *, ud);
-    tokuF_close(T, cd->level, cd->status);
+    tokuF_close(T, cd->level, cd->status, 0);
 }
 
 

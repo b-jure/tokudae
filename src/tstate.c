@@ -304,18 +304,14 @@ int32_t tokuT_resetthread(toku_State *T, int32_t status) {
 }
 
 
-/*
-** Reset thread state 'T' by unwinding `CallFrame` list,
-** closing all upvalues (and to-be-closed variables) and
-** reseting the stack.
-** In case of errors, error object is placed on top of the
-** stack and the function returns relevant status code.
-** If no errors occured `TOKU_STATUS_OK` status is returned.
-*/
-TOKU_API int32_t toku_resetthread(toku_State *T) {
+/* TODO: add docs (by removing 'toku_resetthread') */
+TOKU_API int32_t toku_closethread(toku_State *T, toku_State *from) {
     int32_t status;
     toku_lock(T);
+    T->nCcalls = (from) ? getCcalls(from) : 0;
     status = tokuT_resetthread(T, T->status);
+    if (T == from) /* closing itself? */
+        tokuPR_throwbaselevel(T, status);
     toku_unlock(T);
     return status;
 }

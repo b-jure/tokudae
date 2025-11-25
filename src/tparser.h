@@ -26,7 +26,7 @@
 /* check expression type */
 #define eisvar(e)       ((e)->et >= EXP_UVAL && (e)->et <= EXP_DOTSUPER)
 #define eisconstant(e)  ((e)->et >= EXP_NIL && (e)->et <= EXP_K)
-#define eismulret(e)    ((e)->et == EXP_CALL || (e)->et == EXP_VARARG)
+#define eismultret(e)   ((e)->et == EXP_CALL || (e)->et == EXP_VARARG)
 #define eistrue(e)      ((e)->et >= EXP_TRUE && (e)->et <= EXP_K)
 #define eisindexed(e)   ((e)->et >= EXP_INDEXED && (e)->et <= EXP_DOTSUPER)
 #define eisstring(e)    ((e)->et == EXP_STRING)

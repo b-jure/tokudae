@@ -152,9 +152,9 @@ TOKU_API void toku_setntop(toku_State *T, int32_t n) {
     newtop = T->sp.p + diff;
     if (diff < 0 && T->tbclist.p >= newtop) {
         toku_assert(cf->status & CFST_TBC); /* must have the mark */
-        newtop = tokuF_close(T, newtop, CLOSEKTOP);
+        newtop = tokuF_close(T, newtop, CLOSEKTOP, 0);
     }
-    T->sp.p = newtop; /* set new top */
+    T->sp.p = newtop; /* set new top (after closing any upvalue) */
     toku_unlock(T);
 }
 
@@ -191,8 +191,7 @@ t_sinline void rev(toku_State *T, SPtr from, SPtr to) {
 ** Stack-array rotation between the top of the stack and the 'index' for 'n'
 ** times elements. Negative '-n' indicates left-rotation, while positive 'n'
 ** right-rotation. The absolute value of 'n' must not be greater than the size
-** of the slice being rotated.
-** Note that 'index' must be in stack.
+** of the slice being rotated. Note that 'idx' must be in stack.
 **
 ** Example right-rotation:
 ** [func][0][1][2][3][4]
@@ -1314,13 +1313,13 @@ TOKU_API int32_t toku_pcallk(toku_State *T, int32_t nargs, int32_t nresults,
         cf->u.c.k = k; /* save continuation */
         cf->u.c.cx = cx; /* save continuation context */
         /* save information for error recovery */
-        cf->u2.funcidx = cast_i32(savestack(cd.func));
+        cf->u2.funcidx = cast_i32(savestack(T, cd.func));
         cf->u.c.old_errfunc = T->errfunc;
         T->errfunc = func;
         setoah(cf, T->allowhook);
         cf->status |= CFST_YPCALL; /* function can do error recovery */
         tokuPR_call(T, cd.func, nresults); /* do the call */
-        cf->status &= ~(CFST_YPCALL);
+        cf->status &= cast_u16(~CFST_YPCALL);
         T->errfunc = cf->u.c.old_errfunc;
         status = TOKU_STATUS_OK; /* if it is here, there were no errors */
     }
@@ -1417,37 +1416,11 @@ TOKU_API int32_t toku_dump(toku_State *T, toku_Writer fw, void *data,
 }
 
 
-/* }{Coroutine functions================================================== */
-
-
-TOKU_API int32_t toku_yieldk(toku_State *T, int32_t nresults,
-                             toku_KContext cx, toku_KFunction k) {
-    UNUSED(T);
-    UNUSED(nresults);
-    UNUSED(cx);
-    UNUSED(k);
-    return 0;
-}
-
-
-TOKU_API int32_t toku_resume(toku_State *T, toku_State *from, int32_t narg,
-                             int32_t *nres) {
-    UNUSED(T);
-    UNUSED(from);
-    UNUSED(narg);
-    UNUSED(nres);
-    return 0;
-}
+/* }{Coroutine functions (other functions are defined in tprotected.c)==== */
 
 
 TOKU_API int32_t toku_status(toku_State *T) {
     return T->status;
-}
-
-
-TOKU_API int32_t toku_isyieldable(toku_State *T) {
-    UNUSED(T);
-    return 0;
 }
 
 
@@ -1649,13 +1622,11 @@ TOKU_API void toku_concat(toku_State *T, int32_t n) {
 
 TOKU_API void toku_toclose(toku_State *T, int32_t idx) {
     SPtr o;
-    int32_t nresults;
     toku_lock(T);
     o = index2stack(T, idx);
     api_check(T, T->tbclist.p < o,
                   "given level below or equal to the last marked slot");
     tokuF_newtbcupval(T, o); /* create new to-be-closed upvalue */
-    nresults = T->cf->nresults;
     T->cf->status |= CFST_TBC; /* mark function that it has TBC slots */
     toku_unlock(T);
 }
@@ -1667,7 +1638,7 @@ TOKU_API void toku_closeslot(toku_State *T, int32_t idx) {
     level = index2stack(T, idx);
     api_check(T, (T->cf->status & CFST_TBC) && (T->tbclist.p == level),
                  "no variable to close at the given level");
-    level = tokuF_close(T, level, CLOSEKTOP);
+    level = tokuF_close(T, level, CLOSEKTOP, 0);
     setnilval(s2v(level));
     toku_unlock(T);
 }

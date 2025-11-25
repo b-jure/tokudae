@@ -11,7 +11,6 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include <stddef.h>
 
 #include "tokudae.h"
 

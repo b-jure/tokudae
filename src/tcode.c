@@ -257,7 +257,7 @@ int32_t tokuC_emitILLL(FunctionState *fs, uint8_t i, int32_t a, int32_t b,
 
 t_sinline void freeslots(FunctionState *fs, int32_t n) {
     fs->sp -= n;
-    toku_assert(fs->sp >= 0); /* negative slots are invalid */
+    toku_assert(fs->sp >= 0);
 }
 
 
@@ -436,8 +436,8 @@ void tokuC_reserveslots(FunctionState *fs, int32_t n) {
 
 /*
 ** Sets number of returns in multi-ret expression.
-** This does not reserve a stack slot, it assumes the slots are
-** already checked by the parser, will be ensured by the callee or
+** This does not reserve a stack slot, it assumes the stack slots are
+** already checked by the parser, or will be ensured by the callee or
 ** dynamically by the VM. Additionally the expression 'e' still
 ** holds the pc in 'info' as stack index in this context would
 ** be irrelevant.
@@ -467,18 +467,14 @@ void tokuC_setreturns(FunctionState *fs, ExpInfo *e, int32_t nres) {
 
 
 /*
-** Similar to 'tokuC_setreturns', except here we might reserve a
-** stack slot. If the expression is a call, we just set the number of
-** returns, the stack slot for the result is already ensured as it is
-** inserted in-place of the callee. However for the vararg expressions
-** we must reserve a stack slot.
+** Similar to 'tokuC_setreturns', except here we reserve stack slots.
 */
-void tokuC_setoneret(FunctionState *fs, ExpInfo *e) {
+static void setoneret(FunctionState *fs, ExpInfo *e) {
     if (e->et == EXP_VARARG || e->et == EXP_CALL) {
-        tokuC_reserveslots(fs, (e->et == EXP_VARARG));
+        tokuC_reserveslots(fs, 1);
         tokuC_setreturns(fs, e, 1);
         e->u.info = fs->sp - 1; /* set stack index of the result */
-        e->et == EXP_FINEXPR; /* mark as finalized */
+        e->et = EXP_FINEXPR; /* mark as finalized */
     }
 }
 
@@ -886,7 +882,7 @@ int32_t tokuC_dischargevars(FunctionState *fs, ExpInfo *v) {
             break;
         case EXP_INDEXINT:
             freeslots(fs, 1);
-            tindexint(fs, v);
+            getindexint(fs, v);
             break;
         case EXP_INDEXSUPER:
             freeslots(fs, 2);
@@ -901,7 +897,7 @@ int32_t tokuC_dischargevars(FunctionState *fs, ExpInfo *v) {
             tokuC_emitIL(fs, OP_GETPROPERTY, v->u.info);
             break;
         case EXP_CALL: case EXP_VARARG:
-            tokuC_setoneret(fs, v); /* default is one value returned */
+            setoneret(fs, v); /* default is one value returned */
             return 1; /* true; expression was a variable */
         case EXP_SUPER:
             v->et = EXP_FINEXPR; /* mark as finalized */
@@ -909,7 +905,7 @@ int32_t tokuC_dischargevars(FunctionState *fs, ExpInfo *v) {
             return 1; /* true; expression was a variable */
         default: return 0; /* false; expression is not a variable */
     }
-    v->info = fs->sp; /* set the stack index */
+    v->u.info = fs->sp; /* set the stack index */
     v->et = EXP_FINEXPR; /* mark as finalized */
     tokuC_reserveslots(fs, 1); /* reserve stack slot for the expression */
     return 1; /* true; expression was a variable */
@@ -1090,10 +1086,10 @@ void tokuC_indexed(FunctionState *fs, ExpInfo *var, ExpInfo *key,
 }
 
 
-void tokuC_super(FunctionState *fs, ExpInfo *inst) {
-    tokuC_exp2stack(fs, inst);
-    e->u.info = tokuC_emitI(fs, OP_SUPER);
-    e->et = EXP_SUPER;
+void tokuC_super(FunctionState *fs, ExpInfo *instance) {
+    tokuC_exp2stack(fs, instance);
+    instance->u.info = tokuC_emitI(fs, OP_SUPER);
+    instance->et = EXP_SUPER;
 }
 
 
@@ -1530,9 +1526,13 @@ static uint8_t *previousopcode(FunctionState *fs) {
 
 
 static void codeconcat(FunctionState *fs, ExpInfo *e1, int32_t linenum) {
-    if (*previousopcode(fs) != OP_CONCAT) {
+    uint8_t *po = previousopcode(fs);
+    if (*po != OP_CONCAT) { /* previous opcode is not a concatenation? */
         tokuC_emitIL(fs, OP_CONCAT, e1->u.info);
         tokuC_fixline(fs, linenum);
+    } else { /* otherwise merge */
+        toku_assert(e1->u.info + 1 == GET_ARG_L(po, 0));
+        SET_ARG_L(po, 0, e1->u.info);
     }
     freeslots(fs, 1);
 }

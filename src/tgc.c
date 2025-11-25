@@ -543,13 +543,13 @@ static void freeobject(toku_State *T, GCObject *o) {
 static GCObject **sweeplist(toku_State *T, GCObject **l, uint32_t nobjects, 
                             uint32_t *nsweeped) {
     GState *gs = G(T);
-    int32_t white = tokuG_white(gs); /* current white */
-    int32_t whitexor = whitexor(gs); /* dead white */
+    uint32_t white = tokuG_white(gs); /* current white */
+    uint32_t whitexor = whitexor(gs); /* dead white */
     uint32_t i;
     toku_assert(nobjects > 0);
     for (i = 0; *l != NULL && i < nobjects; i++) {
         GCObject *curr = *l;
-        int32_t mark = curr->mark;
+        uint32_t mark = curr->mark;
         if (whitexor & mark) { /* is 'curr' dead? */
             *l = curr->next; /* remove 'curr' from list */
             freeobject(T, curr); /* and collect it */
@@ -930,7 +930,7 @@ void tokuG_freeallobjects(toku_State *T) {
 */
 void tokuG_rununtilstate(toku_State *T, int32_t statemask) {
     GState *gs = G(T);
-    while (!testbit(statemask, gs->gcstate))
+    while (!testbit(cast_u32(statemask), gs->gcstate))
         singlestep(T);
 }
 

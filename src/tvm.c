@@ -35,16 +35,21 @@
 #include <stdio.h>
 #include "topnames.h"
 
-#define debugline(p,pc) \
+#define debugline(f) \
         printf("%-12s on line: %d\n", \
-                opnames[O], tokuD_getfuncline(p, relpc(pc, p)));
+               opnames[O], tokuD_getfuncline(f, relpc(pc, f)))
+
+/* also debug stack pointer and the stack frame top */
+#define vm_break \
+  { printf("> SP:%3d  TOP:%3d\n", \
+           cast_i32(sp - base), cast_i32(cf->top.p - base)); break; }
 
 #undef TOKU_USE_JUMPTABLE
 #define TOKU_USE_JUMPTABLE      0
 
 #else /* }{ otherwise do not trace bytecode execution */
 
-#define debugline(p,pc)     ((void)0)
+#define debugline(f)        ((void)0)
 
 #if !defined(TOKU_USE_JUMPTABLE)
 #if defined(__GNUC__)
@@ -649,337 +654,6 @@ t_sinline int32_t checksuper(toku_State *T, TValue *o, int32_t get, SPtr res) {
     } else tokuD_runerror(T, "class instance has no superclass"); }
 
 
-/*
-** Executes a return hook for Tokudae and C functions and sets/corrects
-** 'oldpc'. (Note that this correction is needed by the line hook, so it
-** is done even when return hooks are off.)
-*/
-static void rethook(toku_State *T, CallFrame *cf, int32_t nres) {
-    if (T->hookmask & TOKU_MASK_RET) { /* is return hook on? */
-        SPtr firstres = T->sp.p - nres; /* index of first result */
-        int32_t delta = 0; /* correction for vararg functions */
-        int32_t ftransfer;
-        if (isTokudae(cf)) {
-            Proto *p = cf_func(cf)->p;
-            delta = !!p->isvararg * (cf->u.t.nvarargs + p->arity + 1);
-        }
-        cf->func.p += delta; /* if vararg, back to virtual function */
-        ftransfer = cast_i32(firstres - cf->func.p) - 1;
-        toku_assert(ftransfer >= 0);
-        tokuD_hook(T, TOKU_HOOK_RET, -1, ftransfer, nres); /* call it */
-        cf->func.p -= delta; /* if vararg, back to original function */
-    }
-    if (isTokudae(cf = cf->prev))
-        T->oldpc = relpc(cf->u.t.savedpc, cf_func(cf)->p); /* set 'oldpc' */
-}
-
-
-/* move call results and if needed close variables */
-t_sinline void moveresults(toku_State *T, SPtr res, int32_t nres,
-                                                    int32_t wanted) {
-    int32_t i;
-    SPtr firstresult;
-    switch (wanted) {
-        case TOKU_MULTRET: /* all values needed */
-            wanted = nres;
-            break;
-        case 0: /* no values needed */
-            T->sp.p = res;
-            return; /* done */
-        case 1: /* one value needed */
-            if (nres == 0)
-                setnilval(s2v(res));
-            else
-                setobjs2s(T, res, T->sp.p - nres);
-            T->sp.p = res + 1;
-            return; /* done */
-        default: { /* two/more results and/or to-be-closed variables */
-            if (hastocloseCfunc(wanted)) { /* to-be-closed variables? */
-                res = tokuF_close(T, res, CLOSEKTOP); /* do the closing */
-                if (T->hookmask) { /* if needed, call hook after '__close's */
-                    ptrdiff_t savedres = savestack(T, res);
-                    rethook(T, T->cf, nres);
-                    res = restorestack(T, savedres); /* hook can move stack */
-                }
-                wanted = decodeNresults(wanted); /* decode nresults */
-                if (wanted == TOKU_MULTRET)
-                    wanted = nres; /* we want all results */
-            }
-        }
-    }
-    /* generic case (all values needed or 2 or more values needed) */
-    firstresult = T->sp.p - nres;
-    if (nres > wanted) /* have extra results? */
-        nres = wanted; /* discard them */
-    for (i = 0; i < nres; i++) /* move all the results */
-        setobjs2s(T, res + i, firstresult + i);
-    for (; i < wanted; i++)
-        setnilval(s2v(res + i));
-    T->sp.p = res + wanted;
-}
-
-
-/* get the next call frame or allocate a new one */
-#define next_cf(T)   ((T)->cf->next ? (T)->cf->next : tokuT_newcf(T))
-
-/*
-** These macros are used to manipulate 'extra' in order to extract the
-** total number of call, init and/or bound (meta)method calls in a chains.
-** Bits 0-7 are reserved for status; bits 8-15 are reserved for counting
-** call metamethods; bits 16-23 are reserved for counting init metamethods;
-** bits 24-31 are reserved for counting bound methods.
-*/
-
-#define gstatus(extra)      ((extra) & 0xff)
-
-#define incccall(extra)     ((extra) + 0x100u)
-#define gccall(extra)       cast_u32(((extra) & 0xff00) >> 8u)
-
-#define inccinit(extra)     ((extra) + 0x10000u)
-#define gcinit(extra)       cast_u32(((extra) & 0xff0000) >> 16u)
-
-#define inccmethod(extra)   ((extra) + 0x1000000u)
-#define gcmethod(extra)     cast_u32(((extra) & 0xff000000) >> 24u)
-
-
-t_sinline CallFrame *prepcallframe(toku_State *T, SPtr func,
-                                   uint32_t extra, int32_t nres, SPtr top) {
-    CallFrame *cf = T->cf = next_cf(T);
-    cf->func.p = func;
-    cf->top.p = top;
-    cf->nresults = nres;
-    cf->extraargs = gccall(extra) + gcinit(extra) + gcmethod(extra);
-    cf->status = cast_u8(gstatus(extra));
-    return cf;
-}
-
-
-/* move the results into correct place and return to caller */
-t_sinline void poscall(toku_State *T, CallFrame *cf, int32_t nres) {
-    int32_t wanted = cf->nresults;
-    if (t_unlikely(T->hookmask) && !hastocloseCfunc(wanted))
-        rethook(T, cf, nres);
-    /* move results to proper place */
-    moveresults(T, cf->func.p, nres, wanted);
-    /* function cannot be in any of these cases when returning */
-    toku_assert(!(cf->status & (CFST_HOOKED | CFST_FIN)));
-    T->cf = cf->prev; /* back to caller (after closing variables) */
-}
-
-
-t_sinline int32_t precallC(toku_State *T, SPtr func,
-                           uint32_t extra, int32_t nres, toku_CFunction f) {
-    int32_t n;
-    CallFrame *cf;
-    checkstackGCp(T, TOKU_MINSTACK, func); /* ensure minimum stack space */
-    T->cf = cf = prepcallframe(T, func, extra | CFST_C, nres,
-                                  T->sp.p + TOKU_MINSTACK);
-    toku_assert(cf->top.p <= T->stackend.p);
-    if (t_unlikely(T->hookmask & TOKU_MASK_CALL)) {
-        int32_t narg = cast_i32(T->sp.p - func) - 1;
-        tokuD_hook(T, TOKU_HOOK_CALL, -1, 0, narg);
-    }
-    toku_unlock(T);
-    n = (*f)(T);
-    toku_lock(T);
-    api_checknelems(T, n);
-    poscall(T, cf, n);
-    return n;
-}
-
-
-/* 
-** Shifts stack by one slot in direction of stack pointer,
-** and inserts 'f' in place of 'func'.
-** WARNING: this function assumes there is enough space for 'f'.
-*/
-t_sinline void auxinsertf(toku_State *T, SPtr func, const TValue *f) {
-    for (SPtr p = T->sp.p; p > func; p--)
-        setobjs2s(T, p, p-1);
-    T->sp.p++;
-    setobj2s(T, func, f);
-}
-
-
-t_sinline int32_t callclass(toku_State *T, SPtr *func, uint32_t extra) {
-    const TValue *tm = NULL;
-    OClass *cls = classval(s2v(*func));
-    Table *mt = cls->metatable;
-    Instance *ins = tokuTM_newinstance(T, cls);
-    tokuG_checkfin(T, obj2gco(ins), mt);
-    setinsval2s(T, *func, ins); /* replace class with its instance */
-    if (fasttm(T, mt, TM_INIT)) { /* have __init (before GC)? */
-        checkstackGCp(T, 1, *func); /* space for 'tm' */
-        tm = fasttm(T, ins->oclass->metatable, TM_INIT); /* (after GC) */
-    }
-    if (tm) { /* have __init (after GC)? */
-        auxinsertf(T, *func, tm);
-        if (t_unlikely(gcinit(extra) == CALLCHAIN_MAX))
-            tokuD_runerror(T, "'__init' chain too long");
-        return 1; /* try again */
-    } else
-        return 0;
-}
-
-
-#define callbmethod(T,func,as,set,self,extra,t) \
-    { t *bm_ = as(s2v(func)); \
-      checkstackGCp(T, 1, func); /* space for method and instance */ \
-      auxinsertf(T, func, &bm_->method); /* insert method object... */ \
-      set(T, func + 1, bm_->self); /* and self as first arg */ \
-      if (t_unlikely(gcmethod(extra) >= CALLCHAIN_MAX)) \
-          tokuD_runerror(T, "bound method call chain too long"); }
-
-
-t_sinline uint32_t trymetacall(toku_State *T, SPtr func, uint32_t extra) {
-    const TValue *f = tokuTM_objget(T, s2v(func), TM_CALL);
-    if (t_unlikely(notm(f))) /* missing __call? */
-        tokuD_callerror(T, s2v(func));
-    auxinsertf(T, func, f);
-    if (t_unlikely(gccall(extra) == CALLCHAIN_MAX))
-        tokuD_runerror(T, "'__call' chain too long");
-    return incccall(extra);
-}
-
-
-CallFrame *precall(toku_State *T, SPtr func, int32_t nres) {
-    uint32_t extra = 0; /* extraargs + status */
-retry:
-    switch (ttypetag(s2v(func))) {
-        case TOKU_VCCL: /* C closure */
-            precallC(T, func, extra, nres, clCval(s2v(func))->fn);
-            return NULL; /* done */
-        case TOKU_VLCF: /* light C function */
-            precallC(T, func, extra, nres, lcfval(s2v(func)));
-            return NULL; /* done */
-        case TOKU_VTCL: { /* Tokudae closure */
-            CallFrame *cf;
-            Proto *f = clTval(s2v(func))->p;
-            int32_t narg = cast_i32(T->sp.p - func - 1); /* num. arguments */
-            int32_t nparams = f->arity; /* number of fixed parameters */
-            int32_t fsize = f->maxstack; /* frame size */
-            checkstackGCp(T, fsize, func);
-            T->cf = cf = prepcallframe(T, func, extra, nres, func+1+fsize);
-            cf->u.t.savedpc = cf->u.t.retpc = f->code; /* set starting point */
-            for (; narg < nparams; narg++)
-                setnilval(s2v(T->sp.p++)); /* set missing as 'nil' */
-            if (!f->isvararg) /* not a vararg function? */
-                T->sp.p = func + 1 + nparams; /* might have extra args */
-            toku_assert(cf->top.p <= T->stackend.p);
-            return cf; /* new call frame */
-        }
-        case TOKU_VIMETHOD: /* Instance method */
-            callbmethod(T, func, imval, setinsval2s, ins, extra, IMethod);
-            goto retry_bm;
-        case TOKU_VUMETHOD: /* UserData method */
-            callbmethod(T, func, umval, setudval2s, ud, extra, UMethod);
-        retry_bm:
-            extra = inccmethod(extra);
-            goto retry; /* try again with method object */
-        case TOKU_VCLASS: { /* Class object */
-            if (!callclass(T, &func, extra)) { /* no __init? */
-                toku_assert(!hastocloseCfunc(nres));
-                moveresults(T, func, 1, nres); /* only instance is returned */
-                return NULL; /* done */
-            }
-            extra = inccinit(extra);
-            goto retry; /* try again with __init */
-        }
-        default: /* try __call metamethod */
-            checkstackGCp(T, 1, func); /* space for func */
-            extra = trymetacall(T, func, extra);
-            goto retry; /* try again with __call */
-    }
-}
-
-
-/*
-** Prepare a function for a tail call, building its call frame on top
-** of the current call frame. 'narg1' is the number of arguments plus 1
-** (so that it includes the function itself). Return the number of
-** results, if it was a C function, or -1 for a Tokudae function.
-*/
-static int32_t pretailcall(toku_State *T, CallFrame *cf, SPtr func,
-                                          int32_t narg1, int32_t delta) {
-    uint32_t extra = 0; /* extraargs + status */
-retry:
-    switch (ttypetag(s2v(func))) {
-        case TOKU_VCCL: /* C closure */
-            return precallC(T, func, extra, TOKU_MULTRET, clCval(s2v(func))->fn);
-        case TOKU_VLCF: /* light C function */
-            return precallC(T, func, extra, TOKU_MULTRET, lcfval(s2v(func)));
-        case TOKU_VTCL: { /* Tokudae function */
-            Proto *f = clTval(s2v(func))->p;
-            int32_t nparams = f->arity; /* number of fixed parameters */
-            int32_t fsize = f->maxstack; /* frame size */
-            checkstackGCp(T, fsize - delta, func);
-            cf->func.p -= delta; /* restore 'func' (if vararg) */
-            /* move down function and arguments */
-            for (int32_t i = 0; i < narg1; i++)
-                setobjs2s(T, cf->func.p + i, func + i);
-            func = cf->func.p; /* moved-down function */
-            for (; narg1 <= nparams; narg1++)
-                setnilval(s2v(func + narg1)); /* complete missing arguments */
-            cf->top.p = func + 1 + fsize; /* top for new function */
-            toku_assert(cf->top.p <= T->stackend.p);
-            cf->u.t.savedpc = cf->u.t.retpc = f->code; /* set starting point */
-            cf->status |= CFST_TAIL;
-            if (!f->isvararg) /* not a vararg function? */
-                T->sp.p = func + nparams + 1; /* (leave only parameters) */
-            else /* otherwise leave all arguments */
-                T->sp.p = func + narg1;
-            return -1;
-        }
-        case TOKU_VIMETHOD: /* Instance method */
-            callbmethod(T, func, imval, setinsval2s, ins, extra, IMethod);
-            goto retry_bm;
-        case TOKU_VUMETHOD: /* UserData method */
-            callbmethod(T, func, umval, setudval2s, ud, extra, UMethod);
-        retry_bm:
-            extra = inccmethod(extra);
-            /* return pretailcall(T, cf, func, narg1 + 2, delta); */
-            narg1 += 2;
-            goto retry; /* try again with method object */
-        case TOKU_VCLASS: { /* Class object */
-            if (!callclass(T, &func, extra)) { /* no __init? */
-                T->sp.p = func + 1; /* leave only class instance */
-                return 1; /* returns class instance */
-            }
-            extra = inccinit(extra);
-            goto retry1; /* try again with __init */
-        }
-        default:
-            checkstackGCp(T, 1, func); /* space for func */
-            extra = trymetacall(T, func, extra); /* try __call metamethod */
-        retry1:
-            /* return pretailcall(T, cf, func, narg1 + 1, delta); */
-            narg1++;
-            goto retry; /* try again */
-    }
-}
-
-
-t_sinline void ccall(toku_State *T, SPtr func, int32_t nres, uint32_t inc) {
-    CallFrame *cf;
-    T->nCcalls += inc;
-    if (t_unlikely(getCcalls(T) >= TOKUI_MAXCCALLS)) {
-        checkstackp(T, 0, func); /* free any use of EXTRA_STACK */
-        tokuT_checkCstack(T);
-    }
-    if ((cf = precall(T, func, nres)) != NULL) { /* Tokudae function? */
-        cf->status = CFST_FRESH; /* mark it as a "fresh" execute */
-        tokuV_execute(T, cf); /* call it */
-    }
-    T->nCcalls -= inc;
-}
-
-
-/* external interface for 'ccall' */
-void tokuV_call(toku_State *T, SPtr func, int32_t nres) {
-    ccall(T, func, nres, nyci);
-}
-
-
 #define isemptystr(v)   (ttisshrstring(v) && strval(v)->shrlen == 0)
 
 
@@ -1100,8 +774,8 @@ t_sinline void pushtable(toku_State *T, int32_t b) {
 */
 void tokuV_finishOp(toku_State *T) {
     CallFrame *cf = T->cf;
-    StkId base = cf->func.p + 1;
-    uint8_t *po = cf->u.t.savedpc - 1; /* interrupted opcode */
+    SPtr base = cf->func.p + 1;
+    const uint8_t *po = cf->u.t.savedpc - 1; /* interrupted opcode */
     OpCode op = *po;
     switch (op) { /* finish its execution */
         case OP_CONCAT: {
@@ -1157,10 +831,12 @@ void tokuV_finishOp(toku_State *T) {
             SPtr stk = base + GET_ARG_L(po, 0);
             T->sp.p = stk + cf->u2.nres;
             /* repeat opcode to close other vars. and complete the return */
-            cf->u.l.savedpc--;
+            cf->u.t.savedpc--;
             return; /* done; 'savedpc' is already correct */
         }
         default: /* only these other opcodes can yield */
+            /* If OP_TAILCALL was interrupted, it falls through to OP_RETURN
+               which correct 'cf->func.p' and performs the tokuPR_poscall. */
             toku_assert(op==OP_FORCALL || op==OP_CALL || op==OP_TAILCALL);
     }
     cf->u.t.savedpc = po + getopSize(op); /* advance to the next opcode */
@@ -1478,7 +1154,9 @@ void tokuV_finishOp(toku_State *T) {
 /* In cases where jump table is not available or prefered. */
 #define vm_dispatch(x)      switch(x)
 #define vm_case(l)          case l:
+#if !defined(vm_break)
 #define vm_break            break
+#endif
 
 
 /*
@@ -1506,12 +1184,12 @@ void tokuV_execute(toku_State *T, CallFrame *cf) {
 startfunc:
     trap = T->hookmask;
     pc = cf->u.t.savedpc;
-    goto pos_returning;
+    goto afterpc;
 returning: /* trap is already set */
     /* 'savedpc' is pointing one byte after the previous CALL */
     toku_assert(*(cf->u.t.savedpc - 1) == OP_CALL);
     pc = cf->u.t.savedpc + getopSize(OP_CALL) - 1;
-pos_returning:
+afterpc:
     cl = cf_func(cf);
     k = cl->p->k;
     if (t_unlikely(trap)) /* hooks? */
@@ -1521,7 +1199,7 @@ pos_returning:
     for (;;) { /* main loop of interpreter */
         uint8_t O; /* opcode being executed */
         fetch();
-        debugline(cl->p, pc);
+        debugline(cl->p);
         toku_assert(base == cf->func.p + 1);
         toku_assert(base <= T->sp.p && T->sp.p <= T->stackend.p);
         vm_dispatch(O) {
@@ -2028,7 +1706,7 @@ pos_returning:
             }
             vm_case(OP_CLOSE) {
                 savestate(T);
-                tokuF_close(T, STK(fetch_l()), TOKU_STATUS_OK);
+                tokuF_close(T, STK(fetch_l()), TOKU_STATUS_OK, 1);
                 updatetrap(cf);
                 vm_break;
             }
@@ -2095,7 +1773,6 @@ pos_returning:
                 TValue *o;
                 TValue *prop;
                 savestate(T);
-                savesp(T);
                 o = peek(fetch_l());
                 prop = K(fetch_l());
                 toku_assert(ttisstring(prop));
@@ -2281,7 +1958,7 @@ pos_returning:
                 if (nres < 0) /* not fixed ? */
                     nres = cast_i32(sp - stk);
                 if (fetch_s()) { /* have open upvalues? */
-                    tokuF_close(T, base, CLOSEKTOP);
+                    tokuF_close(T, base, CLOSEKTOP, 1);
                     updatetrap(cf);
                     updatestackaux(cf, stk = STK(nslot));
                 }

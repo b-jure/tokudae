@@ -1116,7 +1116,7 @@ int32_t tokuD_traceexec(toku_State *T, const uint8_t *pc, ptrdiff_t stacksz) {
     else if (!(mask & TOKU_MASK_LINE))
         return 1; /* no line hook and count != 0; nothing to be done now */
     if (cf->status & CFST_HOOKYIELD) { /* hook yielded last time? */
-        cf->status &= ~CFST_HOOKYIELD; /* erase mark */
+        cf->status &= cast_u16(~CFST_HOOKYIELD); /* erase mark */
         return 1; /* do not call hook again (VM yielded, so it did not move) */
     }
     if (counthook) {

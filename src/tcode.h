@@ -348,7 +348,6 @@ TOKUI_FUNC void tokuC_removelastjump(FunctionState *fs);
 TOKUI_FUNC void tokuC_checkstack(FunctionState *fs, int32_t n);
 TOKUI_FUNC void tokuC_reserveslots(FunctionState *fs, int32_t n);
 TOKUI_FUNC void tokuC_setreturns(FunctionState *fs, ExpInfo *e, int32_t nret);
-TOKUI_FUNC void tokuC_setmultret(FunctionState *fs, ExpInfo *e);
 TOKUI_FUNC int32_t tokuC_nil(FunctionState *fs, int32_t n);
 TOKUI_FUNC void tokuC_load(FunctionState *fs, int32_t stk);
 TOKUI_FUNC int32_t tokuC_remove(FunctionState *fs, int32_t n);
@@ -379,6 +378,7 @@ TOKUI_FUNC void tokuC_getdotted(FunctionState *fs, ExpInfo *var, ExpInfo *key,
                                 int32_t issuper);
 TOKUI_FUNC void tokuC_indexed(FunctionState *fs, ExpInfo *var, ExpInfo *key,
                               int32_t issuper);
+TOKUI_FUNC void tokuC_super(FunctionState *fs, ExpInfo *instance);
 TOKUI_FUNC void tokuC_unary(FunctionState *fs, ExpInfo *e, Unopr op,
                             int32_t linenum);
 TOKUI_FUNC int32_t tokuC_jmp(FunctionState *fs, OpCode opJ);

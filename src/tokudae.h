@@ -140,7 +140,7 @@ typedef struct toku_Cinfo toku_Cinfo;
 TOKU_API toku_State *toku_newstate(toku_Alloc alloc, void *ud, uint32_t seed); 
 TOKU_API void        toku_close(toku_State *T);
 TOKU_API toku_State *toku_newthread(toku_State *T);
-TOKU_API int32_t     toku_resetthread(toku_State *T);
+TOKU_API int32_t     toku_closethread(toku_State *T, toku_State *from);
 TOKU_API toku_CFunction toku_atpanic(toku_State *T, toku_CFunction fn);
 TOKU_API void        toku_setallocf(toku_State *T, toku_Alloc alloc, void *ud); 
 TOKU_API toku_Alloc  toku_getallocf(toku_State *T, void **ud); 

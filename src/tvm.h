@@ -37,7 +37,6 @@
 
 TOKUI_FUNC void tokuV_finishOp(toku_State *T);
 TOKUI_FUNC void tokuV_execute(toku_State *T, CallFrame *cf);
-TOKUI_FUNC void tokuPR_call(toku_State *T, SPtr fn, int nreturns);
 TOKUI_FUNC void tokuV_concat(toku_State *T, int n);
 TOKUI_FUNC toku_Integer tokuV_divi(toku_State *T, toku_Integer x,
                                                   toku_Integer y);

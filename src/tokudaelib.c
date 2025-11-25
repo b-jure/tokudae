@@ -23,6 +23,7 @@ TOKUI_FUNC int32_t tokuopen_reg(toku_State *T);
 TOKUI_FUNC int32_t tokuopen_debug(toku_State *T);
 TOKUI_FUNC int32_t tokuopen_list(toku_State *T);
 TOKUI_FUNC int32_t tokuopen_utf8(toku_State *T);
+TOKUI_FUNC int32_t tokuopen_co(toku_State *T);
 
 
 /*
@@ -31,15 +32,16 @@ TOKUI_FUNC int32_t tokuopen_utf8(toku_State *T);
 */
 static const tokuL_Entry stdlibs[] = {
     {TOKU_GNAME, tokuopen_basic},
-    {TOKU_LIBN_PACKAGE, tokuopen_package},
+    {TOKU_LIBN_LOADLIB, tokuopen_package},
     {TOKU_LIBN_STRING, tokuopen_string},
     {TOKU_LIBN_MATH, tokuopen_math},
     {TOKU_LIBN_IO, tokuopen_io},
     {TOKU_LIBN_OS, tokuopen_os},
-    {TOKU_LIBN_REGEX, tokuopen_reg},
+    {TOKU_LIBN_REG, tokuopen_reg},
     {TOKU_LIBN_DEBUG, tokuopen_debug},
     {TOKU_LIBN_LIST, tokuopen_list},
     {TOKU_LIBN_UTF8, tokuopen_utf8},
+    {TOKU_LIBN_CO, tokuopen_co},
     {NULL, NULL}
 };
 
@@ -58,6 +60,6 @@ TOKULIB_API void tokuL_openlibsx(toku_State *T, int32_t libload,
             toku_set_field_str(T, -2, lib->name); /* __PRELOAD[name] = libf */
         }
     }
-    toku_assert((mask >> 1) == TOKU_LIB_UTF8);
+    toku_assert((mask >> 1) == TOKU_LIB_CO);
     toku_pop(T, 1); /* remove preload table */
 }

@@ -18,6 +18,7 @@
 #include "tokudaelimits.h"
 #include "tmem.h"
 #include "tobject.h"
+#include "tprotected.h"
 #include "tobject.h"
 #include "tparser.h"
 #include "tokudaeconf.h"
@@ -859,8 +860,7 @@ static void call(Lexer *lx, ExpInfo *e) {
             tokuC_setmultret(fs, e); /* it returns all values (finalize it) */
         else /* otherwise... */
             tokuC_exp2stack(fs, e); /* put last argument value on stack */
-    } else /* otherwise no arguments */
-        e->et = EXP_VOID;
+    } /* otherwise no arguments */
     expectnext(lx, ')');
     initexp(e, EXP_CALL, tokuC_call(fs, base, TOKU_MULTRET));
     tokuC_fixline(fs, linenum);
@@ -1317,8 +1317,8 @@ static void decl_list(Lexer *lx, int32_t blocktk) {
 }
 
 
-/* check if 'var' is 'final' (read-only) */
-static void checkreadonly(Lexer *lx, ExpInfo *var) {
+/* check if 'var' is 'final'/'close' (read-only) */
+static void check_readonly(Lexer *lx, ExpInfo *var) {
     FunctionState *fs = lx->fs;
     OString *varid = NULL;
     switch (var->et) {
@@ -1424,11 +1424,12 @@ static int32_t compound_assign(Lexer *lx, struct LHS_assign *lhs,
 }
 
 
+// FIX: calls
 static int32_t assign(Lexer *lx, struct LHS_assign *lhs, int32_t nvars,
                                                          int32_t *comp) {
     int32_t left = 0; /* number of values left in the stack after assignment */
     expect_cond(lx, eisvar(&lhs->v), "expect variable");
-    checkreadonly(lx, &lhs->v);
+    check_readonly(lx, &lhs->v);
     if (match(lx, ',')) { /* more vars? */
         struct LHS_assign var = { .prev = lhs, .v = INIT_EXP };
         var.prev = lhs; /* chain previous var */
@@ -1495,8 +1496,9 @@ static void expstm(Lexer *lx) {
         } else { /* otherwise compound assignment to only one variable */
             int32_t tk = lx->t.tk;
             Binopr op = getbinopr(tk);
-            expect_cond(lx, eisvar(&v.v), "expect variable");
-            checkreadonly(lx, &v.v);
+            expect_cond(lx, eisvar(&v.v),
+                "syntax error (expect assignment or a function call)");
+            check_readonly(lx, &v.v);
             switch (tk) {
                 case '+':
                     tokuY_scan(lx);
@@ -1721,7 +1723,7 @@ static void fnstm(Lexer *lx, int32_t linenum) {
     tokuY_scan(lx); /* skip 'fn' */
     dottedname(lx, &var);
     funcbody(lx, &e, 0, linenum, '(');
-    checkreadonly(lx, &var);
+    check_readonly(lx, &var);
     tokuC_storepop(fs, &var, linenum);
 }
 
@@ -1738,7 +1740,7 @@ static void classstm(Lexer *lx, int32_t linenum) {
     addlocallit(lx, "(class temporary)"); /* class object temporary */
     adjustlocals(lx, nvars);
     classexp(lx, NULL);
-    checkreadonly(lx, &var);
+    check_readonly(lx, &var);
     tokuC_storepop(fs, &var, linenum);
     removelocals(fs, level);
 }

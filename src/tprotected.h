@@ -64,7 +64,8 @@ typedef void (*ProtectedFn)(toku_State *T, void *userdata);
 #endif
 
 
-TOKUI_FUNC t_noret tokuPR_throw(toku_State *T, int32_t code);
+TOKUI_FUNC t_noret tokuPR_throw(toku_State *T, int32_t errcode);
+TOKUI_FUNC t_noret tokuPR_throwbaselevel(toku_State *T, int32_t errcode);
 TOKUI_FUNC t_noret tokuPR_errerr(toku_State *T);
 TOKUI_FUNC void tokuPR_incsp(toku_State *T);
 TOKUI_FUNC void tokuPR_seterrorobj(toku_State *T, int32_t errcode, SPtr oldsp);

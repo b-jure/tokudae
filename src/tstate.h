@@ -99,18 +99,18 @@ typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
 /* {{CallFrame============================================================ */
 
 /* bits in CallFrame status */
-#define CFST_C          (1<<0) /* call is running a C function */
-#define CFST_FRESH      (1<<1) /* call is on fresh "tokuV_execute" frame */
-#define CFST_CLSRET     (1<<2) /* function is closing tbc variables */
-#define CFST_TBC        (1<<3) /* function has tbc variables to close */
-#define CFST_OAH        (1<<4) /* original value of 'allowhook' */
-#define CFST_HOOKED     (1<<5) /* call is running a debug hook */
-#define CFST_YPCALL     (1<<6) /* doing a yieldable protected call */
-#define CFST_TAIL       (1<<7) /* call was tail called */
-#define CFST_HOOKYIELD  (1<<8) /* last hook that was called yielded */
-#define CFST_FIN        (1<<9) /* function "called" a finalizer */
+#define CFST_C          bitmask(0) /* call is running a C function */
+#define CFST_FRESH      bitmask(1) /* call is on fresh "tokuV_execute" */
+#define CFST_CLSRET     bitmask(2) /* function is closing tbc variables */
+#define CFST_TBC        bitmask(3) /* function has tbc vars. to close */
+#define CFST_OAH        bitmask(4) /* original value of 'allowhook' */
+#define CFST_HOOKED     bitmask(5) /* call is running a debug hook */
+#define CFST_YPCALL     bitmask(6) /* doing a yieldable protected call */
+#define CFST_TAIL       bitmask(7) /* call was tail called */
+#define CFST_HOOKYIELD  bitmask(8) /* last hook that was called yielded */
+#define CFST_FIN        bitmask(9) /* function "called" a finalizer */
 /* bits 10-12 are used for CFST_RECST (see below) */
-#define CFST_RECST      10 /* the offset, not the mask */
+#define CFST_RECST      10u /* the offset, not the mask */
 /* bits 13-15 are unused */
 
 
@@ -122,22 +122,22 @@ typedef struct toku_longjmp toku_longjmp; /* defined in 'tprotected.c' */
 */
 #define getcfstrecst(cf)    (((cf)->status >> CFST_RECST) & 7)
 #define setcfstrecst(cf,st) \
-        check_exp(((st) & 7) == (st), /* status must fit in three bits */ \
-                  ((cf)->status = ((cf)->status & ~(7u << CFST_RECST))  \
-                                  | (cast_u32(st) << CFST_RECST)))
+        check_exp(((st) & 7) == (st), /* must fit in three bits */ \
+                  ((cf)->status = cast_u16(((cf)->status & ~(7u<<CFST_RECST)) \
+                                  | cast_u16(cast_u16(st) << CFST_RECST))))
 
 
 /* active function is Tokudae function */
 #define isTokudae(cf)       (!((cf)->status & CFST_C))
 
 /* call is running Tokudae code (not a hook) */
-#define isTokudaecode(cf)   (!((cf)->callstatus & (CFST_C | CFST_HOOKED)))
+#define isTokudaecode(cf)   (!((cf)->status & (CFST_C | CFST_HOOKED)))
 
 
 /* set/get original 'allowhook' from status */
 #define setoah(cf,v)  \
-        ((cf)->status = ((v) ? (cf)->status|CFST_OAH  \
-                             : (cf)->status & ~CFST_OAH))
+        ((cf)->status = cast_u16((v) ? (cf)->status|CFST_OAH  \
+                                     : (cf)->status & ~CFST_OAH))
 #define getoah(cf)  (((cf)->status & CFST_OAH) ? 1 : 0)
 
 
@@ -169,7 +169,7 @@ typedef struct CallFrame {
 
 
 /* 'nresults' in CallFrame are biased with 1 because of TOKU_MULTRET */
-#define cfnres(n)       ((n) + 1)
+#define cfnres(n)       (cast_u32(n) + 1u)
 
 /* maximum number of calls through init/call/bound (meta)methods */
 #define CALLCHAIN_MAX   UINT8_MAX
